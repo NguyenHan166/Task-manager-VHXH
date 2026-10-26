@@ -1,6 +1,6 @@
 # Prompt 10 — Bàn giao từ prototype sang backend
 
-Trên dự án đã hoàn thiện UI/UX, hãy tạo tài liệu `docs/FRONTEND_BACKEND_HANDOFF.md` trong dự án Google AI Studio để đội backend triển khai NestJS/PostgreSQL/R2. Dùng **mã và hợp đồng dữ liệu hiện có** làm bằng chứng; không suy đoán màn hình hoặc endpoint chưa được sử dụng.
+Trên dự án đã hoàn thiện UI/UX, hãy tạo tài liệu `docs/FRONTEND_BACKEND_HANDOFF.md` trong dự án để đội backend triển khai NestJS/PostgreSQL/R2. Dùng **mã và hợp đồng dữ liệu hiện có** làm bằng chứng; không suy đoán màn hình hoặc endpoint chưa được sử dụng.
 
 ## Nội dung tài liệu
 
