@@ -1,6 +1,6 @@
 # Prompt 02 — Khung giao diện, điều hướng và phiên demo
 
-Tiếp tục sửa dự án hiện tại, giữ Prompt 00 và hợp đồng dữ liệu. Thiết kế app shell dựa trên tinh thần bố cục của ảnh MISA: sidebar bên trái, topbar gọn, khu nội dung có card và khoảng trắng dễ đọc. Dùng nhận diện riêng của “Office Workspace”, không sao chép MISA.
+Tiếp tục sửa dự án hiện tại, giữ Prompt 00, Prompt 01A và hợp đồng dữ liệu. Thiết kế app shell dựa trên tinh thần bố cục của ảnh MISA: sidebar bên trái, topbar gọn, khu nội dung có card và khoảng trắng dễ đọc. Dùng **đúng token, typography, kích thước, component và trạng thái responsive của Prompt 01A** cho nhận diện riêng của “Office Workspace”.
 
 ## Màn hình và thành phần
 

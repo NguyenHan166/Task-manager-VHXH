@@ -20,6 +20,8 @@ Tham khảo **cấu trúc**: sidebar dọc, topbar tìm kiếm/thông báo/avata
 
 Ưu tiên nền sáng, tương phản tốt, hệ màu cố định cho trạng thái và mức ưu tiên nhưng luôn kèm chữ. Có spacing nhất quán, desktop 1440px đẹp, hoạt động tốt trên 390px mobile. Sidebar desktop, menu thu gọn trên mobile. Dùng text thật tiếng Việt, không lorem ipsum, không số liệu giả gắn trực tiếp vào component.
 
+Sau Prompt 01, tôi sẽ gửi **Prompt 01A — Thiết kế thị giác và design system**. Prompt đó chốt màu hex, font, kích thước, component và bố cục; áp dụng nó cho tất cả màn hình tiếp theo. Khi có khác biệt về style, ưu tiên Prompt 01A.
+
 ## Chất lượng tương tác
 
 Mọi nút hiển thị phải có hành động hợp lý. Form có validation và lỗi theo trường; thao tác thành công có toast và state cập nhật; thao tác nguy hiểm có xác nhận. Có loading, empty state, error state. Bảng có tìm kiếm, lọc, phân trang hoặc tải thêm. Biểu đồ và thẻ KPI cùng dùng một phép tính. File upload trong prototype chỉ lưu metadata/tên/tổng dung lượng ở mock store; hiển thị rõ đây là mô phỏng, không giả vờ đã upload R2.

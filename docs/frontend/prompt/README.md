@@ -10,7 +10,7 @@ Nguồn nghiệp vụ: [`../../TONG_QUAN_UNG_DUNG_QUAN_LY_CONG_VIEC_NOI_BO.md`](
 
 1. Tạo một dự án React + TypeScript trong Google AI Studio Build. Bắt đầu **một cuộc hội thoại duy nhất** để các bước sau kế thừa mã đã tạo.
 2. Dán toàn bộ `00_Boi_canh_chung.md`. Đính kèm `misa-reference.png` nếu muốn AI Studio nhìn trực tiếp ảnh. Đính kèm hoặc dán nội dung `data-contract.ts` và `mock-seed.ts` cùng lúc. Nếu AI Studio không đọc được tệp cục bộ, dán nội dung hai tệp vào cuộc hội thoại trước Prompt 01.
-3. Gửi lần lượt Prompt 01 → 10. Chờ AI Studio hoàn tất mã của từng bước, xem giao diện và sửa lỗi phát sinh trước khi sang bước kế tiếp. Nếu AI Studio mất ngữ cảnh, gửi lại Prompt 00 và hai tệp dữ liệu.
+3. Gửi Prompt 01, rồi **Prompt 01A về style/màu/design system**, sau đó Prompt 02 → 10. Duyệt trang `/ui-kit` sau Prompt 01A trước khi dựng các màn hình. Chờ AI Studio hoàn tất mã của từng bước, xem giao diện và sửa lỗi phát sinh trước khi sang bước kế tiếp. Nếu AI Studio mất ngữ cảnh, gửi lại Prompt 00, Prompt 01A và hai tệp dữ liệu.
 4. Sau mỗi bước, yêu cầu AI Studio **sửa trực tiếp dự án đang có**, không tạo dự án mới. Có thể dùng prompt sửa lỗi ở cuối README khi cần.
 5. Ở Prompt 10, lấy lại bảng ánh xạ UI → dữ liệu → API để làm đầu vào thiết kế backend.
 
@@ -20,6 +20,7 @@ Nguồn nghiệp vụ: [`../../TONG_QUAN_UNG_DUNG_QUAN_LY_CONG_VIEC_NOI_BO.md`](
 |---|---|
 | `00_Boi_canh_chung.md` | Bối cảnh sản phẩm, ranh giới nghiệp vụ, quy ước giao diện |
 | `01_Nen_tang_mock.md` | React app, kiểu dữ liệu, mock repository, phiên demo |
+| `01A_He_thong_thiet_ke.md` | Style, bảng màu, typography, lưới, component và trang `/ui-kit` |
 | `02_Khung_giao_dien.md` | Shell, điều hướng, đăng nhập demo, responsive |
 | `03_Dashboard.md` | Dashboard Trưởng phòng và Chuyên viên, KPI cùng nguồn dữ liệu |
 | `04_Danh_sach_chi_tiet_cong_viec.md` | List, Kanban, bộ lọc, chi tiết, bình luận |
@@ -45,6 +46,7 @@ Nguồn nghiệp vụ: [`../../TONG_QUAN_UNG_DUNG_QUAN_LY_CONG_VIEC_NOI_BO.md`](
 3. Chuyên viên không tự duyệt, không sửa hạn/chủ trì việc chính thức, không xem việc cá nhân của người khác.
 4. Bộ lọc, Kanban, lịch, báo cáo đều hiển thị từ cùng task store; tổng số không lệch nhau.
 5. Thử desktop, tablet và mobile; kiểm tra menu, bảng dữ liệu, form, modal, trạng thái rỗng/lỗi.
+6. Đối chiếu màu, font, badge, card và spacing của các trang với Prompt 01A; không để mỗi màn hình tự chọn một hệ màu.
 
 ## Prompt sửa lỗi ngắn
 

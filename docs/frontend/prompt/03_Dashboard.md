@@ -1,6 +1,6 @@
 # Prompt 03 — Dashboard theo vai trò
 
-Tiếp tục trên dự án hiện tại. Tạo hai Dashboard thật sự đọc từ `MockRepository` và selectors dùng chung; không hardcode giá trị trên card hoặc biểu đồ.
+Tiếp tục trên dự án hiện tại. Tạo hai Dashboard thật sự đọc từ `MockRepository` và selectors dùng chung; không hardcode giá trị trên card hoặc biểu đồ. Áp dụng bố cục Dashboard, card KPI, thang chữ và palette trạng thái trong Prompt 01A.
 
 ## Dashboard Trưởng phòng
 
