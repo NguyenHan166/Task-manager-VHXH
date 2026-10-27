@@ -66,9 +66,10 @@ PRIORITY = string(enum=["LOW", "NORMAL", "HIGH", "URGENT"])
 
 schemas = {
     "Health": model({"status": string(enum=["ok", "degraded"]), "database": string(enum=["ok", "unavailable"])}, ("status", "database")),
-    "ErrorEnvelope": model({"error": model({"code": string(enum=["VALIDATION", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "CONFLICT"]), "message": string(), "fieldErrors": {"type": "object", "additionalProperties": string()}}, ("code", "message"))}, ("error",)),
+    "ErrorEnvelope": model({"error": model({"code": string(enum=["VALIDATION", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "CONFLICT", "RATE_LIMITED", "UNAVAILABLE", "INTERNAL_ERROR"]), "message": string(), "fieldErrors": {"type": "object", "additionalProperties": string()}}, ("code", "message"))}, ("error",)),
     "Success": model({"success": {"type": "boolean", "example": True}}, ("success",)),
     "User": model({"id": UUID, "username": string(), "email": string(fmt="email"), "displayName": string(), "role": ROLE, "status": string(enum=["ACTIVE", "LOCKED"]), "jobTitle": string(), "department": string(nullable=True), "phoneNumber": string(nullable=True), "avatarUrl": string(nullable=True), "createdAt": UTC, "lastLoginAt": {**UTC, "nullable": True}}, ("id", "username", "email", "displayName", "role", "status", "jobTitle", "createdAt")),
+    "DirectoryUser": model({"id": UUID, "username": string(), "email": string(fmt="email"), "displayName": string(), "jobTitle": string(), "department": string(nullable=True), "phoneNumber": string(nullable=True), "avatarUrl": string(nullable=True), "createdAt": UTC}, ("id", "username", "email", "displayName", "jobTitle", "createdAt"), description="Safe active-directory projection; excludes account status, role, last login and management data."),
     "Task": model({"id": UUID, "code": string(pattern=r"^(CV|NH|CN)-\d{4}-\d{4,}$"), "type": TYPE, "title": string(), "description": string(), "deliverable": string(), "status": STATUS, "priority": PRIORITY, "progressPercent": integer(minimum=0, maximum=100), "createdById": UUID, "primaryAssigneeId": {**UUID, "nullable": True}, "projectId": {**UUID, "nullable": True}, "parentTaskId": {**UUID, "nullable": True}, "assignedAt": {**UTC, "nullable": True}, "dueAt": {**UTC, "nullable": True}, "completedAt": {**UTC, "nullable": True}, "approvedById": {**UUID, "nullable": True}, "approvedAt": {**UTC, "nullable": True}, "completionDueAtSnapshot": {**UTC, "nullable": True}, "isBlocked": {"type": "boolean"}, "blockedReason": string(nullable=True), "createdAt": UTC, "updatedAt": UTC, "version": integer(minimum=1)}, ("id", "code", "type", "title", "description", "deliverable", "status", "priority", "progressPercent", "createdById", "createdAt", "updatedAt", "version")),
     "TaskParticipant": model({"id": UUID, "taskId": UUID, "userId": UUID, "role": string(enum=["COLLABORATOR", "WATCHER"]), "invitationStatus": string(enum=["PENDING", "ACCEPTED", "DECLINED"]), "invitedAt": UTC, "respondedAt": {**UTC, "nullable": True}}, ("id", "taskId", "userId", "role", "invitationStatus", "invitedAt")),
     "TaskComment": model({"id": UUID, "taskId": UUID, "authorId": UUID, "body": string(), "createdAt": UTC, "editedAt": {**UTC, "nullable": True}}, ("id", "taskId", "authorId", "body", "createdAt")),
@@ -88,8 +89,10 @@ schemas = {
     "ChatRoom": model({"id": UUID, "kind": string(enum=["DIRECT", "GROUP"]), "title": string(nullable=True), "createdAt": UTC}, ("id", "kind", "createdAt")),
     "ChatMessage": model({"id": UUID, "roomId": UUID, "senderId": UUID, "body": string(), "createdAt": UTC, "editedAt": {**UTC, "nullable": True}, "deletedAt": {**UTC, "nullable": True}}, ("id", "roomId", "senderId", "body", "createdAt")),
     "AuthSession": model({"accessToken": string(), "expiresInSeconds": integer(example=900), "user": ref("User")}, ("accessToken", "expiresInSeconds", "user")),
+    "UserRecord": {"oneOf": [ref("User"), ref("DirectoryUser")]},
+    "CreateUserResult": model({"user": ref("User"), "temporaryPassword": string()}, ("user",), description="temporaryPassword appears only when the server generated it and is returned once."),
     "ResetPasswordResult": model({"temporaryPassword": string(), "message": string()}, ("temporaryPassword", "message")),
-    "UserWorkloadStats": model({"user": ref("User"), "primaryCount": integer(), "collabCount": integer(), "doneCount": integer(), "doneOnTimeCount": integer(), "onTimeRate": integer(minimum=0, maximum=100), "overdueCount": integer()}, ("user", "primaryCount", "collabCount", "doneCount", "doneOnTimeCount", "onTimeRate", "overdueCount")),
+    "UserWorkloadStats": model({"user": ref("User"), "primaryCount": integer(), "collabCount": integer(), "doneCount": integer(), "doneOnTimeCount": integer(), "onTimeRate": integer(minimum=0, maximum=100), "overdueCount": integer()}, ("user", "primaryCount", "collabCount", "doneCount", "doneOnTimeCount", "onTimeRate", "overdueCount"), description="fromDate/toDate filter task createdAt in UTC. Primary metrics use valid OFFICIAL tasks; collabCount also includes accepted TEAM collaborators, excluding primary assignments."),
     "ManagerDashboardStats": model({key: integer(minimum=0) for key in ["totalActivePublished", "todoCount", "inProgressCount", "inReviewCount", "doneCount", "overdueCount", "completedOnTimeCount", "draftCount", "cancelledCount", "totalOfficialCount"]}, ["totalActivePublished", "todoCount", "inProgressCount", "inReviewCount", "doneCount", "overdueCount", "completedOnTimeCount", "draftCount", "cancelledCount", "totalOfficialCount"]),
     "StaffDashboardStats": model({key: integer(minimum=0) for key in ["totalAssigned", "todoCount", "inProgressCount", "inReviewCount", "doneCount", "overdueCount", "dueSoonCount", "collaboratingCount", "personalCount"]}, ["totalAssigned", "todoCount", "inProgressCount", "inReviewCount", "doneCount", "overdueCount", "dueSoonCount", "collaboratingCount", "personalCount"]),
     "KpiReport": model({"scope": string(enum=["DEPT", "STAFF"]), "summary": {"oneOf": [ref("ManagerDashboardStats"), ref("StaffDashboardStats")]}, "workloads": array(ref("UserWorkloadStats"))}, ("scope", "summary", "workloads")),
@@ -107,6 +110,12 @@ schemas = {
 
 for item in ("User", "Task", "TaskComment", "TaskSubmission", "TaskApproval", "TaskEvent", "TaskDeadlineRequest", "TaskAssigneeRequest", "FileObject", "Notification", "AuditLog", "Project", "RecurrenceRule", "RecurrenceInstance", "ChatRoom", "ChatMessage"):
     schemas[f"Page{item}"] = page(item)
+schemas["PageUser"]["properties"]["items"]["items"] = {
+    "oneOf": [ref("User"), ref("DirectoryUser")]
+}
+schemas["UserWorkloadStats"]["properties"]["user"] = {
+    "oneOf": [ref("User"), ref("DirectoryUser")]
+}
 schemas["ErrorEnvelope"]["example"] = {"error": {"code": "CONFLICT", "message": "Trạng thái nhiệm vụ đã thay đổi"}}
 
 # Strict request DTOs. The server fills all actor/system fields.
@@ -143,6 +152,16 @@ schemas.update({
     "ChatRoomInput": model({"kind": string(enum=["DIRECT", "GROUP"]), "title": string(), "memberIds": array(UUID)}, ("kind", "memberIds")),
     "ChatMessageInput": model({"body": string()}, ("body",)),
 })
+for schema_name, field_name in [
+    ("LoginInput", "password"),
+    ("ChangePasswordInput", "currentPassword"),
+    ("ChangePasswordInput", "newPassword"),
+    ("CreateUserInput", "initialPassword"),
+    ("ResetPasswordInput", "newPassword"),
+]:
+    schemas[schema_name]["properties"][field_name]["description"] = (
+        "Password is subject to the bcrypt 72-byte UTF-8 input limit."
+    )
 
 paths: dict[str, dict] = {}
 
@@ -195,16 +214,18 @@ def add(method: str, path: str, opid: str, tag: str, result: str, *, phase="P0",
     elif cookie:
         operation["security"] = [{"refreshCookie": []}]
     for status in errors:
-        operation["responses"][str(status)] = {"description": {400: "Invalid input", 401: "Unauthenticated", 403: "Forbidden", 404: "Not found or unreadable", 409: "Conflict"}[status], "content": {"application/json": {"schema": ref("ErrorEnvelope")}}}
+        operation["responses"][str(status)] = {"description": {400: "Invalid input", 401: "Unauthenticated", 403: "Forbidden", 404: "Not found or unreadable", 409: "Conflict", 429: "Rate limited"}[status], "content": {"application/json": {"schema": ref("ErrorEnvelope")}}}
+    if 429 not in errors:
+        operation["responses"]["429"] = {"description": "Rate limited", "content": {"application/json": {"schema": ref("ErrorEnvelope")}}}
     paths.setdefault(path, {})[method.lower()] = operation
 
 
-add("POST", "/auth/login", "login", "Auth", "AuthSession", request="LoginInput", public=True, errors=(400, 401, 403), request_example={"email": "user@example.invalid", "password": "example-password"}, example={"accessToken": "example-access-token", "expiresInSeconds": 900, "user": {"id": "00000000-0000-4000-8000-000000000001", "username": "user@example.invalid", "email": "user@example.invalid", "displayName": "Người dùng mẫu", "role": "STAFF", "status": "ACTIVE", "jobTitle": "Chuyên viên", "createdAt": "2026-10-27T09:00:00.000Z"}})
+add("POST", "/auth/login", "login", "Auth", "AuthSession", request="LoginInput", public=True, errors=(400, 401, 429), request_example={"email": "user@example.invalid", "password": "example-password"}, example={"accessToken": "example-access-token", "expiresInSeconds": 900, "user": {"id": "00000000-0000-4000-8000-000000000001", "username": "user@example.invalid", "email": "user@example.invalid", "displayName": "Người dùng mẫu", "role": "STAFF", "status": "ACTIVE", "jobTitle": "Chuyên viên", "createdAt": "2026-10-27T09:00:00.000Z"}})
 paths["/auth/login"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "Rotating refresh cookie; HttpOnly, Secure, SameSite=Lax, Path=/api/auth, Max-Age=604800", "schema": string()}}
 add("GET", "/health", "getHealth", "Operations", "Health", public=True, errors=(), description="Liveness/readiness projection without infrastructure details.")
-add("POST", "/auth/refresh", "refreshSession", "Auth", "AuthSession", cookie=True, errors=(401, 403), description="Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 15-minute access token.")
+add("POST", "/auth/refresh", "refreshSession", "Auth", "AuthSession", cookie=True, errors=(401,), description="Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 15-minute access token. Invalid/expired cookies are cleared.")
 paths["/auth/refresh"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "New rotating refresh cookie", "schema": string()}}
-add("POST", "/auth/logout", "logout", "Auth", "Success", cookie=True, errors=(401,))
+add("POST", "/auth/logout", "logout", "Auth", "Success", errors=(401,))
 paths["/auth/logout"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "Clears refresh cookie", "schema": string()}}
 add("POST", "/auth/logout-all", "logoutAll", "Auth", "Success", description="Revoke all refresh sessions for the current user.", errors=(401,))
 paths["/auth/logout-all"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "Clears current refresh cookie", "schema": string()}}
@@ -212,12 +233,12 @@ add("GET", "/auth/me", "getMe", "Auth", "User", errors=(401,))
 add("PATCH", "/auth/me", "updateOwnProfile", "Auth", "User", request="OwnProfileInput", errors=(400, 401))
 add("POST", "/auth/change-password", "changePassword", "Auth", "Success", request="ChangePasswordInput", errors=(400, 401))
 
-add("GET", "/users", "listUsers", "Users", "PageUser", params=PAGE + [query("status", string(enum=["ACTIVE", "LOCKED"])), query("role", ROLE), query("search")], description="STAFF receives only ACTIVE directory projection; management fields are Manager-only.", errors=(400, 401, 403))
-add("POST", "/users", "createUser", "Users", "User", request="CreateUserInput", created=True, description="MANAGER only.")
-add("GET", "/users/{id}", "getUser", "Users", "User", params=[path_id()], errors=(400, 401, 403, 404))
-add("PATCH", "/users/{id}", "updateUser", "Users", "User", params=[path_id()], request="UpdateUserInput", description="MANAGER only; protect last ACTIVE MANAGER and self-lock.")
-add("POST", "/users/{id}/reset-password", "resetUserPassword", "Users", "ResetPasswordResult", params=[path_id()], request="ResetPasswordInput", description="MANAGER only; temporary password is returned once and must not be logged.")
-add("GET", "/users/{id}/workload", "getUserWorkload", "Users", "UserWorkloadStats", params=[path_id()] + DATE_RANGE, description="Leaders can inspect all; STAFF only self.")
+add("GET", "/users", "listUsers", "Users", "PageUser", params=PAGE + [query("status", string(enum=["ACTIVE", "LOCKED"])), query("role", ROLE), query("search")], description="MANAGER may browse all account statuses and receives safe admin DTOs. DEPUTY_MANAGER receives active-directory DTOs. STAFF receives the active directory projection only. LOCKED is not enumerable to non-Managers.", errors=(400, 401, 403, 404))
+add("POST", "/users", "createUser", "Users", "CreateUserResult", request="CreateUserInput", created=True, description="MANAGER only. If initialPassword is omitted, one generated temporary password is returned once.", errors=(400, 401, 403, 409))
+add("GET", "/users/{id}", "getUser", "Users", "UserRecord", params=[path_id()], description="Manager receives the safe admin DTO; other roles receive active-directory projection. LOCKED users are hidden from non-Managers.", errors=(400, 401, 403, 404))
+add("PATCH", "/users/{id}", "updateUser", "Users", "User", params=[path_id()], request="UpdateUserInput", description="MANAGER only; role/status/email changes revoke sessions. A transaction lock protects the final ACTIVE Manager; self-lock is denied.", errors=(400, 401, 403, 404, 409))
+add("POST", "/users/{id}/reset-password", "resetUserPassword", "Users", "ResetPasswordResult", params=[path_id()], request="ResetPasswordInput", description="MANAGER only; temporary password is returned once and must not be logged. All existing sessions are revoked.", errors=(400, 401, 403, 404))
+add("GET", "/users/{id}/workload", "getUserWorkload", "Users", "UserWorkloadStats", params=[path_id()] + DATE_RANGE, description="MANAGER/DEPUTY_MANAGER can inspect all users; STAFF only self. Filters task createdAt in UTC.", errors=(400, 401, 403, 404))
 
 task_example = {"id": "00000000-0000-4000-8000-000000000101", "code": "CV-2026-0001", "type": "OFFICIAL", "title": "Báo cáo mẫu", "description": "", "deliverable": "Báo cáo", "status": "IN_PROGRESS", "priority": "HIGH", "progressPercent": 60, "createdById": "00000000-0000-4000-8000-000000000001", "primaryAssigneeId": "00000000-0000-4000-8000-000000000002", "projectId": None, "parentTaskId": None, "assignedAt": "2026-10-22T09:00:00.000Z", "dueAt": "2026-10-28T09:00:00.000Z", "completedAt": None, "approvedById": None, "approvedAt": None, "completionDueAtSnapshot": None, "isBlocked": False, "blockedReason": None, "createdAt": "2026-10-21T09:00:00.000Z", "updatedAt": "2026-10-26T09:00:00.000Z", "version": 3}
 add("GET", "/tasks", "queryTasks", "Tasks", "PageTask", params=TASK_QUERY, example={"items": [task_example], "total": 1, "page": 1, "pageSize": 10}, description="ACL is applied before filtering and total counting.")

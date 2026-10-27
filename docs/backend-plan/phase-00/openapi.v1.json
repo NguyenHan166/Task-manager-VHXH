@@ -130,8 +130,8 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -182,6 +182,16 @@
                   "required": [
                     "data"
                   ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -237,8 +247,8 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -248,7 +258,7 @@
             }
           }
         },
-        "description": "Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 15-minute access token.",
+        "description": "Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 15-minute access token. Invalid/expired cookies are cleared.",
         "security": [
           {
             "refreshCookie": []
@@ -301,13 +311,18 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "refreshCookie": []
-          }
-        ]
+        }
       }
     },
     "/auth/logout-all": {
@@ -348,6 +363,16 @@
           },
           "401": {
             "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -397,6 +422,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       },
@@ -439,6 +474,16 @@
           },
           "401": {
             "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -500,6 +545,16 @@
           },
           "401": {
             "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -578,9 +633,29 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not found or unreadable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
-        "description": "STAFF receives only ACTIVE directory projection; management fields are Manager-only.",
+        "description": "MANAGER may browse all account statuses and receives safe admin DTOs. DEPUTY_MANAGER receives active-directory DTOs. STAFF receives the active directory projection only. LOCKED is not enumerable to non-Managers.",
         "parameters": [
           {
             "name": "page",
@@ -652,7 +727,7 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/User"
+                      "$ref": "#/components/schemas/CreateUserResult"
                     }
                   },
                   "additionalProperties": false,
@@ -693,16 +768,6 @@
               }
             }
           },
-          "404": {
-            "description": "Not found or unreadable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
           "409": {
             "description": "Conflict",
             "content": {
@@ -712,9 +777,19 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
-        "description": "MANAGER only.",
+        "description": "MANAGER only. If initialPassword is omitted, one generated temporary password is returned once.",
         "requestBody": {
           "required": true,
           "content": {
@@ -744,7 +819,7 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/User"
+                      "$ref": "#/components/schemas/UserRecord"
                     }
                   },
                   "additionalProperties": false,
@@ -794,8 +869,19 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
+        "description": "Manager receives the safe admin DTO; other roles receive active-directory projection. LOCKED users are hidden from non-Managers.",
         "parameters": [
           {
             "name": "id",
@@ -884,9 +970,19 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
-        "description": "MANAGER only; protect last ACTIVE MANAGER and self-lock.",
+        "description": "MANAGER only; role/status/email changes revoke sessions. A transaction lock protects the final ACTIVE Manager; self-lock is denied.",
         "requestBody": {
           "required": true,
           "content": {
@@ -978,8 +1074,8 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict",
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -989,7 +1085,7 @@
             }
           }
         },
-        "description": "MANAGER only; temporary password is returned once and must not be logged.",
+        "description": "MANAGER only; temporary password is returned once and must not be logged. All existing sessions are revoked.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1081,8 +1177,8 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict",
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -1092,7 +1188,7 @@
             }
           }
         },
-        "description": "Leaders can inspect all; STAFF only self.",
+        "description": "MANAGER/DEPUTY_MANAGER can inspect all users; STAFF only self. Filters task createdAt in UTC.",
         "parameters": [
           {
             "name": "id",
@@ -1231,6 +1327,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -1479,6 +1585,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "P0 OFFICIAL only; TEAM/PERSONAL variants open in P1.",
@@ -1582,6 +1698,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1665,6 +1791,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -1773,6 +1909,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Creator of PERSONAL only.",
@@ -1859,6 +2005,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -1959,6 +2115,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "DRAFT to TODO; task creator must be a leader.",
@@ -2052,6 +2218,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "TODO to IN_PROGRESS; leader or current assignee.",
@@ -2138,6 +2314,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -2248,6 +2434,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Leader-only direct due date, assignee or priority change with reason.",
@@ -2344,6 +2540,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -2454,6 +2660,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "D-09 transition and history retention.",
@@ -2550,6 +2766,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -2705,6 +2931,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Current assignee in IN_PROGRESS only; each submit creates a new immutable submission.",
@@ -2805,6 +3041,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -2917,6 +3163,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -3075,6 +3331,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "MANAGER/DEPUTY_MANAGER; submissionId must be current PENDING.",
@@ -3174,6 +3440,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -3281,6 +3557,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -3397,6 +3683,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -3492,6 +3788,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -3610,6 +3916,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "P0 only TASK pre-submission; checks write ACL, size/MIME and creates UPLOADING metadata. Never accepts objectKey.",
@@ -3702,6 +4018,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "HEAD/size/type/checksum verification before READY.",
@@ -3787,6 +4113,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -3927,6 +4263,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Rechecks entity ACL; REMOVED files return 404.",
@@ -4020,6 +4366,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Soft REMOVED; object cleanup after 90 days if no valid links.",
@@ -4076,6 +4432,16 @@
           },
           "401": {
             "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -4155,6 +4521,16 @@
           },
           "401": {
             "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -4243,6 +4619,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -4288,6 +4674,16 @@
           },
           "401": {
             "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -4376,6 +4772,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -4547,6 +4953,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Scope DEPT for leaders; STAFF receives own report only. Same filters/formulas as dashboard and export.",
@@ -4692,6 +5108,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -4966,6 +5392,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Leader-only binary export; content is CSV or XLSX. Response envelope does not apply to binary.",
@@ -5201,6 +5637,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       },
@@ -5273,6 +5719,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -5365,6 +5821,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -5498,6 +5964,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "MANAGER only. Metadata of latest backup/restore drill; no raw dump or signed URL."
@@ -5573,6 +6049,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -5691,6 +6177,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -5793,6 +6289,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -5888,6 +6394,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -6004,6 +6520,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -6099,6 +6625,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -6217,6 +6753,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6326,6 +6872,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -6421,6 +6977,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -6539,6 +7105,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6639,6 +7215,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -6730,6 +7316,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6813,6 +7409,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -6920,6 +7526,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "description": "Soft archive; tasks retain project history and ACL.",
@@ -7009,6 +7625,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -7120,6 +7746,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7220,6 +7856,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -7304,6 +7950,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -7411,6 +8067,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7496,6 +8162,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -7595,6 +8271,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7680,6 +8366,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -7798,6 +8494,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7898,6 +8604,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -7982,6 +8698,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -8098,6 +8824,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -8200,6 +8936,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -8267,7 +9013,10 @@
                   "UNAUTHORIZED",
                   "FORBIDDEN",
                   "NOT_FOUND",
-                  "CONFLICT"
+                  "CONFLICT",
+                  "RATE_LIMITED",
+                  "UNAVAILABLE",
+                  "INTERNAL_ERROR"
                 ]
               },
               "message": {
@@ -8381,6 +9130,55 @@
           "jobTitle",
           "createdAt"
         ]
+      },
+      "DirectoryUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "username",
+          "email",
+          "displayName",
+          "jobTitle",
+          "createdAt"
+        ],
+        "description": "Safe active-directory projection; excludes account status, role, last login and management data."
       },
       "Task": {
         "type": "object",
@@ -9444,6 +10242,32 @@
           "user"
         ]
       },
+      "UserRecord": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "$ref": "#/components/schemas/DirectoryUser"
+          }
+        ]
+      },
+      "CreateUserResult": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "temporaryPassword": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "temporaryPassword appears only when the server generated it and is returned once."
+      },
       "ResetPasswordResult": {
         "type": "object",
         "properties": {
@@ -9464,7 +10288,14 @@
         "type": "object",
         "properties": {
           "user": {
-            "$ref": "#/components/schemas/User"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "$ref": "#/components/schemas/DirectoryUser"
+              }
+            ]
           },
           "primaryCount": {
             "type": "integer"
@@ -9496,7 +10327,8 @@
           "doneOnTimeCount",
           "onTimeRate",
           "overdueCount"
-        ]
+        ],
+        "description": "fromDate/toDate filter task createdAt in UTC. Primary metrics use valid OFFICIAL tasks; collabCount also includes accepted TEAM collaborators, excluding primary assignments."
       },
       "ManagerDashboardStats": {
         "type": "object",
@@ -9898,7 +10730,14 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/User"
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/User"
+                },
+                {
+                  "$ref": "#/components/schemas/DirectoryUser"
+                }
+              ]
             }
           },
           "total": {
@@ -10396,7 +11235,8 @@
             "format": "email"
           },
           "password": {
-            "type": "string"
+            "type": "string",
+            "description": "Password is subject to the bcrypt 72-byte UTF-8 input limit."
           }
         },
         "additionalProperties": false,
@@ -10429,10 +11269,12 @@
         "type": "object",
         "properties": {
           "currentPassword": {
-            "type": "string"
+            "type": "string",
+            "description": "Password is subject to the bcrypt 72-byte UTF-8 input limit."
           },
           "newPassword": {
-            "type": "string"
+            "type": "string",
+            "description": "Password is subject to the bcrypt 72-byte UTF-8 input limit."
           }
         },
         "additionalProperties": false,
@@ -10469,7 +11311,8 @@
             "type": "string"
           },
           "initialPassword": {
-            "type": "string"
+            "type": "string",
+            "description": "Password is subject to the bcrypt 72-byte UTF-8 input limit."
           }
         },
         "additionalProperties": false,
@@ -10521,7 +11364,8 @@
         "type": "object",
         "properties": {
           "newPassword": {
-            "type": "string"
+            "type": "string",
+            "description": "Password is subject to the bcrypt 72-byte UTF-8 input limit."
           }
         },
         "additionalProperties": false
