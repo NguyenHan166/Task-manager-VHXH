@@ -59,7 +59,7 @@ export function TasksPage() {
   const primaryAssigneeId = searchParams.get("primaryAssigneeId") || "ALL";
   const scope = (searchParams.get("scope") as "ALL" | "OWNED" | "COLLABORATING" | "WATCHING") || (isLeader ? "ALL" : "OWNED");
   const isOverdueParam = searchParams.get("isOverdue") === "true";
-  const sortBy = (searchParams.get("sortBy") as "UPDATED_AT" | "DUE_AT" | "PRIORITY") || "UPDATED_AT";
+  const sortBy = (searchParams.get("sortBy") as "UPDATED_AT" | "DUE_AT" | "PRIORITY" | "CREATED_AT") || "UPDATED_AT";
   const sortDirection = (searchParams.get("sortDirection") as "ASC" | "DESC") || "DESC";
   const page = parseInt(searchParams.get("page") || "1", 10);
   const pageSize = parseInt(searchParams.get("pageSize") || "10", 10);
@@ -214,6 +214,9 @@ export function TasksPage() {
       if (sortBy === "PRIORITY") {
         const weights: Record<TaskPriority, number> = { URGENT: 4, HIGH: 3, NORMAL: 2, LOW: 1 };
         return ((weights[a.priority] || 0) - (weights[b.priority] || 0)) * multiplier;
+      }
+      if (sortBy === "CREATED_AT") {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * multiplier;
       }
       return (new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()) * multiplier;
     });

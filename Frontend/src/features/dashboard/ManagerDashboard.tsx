@@ -278,10 +278,6 @@ export function ManagerDashboard() {
                     <h1 className="text-2xl sm:text-[28px] font-bold text-text-primary tracking-tight mt-1">
                         Chào Trưởng phòng, {currentUser?.displayName}
                     </h1>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                        Tổng quan điều hành công việc chính thức, phê duyệt báo
-                        cáo và phân bổ nguồn lực đơn vị.
-                    </p>
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0">

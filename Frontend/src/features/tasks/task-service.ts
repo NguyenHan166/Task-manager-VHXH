@@ -112,7 +112,7 @@ export class TaskService {
     }
 
     // 9. Due date range & Overdue
-    if ((query as { isOverdue?: boolean }).isOverdue) {
+    if (query.isOverdue) {
       const now = new Date();
       visibleTasks = visibleTasks.filter((t) => isTaskOverdue(t, now));
     }
@@ -144,6 +144,9 @@ export class TaskService {
       if (sortBy === "PRIORITY") {
         const diff = (PRIORITY_WEIGHT[a.priority] || 0) - (PRIORITY_WEIGHT[b.priority] || 0);
         return diff * multiplier;
+      }
+      if (sortBy === "CREATED_AT") {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * multiplier;
       }
       // UPDATED_AT default
       return (

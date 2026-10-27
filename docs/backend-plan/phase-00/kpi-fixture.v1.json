@@ -1,0 +1,561 @@
+{
+  "version": 1,
+  "clock": "2026-10-27T09:00:00.000Z",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "idPolicy": "Aliases are stable fixture keys. Server seed resolves aliases to DB-generated UUIDs and upserts by email/code/periodKey; API never exposes aliases.",
+  "users": [
+    {
+      "alias": "u01",
+      "role": "MANAGER",
+      "status": "ACTIVE",
+      "email": "an.nv@example.invalid"
+    },
+    {
+      "alias": "u06",
+      "role": "DEPUTY_MANAGER",
+      "status": "ACTIVE",
+      "email": "vu.lt@example.invalid"
+    },
+    {
+      "alias": "u02",
+      "role": "STAFF",
+      "status": "ACTIVE",
+      "email": "binh.tt@example.invalid"
+    },
+    {
+      "alias": "u03",
+      "role": "STAFF",
+      "status": "ACTIVE",
+      "email": "chau.lm@example.invalid"
+    },
+    {
+      "alias": "u04",
+      "role": "STAFF",
+      "status": "ACTIVE",
+      "email": "dung.pq@example.invalid"
+    },
+    {
+      "alias": "u05",
+      "role": "STAFF",
+      "status": "ACTIVE",
+      "email": "ha.vt@example.invalid"
+    }
+  ],
+  "projects": [
+    {
+      "alias": "p01",
+      "owner": "u01"
+    },
+    {
+      "alias": "p02",
+      "owner": "u01"
+    }
+  ],
+  "tasks": [
+    {
+      "alias": "t01",
+      "code": "CV-2026-0001",
+      "type": "OFFICIAL",
+      "status": "IN_PROGRESS",
+      "createdBy": "u01",
+      "primaryAssignee": "u02",
+      "project": "p01",
+      "priority": "HIGH",
+      "progressPercent": 60,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-28T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t02",
+      "code": "CV-2026-0002",
+      "type": "OFFICIAL",
+      "status": "IN_REVIEW",
+      "createdBy": "u01",
+      "primaryAssignee": "u03",
+      "project": "p02",
+      "priority": "HIGH",
+      "progressPercent": 100,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-29T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t03",
+      "code": "CV-2026-0003",
+      "type": "OFFICIAL",
+      "status": "TODO",
+      "createdBy": "u01",
+      "primaryAssignee": "u04",
+      "project": "p01",
+      "priority": "NORMAL",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-11-01T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t04",
+      "code": "CV-2026-0004",
+      "type": "OFFICIAL",
+      "status": "IN_PROGRESS",
+      "createdBy": "u01",
+      "primaryAssignee": "u05",
+      "project": null,
+      "priority": "URGENT",
+      "progressPercent": 75,
+      "isBlocked": true,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-26T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t05",
+      "code": "CV-2026-0005",
+      "type": "OFFICIAL",
+      "status": "DONE",
+      "createdBy": "u01",
+      "primaryAssignee": "u02",
+      "project": "p01",
+      "priority": "NORMAL",
+      "progressPercent": 100,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-24T09:00:00.000Z",
+      "completedAt": "2026-10-23T09:00:00.000Z",
+      "completionDueAtSnapshot": "2026-10-24T09:00:00.000Z"
+    },
+    {
+      "alias": "t06",
+      "code": "CV-2026-0006",
+      "type": "OFFICIAL",
+      "status": "DONE",
+      "createdBy": "u01",
+      "primaryAssignee": "u03",
+      "project": null,
+      "priority": "NORMAL",
+      "progressPercent": 100,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-24T09:00:00.000Z",
+      "completedAt": "2026-10-25T09:00:00.000Z",
+      "completionDueAtSnapshot": "2026-10-24T09:00:00.000Z"
+    },
+    {
+      "alias": "t07",
+      "code": "CV-2026-0007",
+      "type": "OFFICIAL",
+      "status": "DRAFT",
+      "createdBy": "u01",
+      "primaryAssignee": "u04",
+      "project": null,
+      "priority": "NORMAL",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": null,
+      "dueAt": "2026-11-03T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t08",
+      "code": "CV-2026-0008",
+      "type": "OFFICIAL",
+      "status": "CANCELLED",
+      "createdBy": "u01",
+      "primaryAssignee": "u05",
+      "project": null,
+      "priority": "NORMAL",
+      "progressPercent": 20,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-25T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t09",
+      "code": "CV-2026-0009",
+      "type": "OFFICIAL",
+      "status": "TODO",
+      "createdBy": "u01",
+      "primaryAssignee": "u02",
+      "project": null,
+      "priority": "URGENT",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-27T17:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t10",
+      "code": "NH-2026-0001",
+      "type": "TEAM",
+      "status": "IN_PROGRESS",
+      "createdBy": "u02",
+      "primaryAssignee": "u02",
+      "project": "p02",
+      "priority": "NORMAL",
+      "progressPercent": 40,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-30T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t11",
+      "code": "NH-2026-0002",
+      "type": "TEAM",
+      "status": "TODO",
+      "createdBy": "u03",
+      "primaryAssignee": "u03",
+      "project": null,
+      "priority": "NORMAL",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-11-02T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t12",
+      "code": "CN-2026-0001",
+      "type": "PERSONAL",
+      "status": "TODO",
+      "createdBy": "u02",
+      "primaryAssignee": "u02",
+      "project": null,
+      "priority": "NORMAL",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-28T15:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t13",
+      "code": "CN-2026-0002",
+      "type": "PERSONAL",
+      "status": "DONE",
+      "createdBy": "u03",
+      "primaryAssignee": "u03",
+      "project": null,
+      "priority": "NORMAL",
+      "progressPercent": 100,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-26T09:00:00.000Z",
+      "completedAt": "2026-10-26T03:00:00.000Z",
+      "completionDueAtSnapshot": "2026-10-26T09:00:00.000Z"
+    },
+    {
+      "alias": "t14",
+      "code": "CV-2026-0010",
+      "type": "OFFICIAL",
+      "status": "IN_REVIEW",
+      "createdBy": "u01",
+      "primaryAssignee": "u02",
+      "project": null,
+      "priority": "HIGH",
+      "progressPercent": 100,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-29T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t15",
+      "code": "CV-2026-0011",
+      "type": "OFFICIAL",
+      "status": "TODO",
+      "createdBy": "u01",
+      "primaryAssignee": "u03",
+      "project": null,
+      "priority": "HIGH",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-29T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t16",
+      "code": "CV-2026-0012",
+      "type": "OFFICIAL",
+      "status": "TODO",
+      "createdBy": "u01",
+      "primaryAssignee": "u04",
+      "project": null,
+      "priority": "HIGH",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-29T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    },
+    {
+      "alias": "t17",
+      "code": "CV-2026-0013",
+      "type": "OFFICIAL",
+      "status": "TODO",
+      "createdBy": "u01",
+      "primaryAssignee": "u05",
+      "project": null,
+      "priority": "HIGH",
+      "progressPercent": 0,
+      "isBlocked": false,
+      "createdAt": "2026-10-21T09:00:00.000Z",
+      "assignedAt": "2026-10-22T09:00:00.000Z",
+      "dueAt": "2026-10-29T09:00:00.000Z",
+      "completedAt": null,
+      "completionDueAtSnapshot": null
+    }
+  ],
+  "participants": [
+    {
+      "task": "t01",
+      "user": "u03",
+      "role": "COLLABORATOR",
+      "invitationStatus": "ACCEPTED"
+    },
+    {
+      "task": "t02",
+      "user": "u02",
+      "role": "COLLABORATOR",
+      "invitationStatus": "ACCEPTED"
+    },
+    {
+      "task": "t04",
+      "user": "u04",
+      "role": "WATCHER",
+      "invitationStatus": "ACCEPTED"
+    },
+    {
+      "task": "t10",
+      "user": "u03",
+      "role": "COLLABORATOR",
+      "invitationStatus": "ACCEPTED"
+    },
+    {
+      "task": "t10",
+      "user": "u05",
+      "role": "COLLABORATOR",
+      "invitationStatus": "PENDING"
+    },
+    {
+      "task": "t11",
+      "user": "u04",
+      "role": "COLLABORATOR",
+      "invitationStatus": "DECLINED"
+    }
+  ],
+  "submissions": [
+    {
+      "alias": "s01",
+      "task": "t02",
+      "by": "u03",
+      "at": "2026-10-27T05:00:00.000Z",
+      "status": "PENDING"
+    },
+    {
+      "alias": "s02",
+      "task": "t05",
+      "by": "u02",
+      "at": "2026-10-22T17:00:00.000Z",
+      "status": "RETURNED"
+    },
+    {
+      "alias": "s03",
+      "task": "t05",
+      "by": "u02",
+      "at": "2026-10-23T05:00:00.000Z",
+      "status": "APPROVED"
+    },
+    {
+      "alias": "s04",
+      "task": "t06",
+      "by": "u03",
+      "at": "2026-10-25T07:00:00.000Z",
+      "status": "APPROVED"
+    },
+    {
+      "alias": "s05",
+      "task": "t14",
+      "by": "u02",
+      "at": "2026-10-27T07:00:00.000Z",
+      "status": "PENDING"
+    }
+  ],
+  "approvals": [
+    {
+      "alias": "a01",
+      "task": "t05",
+      "submission": "s02",
+      "by": "u01",
+      "decision": "RETURNED",
+      "at": "2026-10-22T19:00:00.000Z"
+    },
+    {
+      "alias": "a02",
+      "task": "t05",
+      "submission": "s03",
+      "by": "u01",
+      "decision": "APPROVED",
+      "at": "2026-10-23T09:00:00.000Z",
+      "dueAtSnapshot": "2026-10-24T09:00:00.000Z"
+    },
+    {
+      "alias": "a03",
+      "task": "t06",
+      "submission": "s04",
+      "by": "u01",
+      "decision": "APPROVED",
+      "at": "2026-10-25T09:00:00.000Z",
+      "dueAtSnapshot": "2026-10-24T09:00:00.000Z"
+    }
+  ],
+  "files": [
+    {
+      "alias": "f01",
+      "owner": "u02",
+      "status": "READY",
+      "linkedTo": {
+        "type": "SUBMISSION",
+        "alias": "s03"
+      }
+    },
+    {
+      "alias": "f02",
+      "owner": "u03",
+      "status": "READY",
+      "linkedTo": {
+        "type": "SUBMISSION",
+        "alias": "s01"
+      }
+    }
+  ],
+  "recurrence": {
+    "phase": "P1",
+    "rules": [
+      {
+        "alias": "rr01",
+        "frequency": "MONTHLY",
+        "scope": "CUSTOM",
+        "assignees": [
+          "u02",
+          "u03"
+        ],
+        "dueAfterHours": 120
+      },
+      {
+        "alias": "rr02",
+        "frequency": "WEEKLY",
+        "scope": "ALL",
+        "assignees": [
+          "u02",
+          "u03",
+          "u04",
+          "u05"
+        ],
+        "dueAfterHours": 48
+      }
+    ],
+    "instance": {
+      "alias": "ri01",
+      "rule": "rr02",
+      "periodKey": "2026-W44",
+      "tasks": [
+        "t14",
+        "t15",
+        "t16",
+        "t17"
+      ]
+    }
+  },
+  "expected": {
+    "initial_t01_t09": {
+      "totalOfficialCount": 9,
+      "totalActivePublished": 7,
+      "todoCount": 2,
+      "inProgressCount": 2,
+      "inReviewCount": 1,
+      "doneCount": 2,
+      "overdueCount": 1,
+      "completedOnTimeCount": 1,
+      "draftCount": 1,
+      "cancelledCount": 1
+    },
+    "extended_t01_t17": {
+      "totalOfficialCount": 13,
+      "totalActivePublished": 11,
+      "todoCount": 5,
+      "inProgressCount": 2,
+      "inReviewCount": 2,
+      "doneCount": 2,
+      "overdueCount": 1,
+      "completedOnTimeCount": 1,
+      "draftCount": 1,
+      "cancelledCount": 1
+    },
+    "workload_extended": {
+      "u02": {
+        "primaryCount": 4,
+        "doneCount": 1,
+        "doneOnTimeCount": 1,
+        "collabCount": 1
+      },
+      "u03": {
+        "primaryCount": 3,
+        "doneCount": 1,
+        "doneOnTimeCount": 0,
+        "collabCount": 2
+      },
+      "u04": {
+        "primaryCount": 2,
+        "watchingCount": 1
+      },
+      "u05": {
+        "primaryCount": 2,
+        "overdueCount": 1
+      }
+    },
+    "acl": [
+      "u02 sees t12; u03/u01/u06 do not",
+      "u05 sees only limited invitation projection for t10 before ACCEPTED",
+      "u04 cannot see t11 after DECLINED",
+      "u04 cannot see t07 before publish",
+      "u01/u06 see all published OFFICIAL but not t12/t13 by default"
+    ]
+  }
+}

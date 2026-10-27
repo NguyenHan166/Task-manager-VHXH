@@ -206,6 +206,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   const currentNavItems = isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems;
+  const isP1Route = ["/personal-tasks", "/projects", "/calendar", "/recurrence", "/chat"].some(
+    (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
+  const hasP1TaskControls = location.pathname === "/tasks" ||
+    location.pathname.startsWith("/tasks/") || location.pathname === "/approvals";
 
   return (
     <div className="min-h-screen flex bg-canvas text-text-primary antialiased">
@@ -669,6 +674,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Content Body Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto pb-28">
+          {isP1Route && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+              Dữ liệu mẫu · Tính năng P1 đang chạy trên bản dùng thử và chưa kết nối API thật.
+            </div>
+          )}
+          {hasP1TaskControls && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+              Các thao tác việc nhóm/cá nhân, việc con, xin gia hạn và đổi chủ trì thuộc P1; hiện chỉ chạy trên dữ liệu mẫu.
+            </div>
+          )}
           {children}
         </main>
       </div>

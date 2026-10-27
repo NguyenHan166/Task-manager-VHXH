@@ -59,6 +59,8 @@ export interface Task {
   completedAt: IsoDateTime | null;
   approvedById: Id | null;
   approvedAt: IsoDateTime | null;
+  completionDueAtSnapshot?: IsoDateTime | null;
+  version?: number;
   isBlocked: boolean;
   blockedReason: string | null;
   createdAt: IsoDateTime;
@@ -165,7 +167,7 @@ export interface TaskEvent {
   id: Id;
   taskId: Id;
   actorId: Id;
-  kind: "CREATED" | "PUBLISHED" | "STARTED" | "PROGRESS_UPDATED" | "SUBMITTED" | "SUBMISSION_WITHDRAWN" | "APPROVED" | "RETURNED" | "DEADLINE_REQUESTED" | "DEADLINE_REQUEST_DECIDED" | "DEADLINE_CHANGED" | "ASSIGNEE_REQUESTED" | "ASSIGNEE_REQUEST_DECIDED" | "ASSIGNEE_CHANGED" | "TYPE_CHANGED" | "TEAM_INVITE_RESPONDED" | "RECURRENCE_GENERATED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "REOPENED";
+  kind: "CREATED" | "PUBLISHED" | "STARTED" | "PROGRESS_UPDATED" | "COMPLETED" | "SUBMITTED" | "SUBMISSION_WITHDRAWN" | "APPROVED" | "RETURNED" | "DEADLINE_REQUESTED" | "DEADLINE_REQUEST_DECIDED" | "DEADLINE_CHANGED" | "ASSIGNEE_REQUESTED" | "ASSIGNEE_REQUEST_DECIDED" | "ASSIGNEE_CHANGED" | "TYPE_CHANGED" | "TEAM_INVITE_RESPONDED" | "RECURRENCE_GENERATED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "REOPENED";
   note: string;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
@@ -189,10 +191,10 @@ export interface FileObject {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
-  objectKey: string | null; // null in local mock; backend will assign R2 key
+  objectKey?: string | null; // local mock only; backend keeps its R2 key private
   uploadedById: Id;
   createdAt: IsoDateTime;
-  status: "MOCK_LOCAL" | "READY" | "REMOVED";
+  status: "MOCK_LOCAL" | "UPLOADING" | "READY" | "REMOVED";
 }
 
 export interface FileLink {
@@ -275,9 +277,10 @@ export interface TaskQuery {
   search?: string;
   dueFrom?: IsoDateTime;
   dueTo?: IsoDateTime;
+  isOverdue?: boolean;
   page: number;
   pageSize: number;
-  sortBy?: "DUE_AT" | "UPDATED_AT" | "PRIORITY";
+  sortBy?: "DUE_AT" | "UPDATED_AT" | "PRIORITY" | "CREATED_AT";
   sortDirection?: "ASC" | "DESC";
 }
 
