@@ -32,6 +32,13 @@ export function UserAvatar({
   };
 
   const isManager = user?.role === "MANAGER";
+  const isDeputy = user?.role === "DEPUTY_MANAGER";
+
+  const defaultRoleTitle = isManager
+    ? "Trưởng phòng"
+    : isDeputy
+    ? "Phó phòng"
+    : "Chuyên viên";
 
   return (
     <div className="relative inline-block">
@@ -40,11 +47,13 @@ export function UserAvatar({
           "rounded-full flex items-center justify-center font-semibold select-none border border-border shadow-xs",
           isManager
             ? "bg-teal-700 text-white"
+            : isDeputy
+            ? "bg-indigo-700 text-white"
             : "bg-slate-200 text-slate-700",
           sizeStyles[size],
           className
         )}
-        title={`${displayName} (${user?.jobTitle || (isManager ? "Trưởng phòng" : "Chuyên viên")})`}
+        title={`${displayName} (${user?.jobTitle || defaultRoleTitle})`}
       >
         {initials}
       </div>
@@ -54,10 +63,12 @@ export function UserAvatar({
             "absolute -bottom-1 -right-1 text-[9px] font-bold px-1 rounded-full border",
             isManager
               ? "bg-emerald-600 text-white border-white"
+              : isDeputy
+              ? "bg-indigo-600 text-white border-white"
               : "bg-slate-600 text-white border-white"
           )}
         >
-          {isManager ? "M" : "S"}
+          {isManager ? "TP" : isDeputy ? "PP" : "CV"}
         </span>
       )}
     </div>

@@ -4,7 +4,7 @@
 export type Id = string;
 export type IsoDateTime = string;
 
-export type UserRole = "MANAGER" | "STAFF";
+export type UserRole = "MANAGER" | "DEPUTY_MANAGER" | "STAFF";
 export type UserStatus = "ACTIVE" | "LOCKED";
 export type TaskType = "OFFICIAL" | "TEAM" | "PERSONAL";
 export type TaskStatus = "DRAFT" | "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | "CANCELLED";
@@ -16,13 +16,17 @@ export type RequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface User {
   id: Id;
-  username: string;
+  username: string; // Tên đăng nhập (Email công vụ)
+  email: string; // Email công vụ (bắt buộc, dùng làm tên đăng nhập)
   displayName: string;
   role: UserRole;
   status: UserStatus;
   jobTitle: string;
+  phoneNumber?: string;
+  department?: string;
   avatarUrl: string | null;
   createdAt: IsoDateTime;
+  lastLoginAt?: IsoDateTime | null;
 }
 
 export interface Project {
@@ -86,7 +90,14 @@ export interface TaskSubmission {
   taskId: Id;
   submittedById: Id;
   summary: string;
+  details?: string | null;
+  deliverableUrl?: string | null;
+  notes?: string | null;
+  fileIds?: Id[];
   submittedAt: IsoDateTime;
+  status?: "PENDING" | "APPROVED" | "RETURNED" | "WITHDRAWN";
+  withdrawnAt?: IsoDateTime | null;
+  withdrawnReason?: string | null;
 }
 
 export interface TaskApproval {
@@ -130,7 +141,9 @@ export interface RecurrenceRule {
   title: string;
   description: string;
   ownerId: Id;
-  primaryAssigneeId: Id;
+  scope?: "ALL" | "CUSTOM"; // ALL: giao cả phòng, CUSTOM: nhiều người cụ thể
+  assigneeIds?: Id[]; // danh sách người được giao
+  primaryAssigneeId?: Id; // tương thích ngược
   priority: TaskPriority;
   frequency: "WEEKLY" | "MONTHLY";
   dueAfterHours: number; // dueAt = occurrence creation time + this offset
@@ -144,6 +157,7 @@ export interface RecurrenceInstance {
   ruleId: Id;
   periodKey: string; // e.g. 2026-W44 or 2026-10; unique per rule
   taskId: Id;
+  taskIds?: Id[];
   createdAt: IsoDateTime;
 }
 
@@ -151,7 +165,7 @@ export interface TaskEvent {
   id: Id;
   taskId: Id;
   actorId: Id;
-  kind: "CREATED" | "PUBLISHED" | "STARTED" | "PROGRESS_UPDATED" | "SUBMITTED" | "APPROVED" | "RETURNED" | "DEADLINE_REQUESTED" | "DEADLINE_REQUEST_DECIDED" | "DEADLINE_CHANGED" | "ASSIGNEE_REQUESTED" | "ASSIGNEE_REQUEST_DECIDED" | "ASSIGNEE_CHANGED" | "TYPE_CHANGED" | "TEAM_INVITE_RESPONDED" | "RECURRENCE_GENERATED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "REOPENED";
+  kind: "CREATED" | "PUBLISHED" | "STARTED" | "PROGRESS_UPDATED" | "SUBMITTED" | "SUBMISSION_WITHDRAWN" | "APPROVED" | "RETURNED" | "DEADLINE_REQUESTED" | "DEADLINE_REQUEST_DECIDED" | "DEADLINE_CHANGED" | "ASSIGNEE_REQUESTED" | "ASSIGNEE_REQUEST_DECIDED" | "ASSIGNEE_CHANGED" | "TYPE_CHANGED" | "TEAM_INVITE_RESPONDED" | "RECURRENCE_GENERATED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "REOPENED";
   note: string;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
@@ -161,7 +175,7 @@ export interface TaskEvent {
 export interface Notification {
   id: Id;
   recipientId: Id;
-  type: "TASK_ASSIGNED" | "TASK_UPDATED" | "TASK_DUE_SOON" | "TASK_OVERDUE" | "SUBMISSION_RECEIVED" | "SUBMISSION_RETURNED" | "SUBMISSION_APPROVED" | "DEADLINE_REQUESTED" | "ASSIGNEE_REQUESTED" | "REQUEST_DECIDED" | "COMMENT_ADDED" | "TEAM_INVITED" | "CHAT_MESSAGE";
+  type: "TASK_ASSIGNED" | "TASK_UPDATED" | "TASK_DUE_SOON" | "TASK_OVERDUE" | "SUBMISSION_RECEIVED" | "SUBMISSION_WITHDRAWN" | "SUBMISSION_RETURNED" | "SUBMISSION_APPROVED" | "DEADLINE_REQUESTED" | "ASSIGNEE_REQUESTED" | "REQUEST_DECIDED" | "COMMENT_ADDED" | "TEAM_INVITED" | "CHAT_MESSAGE";
   title: string;
   body: string;
   entityType: "TASK" | "CHAT";
@@ -304,6 +318,9 @@ export interface ProgressInput {
 
 export interface SubmitTaskInput {
   summary: string;
+  details?: string | null;
+  deliverableUrl?: string | null;
+  notes?: string | null;
   fileIds: Id[];
 }
 
@@ -336,7 +353,7 @@ export function isTaskOverdue(task: Task, now: Date = new Date()): boolean {
 export function canSeeTask(task: Task, viewer: User, participants: TaskParticipant[]): boolean {
   if (task.status === "DRAFT" && task.createdById !== viewer.id) return false;
   if (task.type === "PERSONAL") return task.createdById === viewer.id;
-  if (task.type === "OFFICIAL" && viewer.role === "MANAGER") return true;
+  if (task.type === "OFFICIAL" && (viewer.role === "MANAGER" || viewer.role === "DEPUTY_MANAGER")) return true;
   if (task.createdById === viewer.id || task.primaryAssigneeId === viewer.id) return true;
   return participants.some(p => p.taskId === task.id && p.userId === viewer.id && p.invitationStatus === "ACCEPTED");
 }

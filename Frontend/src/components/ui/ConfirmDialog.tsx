@@ -17,6 +17,8 @@ export interface ConfirmDialogProps {
   onCancel?: () => void;
   onClose?: () => void;
   children?: React.ReactNode;
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
+  className?: string;
 }
 
 export function ConfirmDialog({
@@ -33,6 +35,8 @@ export function ConfirmDialog({
   onCancel,
   onClose,
   children,
+  maxWidth = "md",
+  className,
 }: ConfirmDialogProps) {
   const handleClose = onCancel || onClose || (() => {});
   const finalConfirmLabel = confirmText || confirmLabel || "Xác nhận";
@@ -72,7 +76,17 @@ export function ConfirmDialog({
       {/* Modal Dialog */}
       <div
         className={cn(
-          "relative bg-surface rounded-card border border-border shadow-2xl max-w-md w-full p-5 sm:p-6 z-10 animate-scale-up max-h-[90vh] overflow-y-auto"
+          "relative bg-surface rounded-card border border-border shadow-2xl w-full p-5 sm:p-6 z-10 animate-scale-up max-h-[90vh] overflow-y-auto",
+          maxWidth === "sm"
+            ? "max-w-sm"
+            : maxWidth === "lg"
+            ? "max-w-lg"
+            : maxWidth === "xl"
+            ? "max-w-xl"
+            : maxWidth === "2xl"
+            ? "max-w-2xl"
+            : "max-w-md",
+          className
         )}
       >
         <div className="flex items-start justify-between gap-3">

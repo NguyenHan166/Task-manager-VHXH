@@ -25,8 +25,8 @@
 ### 1.2. Phạm vi và giới hạn ban đầu
 
 - Một phòng, một không gian làm việc (single workspace); **chưa cần multi-tenant** hoặc tổ chức nhiều cấp.
-- Hai **vai trò tài khoản thực tế**: `MANAGER` (Trưởng phòng) và `STAFF` (Chuyên viên).
-- Ba **nhóm chức năng về mặt nghiệp vụ**: Trưởng phòng, Chuyên viên, Quản trị hệ thống; Trưởng phòng kiêm toàn bộ quản trị, **không tạo vai trò ADMIN riêng**.
+- Ba **vai trò tài khoản thực tế**: `MANAGER` (Trưởng phòng), `DEPUTY_MANAGER` (Phó phòng), và `STAFF` (Chuyên viên).
+- Ba **nhóm chức năng về mặt nghiệp vụ**: Điều hành chuyên môn (Trưởng phòng & Phó phòng), Chuyên viên thực hiện, và Quản trị hệ thống (Trưởng phòng kiêm toàn bộ quản trị, **không tạo vai trò ADMIN riêng**; Phó phòng có đầy đủ quyền điều hành của Trưởng phòng nhưng không có quyền quản trị hệ thống).
 - Giai đoạn đầu chỉ cần một tiến trình NestJS, một PostgreSQL trên cùng Railway project, không cần microservices/Redis.
 - Không xây họp video, bộ ứng dụng văn phòng chỉnh sửa đồng thời hay bản sao toàn diện của Lark trong MVP.
 - Nếu triển khai cho công việc thực tế của cơ quan nhà nước: cần có phép/đánh giá an toàn thông tin và quy định sử dụng hạ tầng trước khi đưa dữ liệu nghiệp vụ thật lên cloud; khi chưa được phê duyệt, dùng dữ liệu giả lập.
@@ -48,42 +48,76 @@
 
 ## 2. Vai trò và phân quyền
 
-### 2.1. Hai vai trò tài khoản
+### 2.1. Ba vai trò tài khoản
 
-**Trưởng phòng — `MANAGER` (kiêm quản trị hệ thống)**
+**1. Trưởng phòng — `MANAGER` (kiêm Quản trị hệ thống)**
 
-- Toàn quyền tạo, giao, sửa, điều chuyển, tạm dừng, hủy và lưu trữ nhiệm vụ chính thức.
-- Xem tất cả nhiệm vụ chính thức; lọc theo người, trạng thái, thời gian, dự án/nhóm việc.
-- Duyệt hoặc yêu cầu làm lại khi chuyên viên nộp kết quả.
-- Xem Dashboard, báo cáo, nhật ký, lịch sử thay đổi.
-- Tạo, khóa, kích hoạt tài khoản; cấp lại quyền truy cập; thiết lập danh mục và quy tắc nhắc hạn.
-- Quản lý cấu hình, phương án sao lưu và quyền truy cập tệp.
-- Không được âm thầm sửa/xóa lịch sử audit; các tác vụ quản trị nhạy cảm cũng phải có log.
+- Toàn quyền điều hành nghiệp vụ: tạo, giao, sửa, điều chuyển, tạm dừng, hủy và lưu trữ nhiệm vụ chính thức (`OFFICIAL`).
+- Xem tất cả nhiệm vụ chính thức của cả phòng; lọc theo người, trạng thái, thời gian, dự án.
+- Phê duyệt hoặc trả lại yêu cầu làm lại khi chuyên viên nộp kết quả (`/approvals`).
+- Phê duyệt đề nghị gia hạn thời hạn và đề nghị thay đổi người chủ trì.
+- Xem Dashboard điều hành toàn phòng, báo cáo tiến độ/khối lượng, xuất dữ liệu toàn phòng.
+- Quản lý nhiệm vụ định kỳ (`/recurrence`), danh mục dự án, tài liệu và lịch công việc.
+- **Toàn quyền Quản trị hệ thống (Admin)**: Tạo tài khoản, phân vai trò (`role`), khóa/mở khóa tài khoản thành viên; cấu hình không gian làm việc, múi giờ, quy tắc nhắc hạn (`/settings`); xem toàn bộ Nhật ký kiểm toán (`Audit Logs`) và xuất bản sao lưu JSON hệ thống.
+- Cần có ít nhất một MANAGER hoạt động; hệ thống chặn thao tác khóa Trưởng phòng duy nhất còn lại.
 
-**Chuyên viên — `STAFF`**
+**2. Phó phòng — `DEPUTY_MANAGER` (Toàn quyền Điều hành, không có quyền Quản trị)**
+
+- **Kế thừa toàn bộ quyền điều hành chuyên môn của Trưởng phòng**:
+  + Toàn quyền tạo, giao việc chính thức (`OFFICIAL`), lưu nháp và phát hành nhiệm vụ.
+  + Xem tất cả nhiệm vụ chính thức của cả phòng trên Dashboard điều hành (`/dashboard`), danh sách (`/tasks`), lịch (`/calendar`), dự án (`/projects`).
+  + Trực tiếp điều chỉnh nhiệm vụ chính thức (sửa hạn hoàn thành, đổi người chủ trì, mức ưu tiên, nội dung).
+  + Phê duyệt (`approve`) hoặc trả lại (`return`) kết quả nộp của chuyên viên (`/approvals` và chi tiết việc).
+  + Quyết định các yêu cầu gia hạn thời hạn và yêu cầu đổi người chủ trì.
+  + Hủy bỏ và mở lại nhiệm vụ chính thức.
+  + Quản lý cấu hình nhiệm vụ định kỳ của phòng (`/recurrence`).
+  + Xem Dashboard điều hành toàn phòng với đầy đủ KPI, tiến độ, cảnh báo quá hạn.
+  + Xem Báo cáo thống kê toàn phòng (`/reports`), lọc theo chuyên viên và xuất báo cáo CSV/XLSX.
+  + Quản lý, xóa tệp tài liệu chung nếu cần; nhận thông báo điều hành khi chuyên viên nộp bài hoặc báo vướng mắc.
+- **KHÔNG CÓ QUYỀN QUẢN TRỊ HỆ THỐNG**:
+  + **Bị chặn truy cập Quản lý thành viên (`/members`)**: Không được tạo tài khoản mới, không được khóa/mở khóa tài khoản, không được thay đổi vai trò hệ thống của thành viên khác. Nếu truy cập URL trực tiếp sẽ nhận mã lỗi 403 Forbidden.
+  + **Bị chặn truy cập Cài đặt hệ thống (`/settings`)**: Không được chỉnh sửa thông tin workspace, múi giờ, quy tắc nhắc hạn, không được xem Nhật ký kiểm toán hệ thống (`Audit Logs`), không được xuất bản sao lưu JSON.
+  + Menu Sidebar của Phó phòng hiển thị các mục điều hành nhưng **ẩn 2 mục "Thành viên" và "Cài đặt / Nhật ký"**.
+
+**3. Chuyên viên — `STAFF`**
 
 - Xem công việc được giao chủ trì, phối hợp, được mời theo dõi và công việc nhóm đã tham gia.
-- Tiếp nhận nhiệm vụ, cập nhật tiến độ, bình luận, đính kèm tệp, gửi kết quả chờ duyệt.
-- Tạo việc cá nhân; tạo việc nhóm để phối hợp nhưng **không có quyền ban hành nhiệm vụ chính thức thay Trưởng phòng**.
-- Gửi yêu cầu gia hạn/đề nghị thay người xử lý (chỉ là yêu cầu, không tự thay đổi nhiệm vụ chính thức).
+- Tiếp nhận nhiệm vụ, cập nhật tiến độ 0-100%, đánh dấu báo vướng mắc, bình luận, đính kèm tệp kết quả.
+- Nộp báo cáo kết quả hoàn thành chờ Lãnh đạo duyệt; có quyền thu hồi báo cáo khi đang ở trạng thái `IN_REVIEW` nếu chưa có quyết định phê duyệt.
+- Tạo việc cá nhân (`PERSONAL`); tạo việc nhóm (`TEAM`) để phối hợp nội bộ; **không có quyền ban hành nhiệm vụ chính thức (`OFFICIAL`) thay Lãnh đạo**.
+- Gửi yêu cầu gia hạn hạn nộp (`TaskDeadlineRequest`) hoặc đề nghị thay đổi người chủ trì (`TaskAssigneeRequest`) khi có lý do chính đáng.
 - Xem Dashboard cá nhân, lịch cá nhân, thông báo, các cuộc trò chuyện được phép tham gia.
-- Không xem toàn bộ dữ liệu nội bộ của người khác hoặc chức năng quản trị tài khoản.
+- Không xem toàn bộ dữ liệu nội bộ của người khác hoặc các chức năng điều hành toàn phòng / quản trị hệ thống.
 
-### 2.2. Ma trận quyền (rút gọn)
+### 2.2. Ma trận quyền (3 vai trò chi tiết)
 
-| Hành động | MANAGER | STAFF |
-|---|---|---|
-| Tạo/giao nhiệm vụ chính thức | Có | Không |
-| Xem tất cả nhiệm vụ chính thức | Có | Không |
-| Xem nhiệm vụ chính thức được phân công/phối hợp | Có | Có |
-| Thay người chủ trì, hạn, mức ưu tiên của nhiệm vụ chính thức | Có | Chỉ được đề nghị |
-| Cập nhật tiến độ, nộp kết quả nhiệm vụ của mình | Có | Có |
-| Duyệt/trả lại nhiệm vụ chính thức | Có | Không |
-| Tạo việc cá nhân | Có | Có |
-| Tạo việc nhóm, mời người phối hợp | Có | Có, theo quyền tham gia/xác nhận |
-| Xem báo cáo toàn phòng | Có | Không |
-| Xem thống kê bản thân | Có | Có |
-| Quản lý tài khoản, cấu hình hệ thống | Có | Không |
+| Hành động / Quyền hạn | MANAGER (Trưởng phòng kiêm QT) | DEPUTY_MANAGER (Phó phòng) | STAFF (Chuyên viên) |
+|---|---|---|---|
+| **Khối Điều hành Chuyên môn** | | | |
+| Tạo / giao nhiệm vụ chính thức (`OFFICIAL`) | Có | Có | Không |
+| Xem tất cả nhiệm vụ chính thức của phòng | Có (toàn phòng) | Có (toàn phòng) | Không (chỉ việc tham gia) |
+| Xem nhiệm vụ được phân công / phối hợp | Có | Có | Có |
+| Trực tiếp sửa hạn, đổi chủ trì, mức ưu tiên | Có | Có | Chỉ được gửi đề nghị |
+| Phê duyệt / trả lại kết quả nộp (`IN_REVIEW`) | Có | Có | Không |
+| Quyết định đề nghị xin gia hạn / đổi chủ trì | Có | Có | Không (chỉ gửi yêu cầu) |
+| Hủy / mở lại nhiệm vụ chính thức | Có | Có | Không |
+| Chuyển việc nhóm (`TEAM`) thành chính thức | Có | Có | Không |
+| Quản lý & Thực hiện nhiệm vụ định kỳ (`/recurrence`) | CRUD & Phát hành kỳ | CRUD & Phát hành kỳ | Xem & Nộp báo cáo trực tiếp |
+| Xem Dashboard điều hành & KPI toàn phòng | Có | Có | Không (Dashboard cá nhân) |
+| Xem Báo cáo thống kê toàn phòng & Xuất file | Có | Có | Không (Báo cáo cá nhân) |
+| Xóa / gỡ liên kết tệp tin tài liệu chung | Có | Có | Chỉ tệp do mình tải lên |
+| Tạo việc cá nhân (`PERSONAL`) / việc nhóm (`TEAM`) | Có | Có | Có |
+| Cập nhật tiến độ, báo vướng mắc, nộp kết quả việc mình | Có | Có | Có |
+| Thu hồi báo cáo chờ duyệt (`WITHDRAWN`) | Có (khi là chủ trì) | Có (khi là chủ trì) | Có (khi là chủ trì) |
+| **Khối Quản trị Hệ thống (Admin Only)** | | | |
+| Truy cập màn hình Quản lý thành viên (`/members`) | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Tạo tài khoản thành viên mới | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Phân quyền / đổi vai trò tài khoản (`role`) | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Khóa / mở khóa tài khoản thành viên | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Truy cập màn hình Cài đặt hệ thống (`/settings`) | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Cấu hình tên phòng, múi giờ, quy tắc nhắc hạn | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Xem Nhật ký kiểm toán hệ thống (`Audit Logs`) | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
+| Xuất bản sao lưu dữ liệu hệ thống (JSON Backup) | Có | **Không (Chặn 403)** | **Không (Chặn 403)** |
 
 **Quy tắc kiểm soát quyền:** Phải xác thực và kiểm tra quyền ở **backend trên từng API và từng bản ghi**, không chỉ ẩn nút trên frontend. Trưởng phòng quản trị hệ thống **không mặc định được xem việc cá nhân riêng tư** trong giao diện nghiệp vụ; quyền truy cập bảo trì dữ liệu phải có kiểm soát và nhật ký.
 
@@ -91,14 +125,21 @@
 
 ## 3. Các phân hệ chức năng
 
-### 3.1. Đăng nhập, người dùng và hồ sơ (P0)
+### 3.1. Đăng nhập, người dùng và quản lý tài khoản (P0)
 
 - Đăng nhập bằng tài khoản/mật khẩu; phiên đăng nhập bảo mật, đăng xuất mọi thiết bị.
-- Trưởng phòng tạo tài khoản hoặc mời chuyên viên, đặt lại mật khẩu, khóa/mở khóa tài khoản.
-- Hồ sơ: họ tên, ảnh đại diện, chức danh, số liên hệ nội bộ (nếu cần), trạng thái hoạt động.
-- Đổi mật khẩu; lịch sử đăng nhập; chặn thử sai quá nhiều lần.
-- Chỉ hai `role`: `MANAGER`, `STAFF`.
-- Cần ít nhất một MANAGER hoạt động; thao tác vô hiệu hóa tài khoản quản lý cuối cùng phải bị chặn.
+- **Quản lý tài khoản (Chỉ Trưởng phòng kiêm Quản trị hệ thống)**:
+  + Tạo tài khoản thành viên mới: Nhập Email công vụ (bắt buộc, đóng vai trò là tên đăng nhập duy nhất), họ tên hiển thị, số điện thoại nội bộ, tổ/bộ phận chuyên môn, chức danh công việc, vai trò hệ thống, và mật khẩu ban đầu (hoặc tự động sinh mật khẩu tạm thời ngẫu nhiên kèm chức năng sao chép).
+  + Chỉnh sửa hồ sơ & điều chỉnh vai trò hệ thống (`role`): Cho phép cập nhật thông tin và chuyển đổi linh hoạt giữa `MANAGER`, `DEPUTY_MANAGER`, `STAFF` khi phân công lại nhân sự.
+  + Đặt lại mật khẩu (Reset Password): Quản trị viên chủ động cấp lại mật khẩu cho thành viên (tự nhập hoặc sinh ngẫu nhiên `Ows@xxxxxx`), tự động gửi thông báo đến tài khoản đó và cho phép sao chép thông tin bàn giao.
+  + Khóa / mở khóa tài khoản: Tài khoản bị khóa sẽ không thể đăng nhập hoặc lựa chọn giao việc mới, nhưng toàn bộ lịch sử phân công, báo cáo, nhật ký kiểm toán trong quá khứ được giữ nguyên vẹn.
+  + Xem chi tiết hồ sơ & Tải công việc: Bảng danh sách thành viên được tối giản (không hiển thị tải công việc ở bảng); khi cần xem chi tiết tải công việc và các nhiệm vụ cụ thể, Quản trị viên bấm nút "Xem" để mở modal Chi tiết & Tải công việc.
+- **Các quy tắc an toàn cốt lõi (Security Guardrails)**:
+  + Cần ít nhất một `MANAGER` hoạt động; thao tác vô hiệu hóa (khóa) hoặc hạ vai trò của tài khoản Trưởng phòng hoạt động cuối cùng phải bị chặn cứng ở cả giao diện và API Backend.
+  + Quản trị viên không được phép tự khóa tài khoản của chính mình (`Self-lock prevention`).
+  + Phó phòng (`DEPUTY_MANAGER`) và Chuyên viên (`STAFF`) bị chặn truy cập hoàn toàn khỏi màn hình và các API quản lý tài khoản (mã lỗi 403 Forbidden).
+- **Hồ sơ nhân sự**:
+  + Trường thông tin: Họ tên, Email công vụ (bắt buộc, là tên đăng nhập hệ thống), ảnh đại diện, chức danh, tổ/bộ phận chuyên môn, số điện thoại nội bộ, vai trò hệ thống, trạng thái hoạt động, thời điểm tạo và thời điểm đăng nhập gần nhất (`lastLoginAt`).
 
 ### 3.2. Công việc/Nhiệm vụ (P0 — trọng tâm)
 
@@ -166,10 +207,18 @@
 
 ### 3.9. Tác vụ định kỳ (P1)
 
-- Trưởng phòng tạo mẫu công việc lặp hàng tuần/hàng tháng: tiêu đề, chủ trì, hạn, mẫu nội dung.
-- Hệ thống sinh nhiệm vụ mới theo chu kỳ; không tự mở lại nhiệm vụ đã hoàn thành.
-- Một kỳ chỉ được sinh một nhiệm vụ; tránh trùng khi job chạy lại hoặc server khởi động lại.
-- Có tùy chọn bỏ qua ngày nghỉ (quy tắc cụ thể sẽ cấu hình trong phiên bản sau).
+- **Phân quyền & Đối tượng sử dụng**: Cả 3 vai trò (`MANAGER`, `DEPUTY_MANAGER`, `STAFF`) đều có quyền truy cập màn hình `/recurrence`.
+- **Phạm vi giao việc linh hoạt**:
+  + Hỗ trợ giao nhiệm vụ định kỳ cho **Cả phòng** (`scope: "ALL"`) hoặc **Nhiều chuyên viên cụ thể** (`scope: "CUSTOM"` qua danh sách `assigneeIds`).
+  + Khi phát hành một kỳ mới (hàng tuần hoặc hàng tháng), hệ thống tự động sinh nhiệm vụ chính thức riêng cho từng chuyên viên trong phạm vi để mỗi người tự giác nộp báo cáo kết quả.
+- **Thao tác Quản trị (Lãnh đạo: Manager & Deputy Manager)**:
+  + Toàn quyền **CRUD**: Tạo mẫu định kỳ mới, Chỉnh sửa thông tin/phạm vi, Xóa mẫu định kỳ, Tạm dừng hoặc Kích hoạt lại.
+  + Nút phát hành kỳ tiếp theo (`Manual Trigger`), kiểm soát chống sinh trùng lặp theo khóa duy nhất `(rule_id, period_key)`.
+  + Theo dõi tiến độ nộp báo cáo của toàn bộ chuyên viên trong từng kỳ đã phát hành.
+- **Báo cáo trực tiếp cho Chuyên viên (Staff)**:
+  + Chuyên viên truy cập `/recurrence` để theo dõi các nhiệm vụ định kỳ được phân công.
+  + Chuyên viên có thể **trực tiếp nộp báo cáo kết quả** ngay trên giao diện này thông qua modal nộp báo cáo (nhập tóm tắt kết quả, liên kết sản phẩm, ghi chú), không cần phải chuyển sang màn hình khác.
+  + Sau khi nộp, nhiệm vụ chuyển sang trạng thái chờ duyệt (`IN_REVIEW`), tự động gửi thông báo đến Lãnh đạo phòng. Chuyên viên có thể xem lại báo cáo đã nộp bất kỳ lúc nào.
 
 ### 3.10. Nhật ký và cài đặt (P0)
 

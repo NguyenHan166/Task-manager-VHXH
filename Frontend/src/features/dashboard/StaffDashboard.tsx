@@ -140,7 +140,7 @@ export function StaffDashboard() {
       </div>
 
       {/* 2. Row of 5 Staff KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
         {/* Assigned */}
         <StatCard
           label="Việc tôi chủ trì"
@@ -188,6 +188,7 @@ export function StaffDashboard() {
           description="Đã gửi báo cáo"
           variant="info"
           icon={<FileText className="w-5 h-5" />}
+          className="col-span-2 sm:col-span-1"
           onClick={() => navigate("/tasks?status=IN_REVIEW")}
         />
       </div>

@@ -14,12 +14,32 @@ export function toIsoUtc(date: Date = new Date()): string {
 }
 
 /**
- * Format ISO datetime string to VN display (e.g., "16:00 26/10/2026").
+ * Returns standardized YYYY-MM-DD date key in Asia/Ho_Chi_Minh timezone.
+ * Used for date grouping, date matching, and calendar grids.
  */
-export function formatDateTimeVN(iso: string | null | undefined): string {
+export function toDateKeyVN(date: string | Date | null | undefined): string {
+  if (!date) return "";
+  try {
+    const d = typeof date === "string" ? new Date(date) : date;
+    if (isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: TIMEZONE_VN,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Format ISO datetime string or Date to VN display (e.g., "16:00 26/10/2026").
+ */
+export function formatDateTimeVN(iso: string | Date | null | undefined): string {
   if (!iso) return "—";
   try {
-    const d = new Date(iso);
+    const d = typeof iso === "string" ? new Date(iso) : iso;
     if (isNaN(d.getTime())) return "—";
     return new Intl.DateTimeFormat("vi-VN", {
       timeZone: TIMEZONE_VN,
@@ -36,12 +56,12 @@ export function formatDateTimeVN(iso: string | null | undefined): string {
 }
 
 /**
- * Format ISO datetime to date only (e.g., "26/10/2026").
+ * Format ISO datetime or Date to date only (e.g., "26/10/2026").
  */
-export function formatDateVN(iso: string | null | undefined): string {
+export function formatDateVN(iso: string | Date | null | undefined): string {
   if (!iso) return "—";
   try {
-    const d = new Date(iso);
+    const d = typeof iso === "string" ? new Date(iso) : iso;
     if (isNaN(d.getTime())) return "—";
     return new Intl.DateTimeFormat("vi-VN", {
       timeZone: TIMEZONE_VN,
@@ -55,12 +75,12 @@ export function formatDateVN(iso: string | null | undefined): string {
 }
 
 /**
- * Format ISO datetime to time only (e.g., "16:00").
+ * Format ISO datetime or Date to time only (e.g., "16:00").
  */
-export function formatTimeVN(iso: string | null | undefined): string {
+export function formatTimeVN(iso: string | Date | null | undefined): string {
   if (!iso) return "—";
   try {
-    const d = new Date(iso);
+    const d = typeof iso === "string" ? new Date(iso) : iso;
     if (isNaN(d.getTime())) return "—";
     return new Intl.DateTimeFormat("vi-VN", {
       timeZone: TIMEZONE_VN,
@@ -76,10 +96,10 @@ export function formatTimeVN(iso: string | null | undefined): string {
 /**
  * Friendly relative time display in Vietnamese (e.g. "2 giờ trước", "Trong 3 giờ", "Hôm nay 16:00").
  */
-export function formatRelativeVN(iso: string | null | undefined, now: Date = new Date()): string {
+export function formatRelativeVN(iso: string | Date | null | undefined, now: Date = new Date()): string {
   if (!iso) return "—";
   try {
-    const target = new Date(iso);
+    const target = typeof iso === "string" ? new Date(iso) : iso;
     if (isNaN(target.getTime())) return "—";
 
     const diffMs = target.getTime() - now.getTime();
@@ -98,16 +118,16 @@ export function formatRelativeVN(iso: string | null | undefined, now: Date = new
 
       if (absMin < 60) return `${absMin} phút trước`;
       if (absHours < 24) return `${absHours} giờ trước`;
-      if (absDays === 1) return `Hôm qua ${formatTimeVN(iso)}`;
+      if (absDays === 1) return `Hôm qua ${formatTimeVN(target)}`;
       if (absDays < 7) return `${absDays} ngày trước`;
-      return formatDateVN(iso);
+      return formatDateVN(target);
     } else {
       // Future
       if (diffMin < 60) return `Trong ${diffMin} phút nữa`;
       if (diffHours < 24) return `Trong ${diffHours} giờ nữa`;
-      if (diffDays === 1) return `Ngày mai ${formatTimeVN(iso)}`;
+      if (diffDays === 1) return `Ngày mai ${formatTimeVN(target)}`;
       if (diffDays < 7) return `${diffDays} ngày nữa`;
-      return formatDateVN(iso);
+      return formatDateVN(target);
     }
   } catch {
     return "—";

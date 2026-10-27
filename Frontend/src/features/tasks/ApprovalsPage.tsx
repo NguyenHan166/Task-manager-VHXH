@@ -782,6 +782,34 @@ export function ApprovalsPage() {
                 <p className="text-text-primary whitespace-pre-wrap leading-relaxed">
                   {selectedSub.summary}
                 </p>
+
+                {selectedSub.details && (
+                  <div className="pt-2 border-t border-purple-200/80">
+                    <span className="font-semibold text-purple-900 block mb-0.5">Chi tiết số liệu đạt được:</span>
+                    <p className="text-text-primary whitespace-pre-wrap">{selectedSub.details}</p>
+                  </div>
+                )}
+
+                {selectedSub.deliverableUrl && (
+                  <div className="pt-2 border-t border-purple-200/80 flex items-center gap-1.5">
+                    <span className="font-semibold text-purple-900 shrink-0">Link sản phẩm:</span>
+                    <a
+                      href={selectedSub.deliverableUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-700 underline truncate hover:text-brand-800"
+                    >
+                      {selectedSub.deliverableUrl}
+                    </a>
+                  </div>
+                )}
+
+                {selectedSub.notes && (
+                  <div className="pt-2 border-t border-purple-200/80">
+                    <span className="font-semibold text-purple-900 block mb-0.5">Tự đánh giá & Kiến nghị:</span>
+                    <p className="text-text-primary whitespace-pre-wrap">{selectedSub.notes}</p>
+                  </div>
+                )}
               </div>
 
               {/* Attached files */}

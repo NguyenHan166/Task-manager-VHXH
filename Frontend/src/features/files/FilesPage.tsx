@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 
 export function FilesPage() {
-  const { currentUser, isManager, users } = useSession();
+  const { currentUser, isLeader, users } = useSession();
   const { showToast } = useToast();
 
   const [files, setFiles] = useState<FileObject[]>([]);
@@ -350,7 +350,7 @@ export function FilesPage() {
       header: "Thao tác",
       width: "110px",
       render: (f: FileObject) => {
-        const canDelete = currentUser?.id === f.uploadedById || isManager;
+        const canDelete = currentUser?.id === f.uploadedById || isLeader;
         return (
           <div className="flex items-center gap-1.5">
             <button
@@ -455,7 +455,7 @@ export function FilesPage() {
               {filteredFiles.map((f) => {
                 const uploader = users.find((u) => u.id === f.uploadedById);
                 const fLinks = links.filter((l) => l.fileId === f.id);
-                const canDelete = isManager || f.uploadedById === currentUser?.id;
+                const canDelete = isLeader || f.uploadedById === currentUser?.id;
 
                 return (
                   <div

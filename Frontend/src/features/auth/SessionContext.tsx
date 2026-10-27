@@ -11,6 +11,9 @@ export interface SessionContextValue {
   currentUserId: string;
   users: User[];
   isManager: boolean;
+  isDeputy: boolean;
+  isLeader: boolean;
+  isAdmin: boolean;
   isStaff: boolean;
   isLoading: boolean;
   error: AppError | null;
@@ -83,6 +86,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       currentUserId: currentUser?.id || currentUserId,
       users,
       isManager: currentUser?.role === "MANAGER",
+      isDeputy: currentUser?.role === "DEPUTY_MANAGER",
+      isLeader: currentUser?.role === "MANAGER" || currentUser?.role === "DEPUTY_MANAGER",
+      isAdmin: currentUser?.role === "MANAGER",
       isStaff: currentUser?.role === "STAFF",
       isLoading,
       error,

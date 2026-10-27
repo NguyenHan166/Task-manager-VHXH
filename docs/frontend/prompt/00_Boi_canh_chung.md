@@ -6,12 +6,12 @@ Tôi sẽ cung cấp `data-contract.ts` và `mock-seed.ts`. Hãy coi chúng là 
 
 ## Mô hình nghiệp vụ bắt buộc
 
-- Chỉ có hai vai trò tài khoản: `MANAGER` (Trưởng phòng, kiêm quản trị) và `STAFF` (Chuyên viên). Không tạo role `ADMIN`.
-- Có ba loại việc: `OFFICIAL` (chỉ Manager giao, phải duyệt kết quả, được tính trong KPI phòng), `TEAM` (cộng tác, người được mời có thể nhận/từ chối), `PERSONAL` (riêng tư, không tính KPI phòng).
+- Có ba vai trò tài khoản: `MANAGER` (Trưởng phòng, kiêm quản trị hệ thống), `DEPUTY_MANAGER` (Phó phòng, toàn quyền điều hành như Trưởng phòng nhưng không có quyền quản trị hệ thống), và `STAFF` (Chuyên viên). Không tạo role `ADMIN` riêng mà quyền quản trị gắn liền với `MANAGER`.
+- Có ba loại việc: `OFFICIAL` (chỉ Lãnh đạo gồm Manager và Deputy Manager giao, phải duyệt kết quả, được tính trong KPI phòng), `TEAM` (cộng tác, người được mời có thể nhận/từ chối), `PERSONAL` (riêng tư, không tính KPI phòng).
 - Một việc chính thức có đúng một người chủ trì khi phát hành; có thể có nhiều người phối hợp và theo dõi. Staff chỉ đề nghị gia hạn hoặc đổi người, không tự thay đổi hạn/người của `OFFICIAL`.
 - Trạng thái: `DRAFT` → `TODO` → `IN_PROGRESS` → `IN_REVIEW` → `DONE`; `CANCELLED` khi hủy. Trả lại kết quả chuyển về `IN_PROGRESS` và lưu lý do. “Quá hạn” được tính từ `dueAt` và trạng thái, không phải status. “Vướng mắc” là cờ/lý do riêng.
 - Mỗi lần nộp, duyệt, trả lại, đổi hạn, đổi người, hủy phải giữ lịch sử. `DONE` và `CANCELLED` không nhận nhắc quá hạn.
-- Manager xem mọi `OFFICIAL` và quản lý tài khoản; không đưa `PERSONAL` của nhân viên khác vào giao diện Manager. Staff chỉ xem việc được tham gia hoặc do mình tạo. Đây là mô phỏng quyền ở frontend để duyệt UX; hợp đồng backend sau này phải thực thi quyền ở server.
+- Manager và Deputy Manager xem mọi `OFFICIAL`; riêng Manager kiêm quản lý tài khoản và cài đặt hệ thống; Deputy Manager không có quyền quản trị hệ thống. Không đưa `PERSONAL` của nhân viên khác vào giao diện Lãnh đạo. Staff chỉ xem việc được tham gia hoặc do mình tạo. Đây là mô phỏng quyền ở frontend để duyệt UX; hợp đồng backend sau này phải thực thi quyền ở server.
 - Giờ hiển thị `Asia/Ho_Chi_Minh`; giá trị thời gian trao đổi với backend dùng ISO 8601 UTC.
 
 ## Hướng thiết kế từ ảnh tham chiếu MISA

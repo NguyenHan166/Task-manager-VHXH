@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 export function ProjectsPage() {
-  const { currentUser, isManager, users } = useSession();
+  const { currentUser, isManager, isLeader, users } = useSession();
   const { showToast } = useToast();
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -70,14 +70,14 @@ export function ProjectsPage() {
   // Staff only sees projects where they have at least one permitted task OR own the project.
   const visibleProjects = useMemo(() => {
     if (!currentUser) return [];
-    if (isManager) return projects;
+    if (isLeader) return projects;
 
     return projects.filter((proj) => {
       if (proj.ownerId === currentUser.id) return true;
       const projTasks = tasks.filter((t) => t.projectId === proj.id);
       return projTasks.some((t) => canSeeTask(t, currentUser, participants));
     });
-  }, [projects, tasks, participants, currentUser, isManager]);
+  }, [projects, tasks, participants, currentUser, isLeader]);
 
   // Compute stats dynamically for each project from selectors
   const getProjectStats = (projId: string) => {

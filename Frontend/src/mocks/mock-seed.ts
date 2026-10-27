@@ -6,11 +6,12 @@ export function createMockSeed(now = new Date()): MockDb {
   const codeYear = new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(now);
   const code = (prefix: "CV" | "NH" | "CN", sequence: number) => `${prefix}-${codeYear}-${String(sequence).padStart(4, "0")}`;
   const users: User[] = [
-    { id: "u01", username: "truongphong", displayName: "Nguyễn Văn An", role: "MANAGER", status: "ACTIVE", jobTitle: "Trưởng phòng", avatarUrl: null, createdAt: at(-720) },
-    { id: "u02", username: "binh", displayName: "Trần Thị Bình", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên", avatarUrl: null, createdAt: at(-700) },
-    { id: "u03", username: "chau", displayName: "Lê Minh Châu", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên", avatarUrl: null, createdAt: at(-680) },
-    { id: "u04", username: "dung", displayName: "Phạm Quốc Dũng", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên", avatarUrl: null, createdAt: at(-660) },
-    { id: "u05", username: "ha", displayName: "Võ Thu Hà", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên", avatarUrl: null, createdAt: at(-640) },
+    { id: "u01", username: "an.nv@agency.gov.vn", displayName: "Nguyễn Văn An", role: "MANAGER", status: "ACTIVE", jobTitle: "Trưởng phòng", email: "an.nv@agency.gov.vn", phoneNumber: "0901.234.501", department: "Lãnh đạo đơn vị", avatarUrl: null, createdAt: at(-720), lastLoginAt: at(-1) },
+    { id: "u06", username: "vu.lt@agency.gov.vn", displayName: "Lê Tuấn Vũ", role: "DEPUTY_MANAGER", status: "ACTIVE", jobTitle: "Phó trưởng phòng", email: "vu.lt@agency.gov.vn", phoneNumber: "0901.234.506", department: "Lãnh đạo đơn vị", avatarUrl: null, createdAt: at(-710), lastLoginAt: at(-3) },
+    { id: "u02", username: "binh.tt@agency.gov.vn", displayName: "Trần Thị Bình", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên Tổng hợp", email: "binh.tt@agency.gov.vn", phoneNumber: "0901.234.502", department: "Tổ Tổng hợp - Kế hoạch", avatarUrl: null, createdAt: at(-700), lastLoginAt: at(-5) },
+    { id: "u03", username: "chau.lm@agency.gov.vn", displayName: "Lê Minh Châu", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên Kỹ thuật", email: "chau.lm@agency.gov.vn", phoneNumber: "0901.234.503", department: "Tổ Kỹ thuật - Vận hành", avatarUrl: null, createdAt: at(-680), lastLoginAt: at(-12) },
+    { id: "u04", username: "dung.pq@agency.gov.vn", displayName: "Phạm Quốc Dũng", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên Kế toán", email: "dung.pq@agency.gov.vn", phoneNumber: "0901.234.504", department: "Tổ Kế toán - Tài chính", avatarUrl: null, createdAt: at(-660), lastLoginAt: at(-24) },
+    { id: "u05", username: "ha.vt@agency.gov.vn", displayName: "Võ Thu Hà", role: "STAFF", status: "ACTIVE", jobTitle: "Chuyên viên Văn thư", email: "ha.vt@agency.gov.vn", phoneNumber: "0901.234.505", department: "Tổ Hành chính - Văn thư", avatarUrl: null, createdAt: at(-640), lastLoginAt: at(-8) },
   ];
 
   const task = (
@@ -44,6 +45,10 @@ export function createMockSeed(now = new Date()): MockDb {
     task("t11", code("NH", 2), "TEAM", "Góp ý mẫu biểu nội bộ", "TODO", "u03", "u03", 144),
     task("t12", code("CN", 1), "PERSONAL", "Chuẩn bị ghi chú họp cá nhân", "TODO", "u02", "u02", 30),
     task("t13", code("CN", 2), "PERSONAL", "Sắp xếp tài liệu tham khảo", "DONE", "u03", "u03", -24, { progressPercent: 100, completedAt: at(-30) }),
+    task("t14", code("CV", 10), "OFFICIAL", "Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44", "IN_REVIEW", "u01", "u02", 48, { priority: "HIGH", progressPercent: 100, deliverable: "Báo cáo định kỳ theo mẫu quy định." }),
+    task("t15", code("CV", 11), "OFFICIAL", "Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44", "TODO", "u01", "u03", 48, { priority: "HIGH", progressPercent: 0, deliverable: "Báo cáo định kỳ theo mẫu quy định." }),
+    task("t16", code("CV", 12), "OFFICIAL", "Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44", "TODO", "u01", "u04", 48, { priority: "HIGH", progressPercent: 0, deliverable: "Báo cáo định kỳ theo mẫu quy định." }),
+    task("t17", code("CV", 13), "OFFICIAL", "Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44", "TODO", "u01", "u05", 48, { priority: "HIGH", progressPercent: 0, deliverable: "Báo cáo định kỳ theo mẫu quy định." }),
   ];
 
   return {
@@ -72,6 +77,7 @@ export function createMockSeed(now = new Date()): MockDb {
       { id: "s02", taskId: "t05", submittedById: "u02", summary: "Nộp bản báo cáo lần đầu.", submittedAt: at(-112) },
       { id: "s03", taskId: "t05", submittedById: "u02", summary: "Đã bổ sung phụ lục theo yêu cầu.", submittedAt: at(-100) },
       { id: "s04", taskId: "t06", submittedById: "u03", summary: "Hoàn thành biên bản kiểm kê.", submittedAt: at(-50) },
+      { id: "s05", taskId: "t14", submittedById: "u02", summary: "Đã tổng hợp tiến độ tuần 44: các đầu việc đúng tiến độ, đề xuất bố trí thêm nhân sự trực.", submittedAt: at(-2), status: "PENDING" },
     ],
     approvals: [
       { id: "a01", taskId: "t05", submissionId: "s02", decidedById: "u01", decision: "RETURNED", reason: "Cần bổ sung phụ lục số liệu.", decidedAt: at(-110) },
@@ -83,9 +89,12 @@ export function createMockSeed(now = new Date()): MockDb {
     ],
     assigneeRequests: [],
     recurrenceRules: [
-      { id: "rr01", title: "Báo cáo công tác hằng tháng", description: "Tổng hợp kết quả tháng và nộp để duyệt.", ownerId: "u01", primaryAssigneeId: "u02", priority: "NORMAL", frequency: "MONTHLY", dueAfterHours: 120, nextRunAt: at(240), active: true, createdAt: at(-240) },
+      { id: "rr01", title: "Báo cáo công tác hằng tháng", description: "Tổng hợp kết quả chuyên môn trong tháng và nộp báo cáo kết quả để Lãnh đạo duyệt.", ownerId: "u01", scope: "CUSTOM", assigneeIds: ["u02", "u03"], primaryAssigneeId: "u02", priority: "NORMAL", frequency: "MONTHLY", dueAfterHours: 120, nextRunAt: at(240), active: true, createdAt: at(-240) },
+      { id: "rr02", title: "Báo cáo tiến độ công việc hàng tuần", description: "Toàn thể chuyên viên trong phòng nộp tóm tắt các đầu việc đã thực hiện trong tuần, khó khăn vướng mắc và kế hoạch tuần tới.", ownerId: "u01", scope: "ALL", assigneeIds: ["u02", "u03", "u04", "u05"], primaryAssigneeId: "u02", priority: "HIGH", frequency: "WEEKLY", dueAfterHours: 48, nextRunAt: at(72), active: true, createdAt: at(-120) },
     ],
-    recurrenceInstances: [],
+    recurrenceInstances: [
+      { id: "ri01", ruleId: "rr02", periodKey: "2026-W44", taskId: "t14", taskIds: ["t14", "t15", "t16", "t17"], createdAt: at(-48) },
+    ],
     events: [
       { id: "e01", taskId: "t01", actorId: "u01", kind: "PUBLISHED", note: "Giao nhiệm vụ cho Trần Thị Bình.", before: { status: "DRAFT" }, after: { status: "TODO" }, createdAt: at(-120) },
       { id: "e02", taskId: "t01", actorId: "u02", kind: "STARTED", note: "Bắt đầu thực hiện.", before: { status: "TODO" }, after: { status: "IN_PROGRESS" }, createdAt: at(-96) },
@@ -122,6 +131,7 @@ export function createMockSeed(now = new Date()): MockDb {
       { id: "rm04", roomId: "r02", userId: "u02", lastReadAt: at(-5), joinedAt: at(-48) },
       { id: "rm05", roomId: "r02", userId: "u03", lastReadAt: at(-5), joinedAt: at(-48) },
       { id: "rm06", roomId: "r02", userId: "u04", lastReadAt: at(-5), joinedAt: at(-48) },
+      { id: "rm07", roomId: "r02", userId: "u06", lastReadAt: at(-5), joinedAt: at(-48) },
     ],
     chatMessages: [
       { id: "m01", roomId: "r01", senderId: "u02", body: "Châu gửi giúp mình phần tài liệu tập huấn nhé.", createdAt: at(-8), editedAt: null, deletedAt: null },

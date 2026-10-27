@@ -41,7 +41,7 @@ import {
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { currentUser, isManager, users } = useSession();
+  const { currentUser, isManager, isLeader, users } = useSession();
   const { showToast } = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
@@ -95,7 +95,7 @@ export function ProjectDetailPage() {
       const projTasks = allTasks.filter((t) => t.projectId === proj.id);
       const permittedTasks = projTasks.filter((t) => canSeeTask(t, currentUser, allParts));
 
-      if (!isManager && proj.ownerId !== currentUser.id && permittedTasks.length === 0) {
+      if (!isLeader && proj.ownerId !== currentUser.id && permittedTasks.length === 0) {
         setIsForbidden(true);
         return;
       }

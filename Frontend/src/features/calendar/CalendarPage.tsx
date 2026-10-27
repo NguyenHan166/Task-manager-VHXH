@@ -14,7 +14,7 @@ import {
   UserAvatar,
   OverdueBadge,
 } from "../../components/ui";
-import { formatDateVN, formatTimeVN } from "../../shared/datetime";
+import { formatDateVN, formatTimeVN, toDateKeyVN } from "../../shared/datetime";
 import {
   ChevronLeft,
   ChevronRight,
@@ -31,7 +31,7 @@ type CalendarViewMode = "MONTH" | "WEEK" | "DAY" | "AGENDA";
 type CalendarScope = "OWNED" | "COLLABORATING" | "ALL";
 
 export function CalendarPage() {
-  const { currentUser, isManager, users } = useSession();
+  const { currentUser, isLeader, users } = useSession();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [participants, setParticipants] = useState<TaskParticipant[]>([]);
@@ -157,8 +157,9 @@ export function CalendarPage() {
 
     sorted.forEach((t) => {
       if (!t.dueAt) return;
+      const key = toDateKeyVN(t.dueAt);
+      if (!key) return;
       const d = new Date(t.dueAt);
-      const key = d.toISOString().slice(0, 10);
       if (!map.has(key)) {
         map.set(key, { date: d, tasks: [] });
       }
@@ -233,21 +234,20 @@ export function CalendarPage() {
 
   // Helper to find tasks on a given date (Asia/Ho_Chi_Minh)
   const getTasksOnDate = (date: Date) => {
-    const dateStr = date.toISOString().slice(0, 10);
+    const targetKey = toDateKeyVN(date);
+    if (!targetKey) return [];
     return calendarTasks.filter((t) => {
       if (!t.dueAt) return false;
-      const tDate = new Date(t.dueAt).toISOString().slice(0, 10);
-      return tDate === dateStr;
+      return toDateKeyVN(t.dueAt) === targetKey;
     });
   };
 
   const isToday = (d: Date) => {
-    const today = new Date();
-    return (
-      d.getDate() === today.getDate() &&
-      d.getMonth() === today.getMonth() &&
-      d.getFullYear() === today.getFullYear()
-    );
+    return toDateKeyVN(d) === toDateKeyVN(new Date());
+  };
+
+  const isSameDay = (d1: Date, d2: Date) => {
+    return toDateKeyVN(d1) === toDateKeyVN(d2);
   };
 
   return (
@@ -293,7 +293,7 @@ export function CalendarPage() {
               >
                 Phối hợp
               </button>
-              {isManager && (
+              {isLeader && (
                 <button
                   onClick={() => setScope("ALL")}
                   className={`px-3 py-1.5 rounded-btn transition-colors ${
@@ -421,7 +421,13 @@ export function CalendarPage() {
                           {item.date.getDate()}
                         </span>
                         {dayTasks.length > 0 && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-text-secondary">
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                              dayTasks.some((t) => isTaskOverdue(t))
+                                ? "bg-red-100 text-danger"
+                                : "bg-brand-50 text-brand-800 border border-brand-200"
+                            }`}
+                          >
                             {dayTasks.length}
                           </span>
                         )}
@@ -477,42 +483,94 @@ export function CalendarPage() {
                 <div className="grid grid-cols-7 gap-y-1 text-center">
                   {monthGridDays.map((item, idx) => {
                     const dayTasks = getTasksOnDate(item.date);
+                    const hasTasks = dayTasks.length > 0;
                     const today = isToday(item.date);
-                    const isSelected =
-                      selectedMobileDate.toISOString().slice(0, 10) ===
-                      item.date.toISOString().slice(0, 10);
+                    const isSelected = isSameDay(selectedMobileDate, item.date);
                     const hasOverdue = dayTasks.some((t) => isTaskOverdue(t));
+                    const allDone = hasTasks && dayTasks.every((t) => t.status === "DONE");
+
+                    // Button style classes
+                    let buttonStyle = "";
+                    if (isSelected) {
+                      buttonStyle = "bg-brand-700 text-white font-bold shadow-xs";
+                    } else if (today) {
+                      buttonStyle = `ring-2 ring-brand-700 font-bold ${
+                        hasOverdue
+                          ? "bg-red-50 text-red-900 border border-red-300"
+                          : hasTasks
+                          ? "bg-brand-50 text-brand-900 border border-brand-200"
+                          : "text-brand-700 bg-brand-50/50"
+                      }`;
+                    } else if (item.isCurrentMonth) {
+                      if (hasOverdue) {
+                        buttonStyle = "bg-red-50/90 border border-red-200 text-red-700 font-bold hover:bg-red-100/80 shadow-2xs";
+                      } else if (allDone) {
+                        buttonStyle = "bg-emerald-50/90 border border-emerald-200 text-emerald-800 font-bold hover:bg-emerald-100/80 shadow-2xs";
+                      } else if (hasTasks) {
+                        buttonStyle = "bg-brand-50/90 border border-brand-200/90 text-brand-800 font-bold hover:bg-brand-100/80 shadow-2xs";
+                      } else {
+                        buttonStyle = "text-text-primary hover:bg-slate-100 font-medium";
+                      }
+                    } else {
+                      if (hasTasks) {
+                        buttonStyle = "text-text-muted/60 opacity-50 bg-slate-50/50 hover:bg-slate-100";
+                      } else {
+                        buttonStyle = "text-text-muted opacity-35 hover:opacity-60";
+                      }
+                    }
+
+                    // Dot color
+                    let dotColor = "bg-brand-700";
+                    if (isSelected) {
+                      dotColor = hasOverdue ? "bg-red-300 ring-1 ring-white" : "bg-white";
+                    } else if (hasOverdue) {
+                      dotColor = "bg-red-500 ring-1 ring-red-200";
+                    } else if (allDone) {
+                      dotColor = "bg-emerald-600";
+                    }
 
                     return (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => setSelectedMobileDate(item.date)}
-                        className={`h-11 w-full flex flex-col items-center justify-center rounded-xl transition-all relative ${
-                          isSelected
-                            ? "bg-brand-700 text-white font-bold shadow-xs"
-                            : today
-                            ? "ring-2 ring-brand-700 font-bold text-brand-700 bg-brand-50/50"
-                            : item.isCurrentMonth
-                            ? "text-text-primary hover:bg-slate-100 font-medium"
-                            : "text-text-muted opacity-35"
-                        }`}
+                        className={`h-11 w-full flex flex-col items-center justify-center rounded-xl transition-all relative ${buttonStyle}`}
                       >
-                        <span className="text-xs leading-none">{item.date.getDate()}</span>
-                        {dayTasks.length > 0 && (
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${
-                              hasOverdue
-                                ? "bg-red-500 ring-1 ring-white"
-                                : isSelected
-                                ? "bg-white"
-                                : "bg-brand-600"
-                            }`}
-                          />
-                        )}
+                        <span className="text-xs leading-none font-semibold">{item.date.getDate()}</span>
+                        <span className="h-1.5 mt-1 flex items-center justify-center gap-0.5">
+                          {hasTasks && (
+                            <>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                              {dayTasks.length > 1 && (
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isSelected
+                                      ? "bg-white/80"
+                                      : allDone
+                                      ? "bg-emerald-500"
+                                      : "bg-brand-600"
+                                  }`}
+                                />
+                              )}
+                            </>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Visual Legend */}
+                <div className="flex items-center justify-center gap-4 pt-2.5 mt-2 border-t border-border/70 text-[11px] text-text-muted">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-brand-700" /> Có việc
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-red-500" /> Quá hạn
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600" /> Hoàn thành
+                  </span>
                 </div>
               </div>
 
@@ -521,7 +579,7 @@ export function CalendarPage() {
                 <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
                   <div className="font-bold text-sm text-text-primary flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-brand-700" />
-                    <span>Hạn nộp ngày {formatDateVN(selectedMobileDate.toISOString())}</span>
+                    <span>Hạn nộp ngày {formatDateVN(selectedMobileDate)}</span>
                   </div>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-text-secondary">
                     {getTasksOnDate(selectedMobileDate).length} việc
@@ -667,40 +725,71 @@ export function CalendarPage() {
                 <div className="grid grid-cols-7 gap-1 text-center">
                   {weekDays.map((d, idx) => {
                     const dayTasks = getTasksOnDate(d);
+                    const hasTasks = dayTasks.length > 0;
                     const today = isToday(d);
-                    const isSelected =
-                      selectedMobileDate.toISOString().slice(0, 10) ===
-                      d.toISOString().slice(0, 10);
+                    const isSelected = isSameDay(selectedMobileDate, d);
                     const hasOverdue = dayTasks.some((t) => isTaskOverdue(t));
+                    const allDone = hasTasks && dayTasks.every((t) => t.status === "DONE");
+
+                    let buttonStyle = "";
+                    if (isSelected) {
+                      buttonStyle = "bg-brand-700 text-white font-bold shadow-xs";
+                    } else if (today) {
+                      buttonStyle = `ring-2 ring-brand-700 font-bold ${
+                        hasOverdue
+                          ? "bg-red-50 text-red-900 border border-red-300"
+                          : hasTasks
+                          ? "bg-brand-50 text-brand-900 border border-brand-200"
+                          : "text-brand-700 bg-brand-50"
+                      }`;
+                    } else if (hasOverdue) {
+                      buttonStyle = "bg-red-50/90 border border-red-200 text-red-700 font-bold hover:bg-red-100";
+                    } else if (allDone) {
+                      buttonStyle = "bg-emerald-50/90 border border-emerald-200 text-emerald-800 font-bold hover:bg-emerald-100";
+                    } else if (hasTasks) {
+                      buttonStyle = "bg-brand-50/90 border border-brand-200 text-brand-800 font-bold hover:bg-brand-100";
+                    } else {
+                      buttonStyle = "text-text-primary hover:bg-slate-100 font-medium";
+                    }
+
+                    let dotColor = "bg-brand-700";
+                    if (isSelected) {
+                      dotColor = hasOverdue ? "bg-red-300 ring-1 ring-white" : "bg-white";
+                    } else if (hasOverdue) {
+                      dotColor = "bg-red-500 ring-1 ring-red-200";
+                    } else if (allDone) {
+                      dotColor = "bg-emerald-600";
+                    }
 
                     return (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => setSelectedMobileDate(d)}
-                        className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all ${
-                          isSelected
-                            ? "bg-brand-700 text-white font-bold shadow-xs"
-                            : today
-                            ? "ring-2 ring-brand-700 font-bold text-brand-700 bg-brand-50"
-                            : "text-text-primary hover:bg-slate-100 font-medium"
-                        }`}
+                        className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all relative ${buttonStyle}`}
                       >
                         <span className="text-[10px] opacity-80 uppercase">
                           {idx === 5 ? "T7" : idx === 6 ? "CN" : `T${idx + 2}`}
                         </span>
                         <span className="text-sm font-bold mt-0.5">{d.getDate()}</span>
-                        {dayTasks.length > 0 && (
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full mt-1 ${
-                              hasOverdue
-                                ? "bg-red-500 ring-1 ring-white"
-                                : isSelected
-                                ? "bg-white"
-                                : "bg-brand-600"
-                            }`}
-                          />
-                        )}
+                        <span className="h-1.5 mt-1 flex items-center justify-center gap-0.5">
+                          {hasTasks && (
+                            <>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                              {dayTasks.length > 1 && (
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isSelected
+                                      ? "bg-white/80"
+                                      : allDone
+                                      ? "bg-emerald-500"
+                                      : "bg-brand-600"
+                                  }`}
+                                />
+                              )}
+                            </>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
@@ -712,7 +801,7 @@ export function CalendarPage() {
                 <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
                   <div className="font-bold text-sm text-text-primary flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-brand-700" />
-                    <span>Hạn ngày {formatDateVN(selectedMobileDate.toISOString())}</span>
+                    <span>Hạn ngày {formatDateVN(selectedMobileDate)}</span>
                   </div>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-text-secondary">
                     {getTasksOnDate(selectedMobileDate).length} việc
@@ -809,7 +898,7 @@ export function CalendarPage() {
                           }`}
                         >
                           {today && <span className="w-2 h-2 rounded-full bg-brand-700 animate-pulse" />}
-                          {formatDateVN(group.date.toISOString())}
+                          {formatDateVN(group.date)}
                         </span>
                         {today && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-100 text-brand-800">

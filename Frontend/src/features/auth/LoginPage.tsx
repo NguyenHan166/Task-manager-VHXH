@@ -10,6 +10,7 @@ import {
   Layers,
   CheckCircle2,
   Lock,
+  UserCheck,
 } from "lucide-react";
 
 export function LoginPage() {
@@ -33,6 +34,7 @@ export function LoginPage() {
   };
 
   const managerUser = users.find((u) => u.role === "MANAGER") || users[0];
+  const deputyUsers = users.filter((u) => u.role === "DEPUTY_MANAGER");
   const staffUsers = users.filter((u) => u.role === "STAFF");
 
   const selectedUser = useMemo(() => {
@@ -70,7 +72,7 @@ export function LoginPage() {
             Chọn tài khoản demo để trải nghiệm
           </h1>
           <p className="text-sm text-text-secondary max-w-xl mx-auto">
-            Hệ thống không yêu cầu mật khẩu thật. Vui lòng chọn một trong các tài khoản hoạt động để trải nghiệm giao diện và luồng phân quyền tương ứng.
+            Hệ thống hỗ trợ 3 vai trò: <strong>Trưởng phòng</strong> (kiêm Quản trị hệ thống), <strong>Phó phòng</strong> (toàn quyền Điều hành, không có Quản trị), và <strong>Chuyên viên</strong> (Thực hiện & Báo cáo).
           </p>
         </div>
 
@@ -83,7 +85,7 @@ export function LoginPage() {
               <div className="flex items-center gap-2 mb-3">
                 <Shield className="w-4 h-4 text-emerald-700" />
                 <h2 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                  1. Tài khoản Trưởng phòng (Quản trị & Phê duyệt)
+                  1. Tài khoản Trưởng phòng (Điều hành & Quản trị hệ thống)
                 </h2>
               </div>
               {managerUser && (
@@ -121,7 +123,7 @@ export function LoginPage() {
                             Tên đăng nhập: <code className="font-mono text-brand-700">{managerUser.username}</code> • Chức vụ: {managerUser.jobTitle}
                           </div>
                           <div className="text-[11px] text-text-muted mt-1">
-                            Quyền hạn: Xem tất cả việc chính thức, giao việc, duyệt kết quả nộp, phê duyệt gia hạn, quản trị hệ thống.
+                            Quyền hạn: Toàn quyền giao việc chính thức, duyệt kết quả, đổi hạn/chủ trì, hủy/mở lại việc + <strong>Quản trị hệ thống (Thành viên & Cài đặt)</strong>.
                           </div>
                         </div>
                       </div>
@@ -143,12 +145,80 @@ export function LoginPage() {
               )}
             </div>
 
+            {/* Deputy Manager Group */}
+            {deputyUsers.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck className="w-4 h-4 text-indigo-700" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                    2. Tài khoản Phó phòng (Điều hành & Phê duyệt — Không có quyền Quản trị)
+                  </h2>
+                </div>
+                <div className="space-y-2">
+                  {deputyUsers.map((deputy) => {
+                    const isLocked = deputy.status !== "ACTIVE";
+                    const isSelected = selectedUserId === deputy.id;
+                    return (
+                      <div
+                        key={deputy.id}
+                        onClick={() => !isLocked && handleSelectAccount(deputy.id)}
+                        role="button"
+                        tabIndex={0}
+                        className={`p-4 rounded-card border transition-all flex items-center justify-between ${
+                          isLocked
+                            ? "bg-slate-50 border-border opacity-50 cursor-not-allowed"
+                            : isSelected
+                            ? "bg-indigo-50/70 border-indigo-700 ring-2 ring-indigo-700/20 shadow-md cursor-pointer"
+                            : "bg-surface border-border hover:border-indigo-700/40 hover:bg-slate-50 shadow-xs cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <UserAvatar user={deputy} size="lg" showRoleBadge />
+                          <div>
+                            <div className="font-bold text-base text-text-primary flex items-center gap-2">
+                              {deputy.displayName}
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                Phó phòng (DEPUTY_MANAGER)
+                              </span>
+                              {isLocked && (
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
+                                  <Lock className="w-3 h-3" /> Đã khóa
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-text-secondary mt-0.5">
+                              Tên đăng nhập: <code className="font-mono text-indigo-700">{deputy.username}</code> • Chức vụ: {deputy.jobTitle}
+                            </div>
+                            <div className="text-[11px] text-text-muted mt-1">
+                              Quyền hạn: Toàn quyền giao việc, duyệt kết quả nộp, đổi hạn/chủ trì, xem Dashboard & Báo cáo toàn phòng — <strong>Không có quyền quản lý thành viên và cài đặt hệ thống</strong>.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 pl-3">
+                          <div
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                              isSelected && !isLocked
+                                ? "border-indigo-700 bg-indigo-700 text-white"
+                                : "border-border bg-surface"
+                            }`}
+                          >
+                            {isSelected && !isLocked && <CheckCircle2 className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Staff Group */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <User className="w-4 h-4 text-blue-700" />
                 <h2 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                  2. Tài khoản Chuyên viên (Thực hiện & Phối hợp)
+                  3. Tài khoản Chuyên viên (Thực hiện & Phối hợp)
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
@@ -19,7 +19,7 @@ import type {
   TaskPriority,
 } from "../../shared/data-contract";
 import { ForbiddenPage } from "../auth/ForbiddenPage";
-import { validateSelectedFile, setSessionFile } from "../files/file-session-store";
+import { validateSelectedFile, setSessionFile, getSessionFileUrl } from "../files/file-session-store";
 import {
   Breadcrumb,
   Button,
@@ -66,11 +66,15 @@ import {
   Users,
   AlertTriangle,
   CornerDownRight,
+  ExternalLink,
+  X,
+  Download,
+  Undo2,
 } from "lucide-react";
 
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { currentUser, isManager } = useSession();
+  const { currentUser, isLeader } = useSession();
   const { showToast } = useToast();
 
   // Data states
@@ -124,12 +128,20 @@ export function TaskDetailPage() {
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submissionSummary, setSubmissionSummary] = useState("");
+  const [submissionDetails, setSubmissionDetails] = useState("");
+  const [submissionDeliverableUrl, setSubmissionDeliverableUrl] = useState("");
+  const [submissionNotes, setSubmissionNotes] = useState("");
+  const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
+  const submissionFileInputRef = useRef<HTMLInputElement>(null);
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveReason, setApproveReason] = useState("");
 
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnReason, setReturnReason] = useState("");
+
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
 
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [proposedDueDate, setProposedDueDate] = useState("");
@@ -362,13 +374,49 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
+      // 1. Upload any attached files first
+      const uploadedFileIds: string[] = [];
+      const mimeMap: Record<string, string> = {
+        pdf: "application/pdf",
+        doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls: "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ppt: "application/vnd.ms-powerpoint",
+        pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+      };
+
+      for (const f of submissionFiles) {
+        const ext = f.name.split(".").pop()?.toLowerCase() || "";
+        const mimeType = f.type || mimeMap[ext] || "application/octet-stream";
+        const uploaded = await mockRepository.uploadMockFile(
+          { originalName: f.name, mimeType, sizeBytes: f.size },
+          currentUser.id
+        );
+        setSessionFile(uploaded.id, f);
+        uploadedFileIds.push(uploaded.id);
+      }
+
       await mockRepository.addSubmission(
         task.id,
-        { summary: submissionSummary.trim(), fileIds: [] },
+        {
+          summary: submissionSummary.trim(),
+          details: submissionDetails.trim() || null,
+          deliverableUrl: submissionDeliverableUrl.trim() || null,
+          notes: submissionNotes.trim() || null,
+          fileIds: uploadedFileIds,
+        },
         currentUser.id
       );
       setShowSubmitModal(false);
       setSubmissionSummary("");
+      setSubmissionDetails("");
+      setSubmissionDeliverableUrl("");
+      setSubmissionNotes("");
+      setSubmissionFiles([]);
       showToast("Đã nộp báo cáo kết quả. Công việc chuyển sang Chờ duyệt (IN_REVIEW).", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi nộp kết quả", "error");
@@ -420,6 +468,22 @@ export function TaskDetailPage() {
       showToast("Đã trả lại báo cáo để bổ sung. Công việc chuyển về Đang làm (IN_PROGRESS).", "warning");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi trả lại", "error");
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  // Action 7b: Withdraw Submission (Assignee when IN_REVIEW)
+  const handleWithdrawSubmission = async () => {
+    if (!task || !currentUser) return;
+    setIsSubmittingAction(true);
+    try {
+      await mockRepository.withdrawSubmission(task.id, currentUser.id, withdrawReason);
+      setShowWithdrawModal(false);
+      setWithdrawReason("");
+      showToast("Đã thu hồi báo cáo kết quả. Công việc chuyển về Đang làm (IN_PROGRESS).", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Lỗi khi thu hồi báo cáo", "error");
     } finally {
       setIsSubmittingAction(false);
     }
@@ -869,7 +933,7 @@ export function TaskDetailPage() {
   // Permission conditions for action buttons
   const isAssignee = task.primaryAssigneeId === currentUser?.id;
   const isCreator = task.createdById === currentUser?.id;
-  const canActAsAssignee = isAssignee || isManager;
+  const canActAsAssignee = isAssignee || isLeader;
   const myInvite = participants.find(
     (p) => p.userId === currentUser?.id && p.invitationStatus === "PENDING"
   );
@@ -883,7 +947,7 @@ export function TaskDetailPage() {
         {/* Breadcrumb */}
         <Breadcrumb
           items={[
-            { label: isManager ? "Tất cả công việc" : "Công việc của tôi", href: "/tasks" },
+            { label: isLeader ? "Tất cả công việc" : "Công việc của tôi", href: "/tasks" },
             { label: `${task.code} — ${task.title}` },
           ]}
         />
@@ -984,7 +1048,7 @@ export function TaskDetailPage() {
             {/* Contextual Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               {/* DRAFT: Publish and Assign (Manager or Creator) */}
-              {task.status === "DRAFT" && (isManager || isCreator) && (
+              {task.status === "DRAFT" && (isLeader || isCreator) && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1045,7 +1109,7 @@ export function TaskDetailPage() {
               )}
 
               {/* TEAM: Convert to OFFICIAL (Manager only) */}
-              {task.type === "TEAM" && task.status !== "CANCELLED" && isManager && (
+              {task.type === "TEAM" && task.status !== "CANCELLED" && isLeader && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1078,7 +1142,7 @@ export function TaskDetailPage() {
               )}
 
               {/* IN_REVIEW: Approve (Manager only) */}
-              {task.status === "IN_REVIEW" && isManager && (
+              {task.status === "IN_REVIEW" && isLeader && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1090,7 +1154,7 @@ export function TaskDetailPage() {
               )}
 
               {/* IN_REVIEW: Return (Manager only) */}
-              {task.status === "IN_REVIEW" && isManager && (
+              {task.status === "IN_REVIEW" && isLeader && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1098,6 +1162,21 @@ export function TaskDetailPage() {
                   className="gap-1.5 text-amber-800 border-amber-300 hover:bg-amber-50"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-amber-700" /> Trả lại yêu cầu bổ sung
+                </Button>
+              )}
+
+              {/* IN_REVIEW: Specialist Withdraw Submission */}
+              {task.status === "IN_REVIEW" && isAssignee && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setWithdrawReason("");
+                    setShowWithdrawModal(true);
+                  }}
+                  className="gap-1.5 text-amber-800 border-amber-300 hover:bg-amber-50"
+                >
+                  <Undo2 className="w-3.5 h-3.5 text-amber-700" /> Thu hồi báo cáo
                 </Button>
               )}
 
@@ -1121,7 +1200,7 @@ export function TaskDetailPage() {
               )}
 
               {/* Manager Edit Task Details (Manager only for active OFFICIAL tasks) */}
-              {task.status !== "DONE" && task.status !== "CANCELLED" && isManager && task.type === "OFFICIAL" && (
+              {task.status !== "DONE" && task.status !== "CANCELLED" && isLeader && task.type === "OFFICIAL" && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1139,7 +1218,7 @@ export function TaskDetailPage() {
               )}
 
               {/* Reopen DONE task (Manager only) */}
-              {task.status === "DONE" && isManager && (
+              {task.status === "DONE" && isLeader && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1154,7 +1233,7 @@ export function TaskDetailPage() {
               )}
 
               {/* Cancel task (Manager or Creator for non-official) */}
-              {task.status !== "DONE" && task.status !== "CANCELLED" && (isManager || (isCreator && task.type !== "OFFICIAL")) && (
+              {task.status !== "DONE" && task.status !== "CANCELLED" && (isLeader || (isCreator && task.type !== "OFFICIAL")) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1180,7 +1259,7 @@ export function TaskDetailPage() {
                 <strong>Bản nháp nhiệm vụ:</strong> Công việc này chưa được chính thức phát hành. Người được gán chưa nhận được thông báo thực hiện.
               </div>
             </div>
-            {isManager && (
+            {isLeader && (
               <Button
                 variant="primary"
                 size="sm"
@@ -1207,7 +1286,7 @@ export function TaskDetailPage() {
                 </div>
               </div>
             </div>
-            {isManager ? (
+            {isLeader ? (
               <div className="flex items-center gap-2 shrink-0">
                 <Button
                   variant="outline"
@@ -1234,7 +1313,7 @@ export function TaskDetailPage() {
               </div>
             ) : (
               <span className="text-[11px] text-amber-700 font-medium italic">
-                (Đang chờ Trưởng phòng xem xét)
+                (Đang chờ Lãnh đạo phòng xem xét)
               </span>
             )}
           </div>
@@ -1254,7 +1333,7 @@ export function TaskDetailPage() {
                 </div>
               </div>
             </div>
-            {isManager ? (
+            {isLeader ? (
               <div className="flex items-center gap-2 shrink-0">
                 <Button
                   variant="outline"
@@ -1281,9 +1360,65 @@ export function TaskDetailPage() {
               </div>
             ) : (
               <span className="text-[11px] text-blue-700 font-medium italic">
-                (Đang chờ Trưởng phòng xem xét)
+                (Đang chờ Lãnh đạo phòng xem xét)
               </span>
             )}
+          </div>
+        )}
+
+                {/* IN_REVIEW Status Banner */}
+        {task.status === "IN_REVIEW" && (
+          <div className="p-4 bg-purple-50 border border-purple-200 rounded-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-5 h-5 text-purple-700 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-bold text-purple-950">
+                  Báo cáo kết quả công việc đang chờ Lãnh đạo phê duyệt
+                </div>
+                <div className="text-[11px] text-purple-800 mt-0.5">
+                  {isAssignee
+                    ? "Bạn đã hoàn thành và gửi báo cáo kết quả. Bạn có thể thu hồi lại báo cáo để bổ sung tài liệu hoặc chỉnh sửa nội dung nếu Lãnh đạo chưa duyệt."
+                    : isLeader
+                    ? "Chuyên viên đã hoàn thành và nộp báo cáo kết quả kèm sản phẩm. Vui lòng xem xét phê duyệt hoặc yêu cầu bổ sung."
+                    : "Chuyên viên đã hoàn thành và gửi báo cáo kết quả đang chờ duyệt."}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {isAssignee && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setWithdrawReason("");
+                    setShowWithdrawModal(true);
+                  }}
+                  className="gap-1.5 text-amber-800 border-amber-300 hover:bg-amber-50 text-xs py-1 h-8"
+                >
+                  <Undo2 className="w-3.5 h-3.5 text-amber-700" /> Thu hồi báo cáo
+                </Button>
+              )}
+              {isLeader && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowReturnModal(true)}
+                    className="gap-1.5 text-amber-800 border-amber-300 hover:bg-amber-50 text-xs py-1 h-8"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-700" /> Trả lại
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowApproveModal(true)}
+                    className="gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs py-1 h-8"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Phê duyệt
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -1434,7 +1569,7 @@ export function TaskDetailPage() {
                         )}
                       </div>
 
-                      {task.status !== "DONE" && task.status !== "CANCELLED" && !isAtMaxLevel && (isAssignee || isManager || isCreator) && (
+                      {task.status !== "DONE" && task.status !== "CANCELLED" && !isAtMaxLevel && (isAssignee || isLeader || isCreator) && (
                         <Button
                           variant="primary"
                           size="sm"
@@ -1462,7 +1597,7 @@ export function TaskDetailPage() {
                             Chia nhỏ nhiệm vụ thành các bước thực hiện độc lập, phân công người làm và thời hạn riêng.
                           </p>
                         </div>
-                        {!isAtMaxLevel && task.status !== "DONE" && task.status !== "CANCELLED" && (isAssignee || isManager || isCreator) && (
+                        {!isAtMaxLevel && task.status !== "DONE" && task.status !== "CANCELLED" && (isAssignee || isLeader || isCreator) && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1628,8 +1763,18 @@ export function TaskDetailPage() {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
-                                  Đợt nộp #{subNumber}
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                    sub.status === "WITHDRAWN"
+                                      ? "bg-slate-100 text-slate-700 border-slate-300"
+                                      : app?.decision === "APPROVED"
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                      : app?.decision === "RETURNED"
+                                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                                      : "bg-purple-100 text-purple-900 border-purple-200"
+                                  }`}
+                                >
+                                  Đợt nộp #{subNumber} {sub.status === "WITHDRAWN" ? "(Đã thu hồi)" : ""}
                                 </span>
                                 <span className="text-xs text-text-secondary">
                                   Bởi <strong>{submitter?.displayName || "Chuyên viên"}</strong>
@@ -1640,9 +1785,100 @@ export function TaskDetailPage() {
                               </span>
                             </div>
 
-                            <div className="text-xs bg-white p-3 rounded border border-border/80 text-text-primary whitespace-pre-wrap leading-relaxed">
-                              {sub.summary}
+                            {/* Summary */}
+                            <div className="text-xs bg-white p-3 rounded border border-border/80 text-text-primary space-y-1">
+                              <div className="font-semibold text-text-muted text-[11px] uppercase tracking-wider">
+                                Tóm tắt kết quả:
+                              </div>
+                              <p className="whitespace-pre-wrap leading-relaxed">{sub.summary}</p>
                             </div>
+
+                            {/* Details if present */}
+                            {sub.details && (
+                              <div className="text-xs bg-white p-3 rounded border border-border/80 text-text-primary space-y-1">
+                                <div className="font-semibold text-text-muted text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                  <FileText className="w-3.5 h-3.5 text-brand-700" />
+                                  <span>Chi tiết kết quả & Số liệu:</span>
+                                </div>
+                                <p className="whitespace-pre-wrap leading-relaxed text-text-secondary">{sub.details}</p>
+                              </div>
+                            )}
+
+                            {/* Deliverable URL if present */}
+                            {sub.deliverableUrl && (
+                              <div className="text-xs bg-brand-50/60 p-2.5 rounded border border-brand-200/80 flex items-center gap-2">
+                                <ExternalLink className="w-3.5 h-3.5 text-brand-700 shrink-0" />
+                                <span className="font-semibold text-brand-900 shrink-0">Link sản phẩm:</span>
+                                <a
+                                  href={sub.deliverableUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-brand-700 underline truncate hover:text-brand-800"
+                                >
+                                  {sub.deliverableUrl}
+                                </a>
+                              </div>
+                            )}
+
+                            {/* Self review / notes if present */}
+                            {sub.notes && (
+                              <div className="text-xs bg-slate-100/70 p-2.5 rounded border border-border text-text-secondary space-y-1">
+                                <span className="font-semibold text-text-muted text-[11px] uppercase tracking-wider block">
+                                  Tự đánh giá & Kiến nghị:
+                                </span>
+                                <p className="whitespace-pre-wrap leading-relaxed">{sub.notes}</p>
+                              </div>
+                            )}
+
+                            {/* Attached files of this submission */}
+                            {(() => {
+                              const subFiles = files.filter((f) => sub.fileIds?.includes(f.id));
+                              if (subFiles.length === 0) return null;
+                              return (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-[11px] font-semibold text-text-muted flex items-center gap-1.5">
+                                    <Paperclip className="w-3.5 h-3.5 text-brand-700" />
+                                    Tệp đính kèm kết quả ({subFiles.length}):
+                                  </span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {subFiles.map((file) => {
+                                      const fileUrl = getSessionFileUrl(file.id);
+                                      return (
+                                        <div
+                                          key={file.id}
+                                          className="flex items-center justify-between p-2 rounded bg-white border border-border text-xs"
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <FileText className="w-4 h-4 text-blue-700 shrink-0" />
+                                            <div className="truncate">
+                                              <div className="font-medium text-text-primary truncate">
+                                                {file.originalName}
+                                              </div>
+                                              <div className="text-[10px] text-text-muted">
+                                                {(file.sizeBytes / 1024).toFixed(0)} KB
+                                              </div>
+                                            </div>
+                                          </div>
+                                          {fileUrl ? (
+                                            <a
+                                              href={fileUrl}
+                                              download={file.originalName}
+                                              className="text-brand-700 hover:underline text-[11px] font-semibold shrink-0 ml-2 flex items-center gap-0.5"
+                                            >
+                                              <Download className="w-3 h-3" /> Tải về
+                                            </a>
+                                          ) : (
+                                            <span className="text-[10px] font-mono text-text-muted px-1.5 py-0.5 bg-slate-100 rounded shrink-0">
+                                              MOCK
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             {/* Approval Decision if exists */}
                             {app ? (
@@ -1677,9 +1913,47 @@ export function TaskDetailPage() {
                                   </div>
                                 )}
                               </div>
+                            ) : sub.status === "WITHDRAWN" ? (
+                              <div className="p-3 rounded-btn border border-slate-300 bg-slate-100/90 text-xs space-y-1 text-slate-800">
+                                <div className="flex items-center justify-between font-bold">
+                                  <div className="flex items-center gap-1.5 text-slate-700">
+                                    <Undo2 className="w-4 h-4 text-slate-600" />
+                                    <span>ĐÃ THU HỒI BÁO CÁO</span>
+                                  </div>
+                                  {sub.withdrawnAt && (
+                                    <span className="text-[11px] font-normal text-text-muted">
+                                      {formatDateTimeVN(sub.withdrawnAt)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-text-secondary">
+                                  Chuyên viên đã chủ động rút lại báo cáo này để chỉnh sửa và hoàn thiện nội dung.
+                                </div>
+                                {sub.withdrawnReason && (
+                                  <div className="text-xs pt-1 border-t border-slate-200">
+                                    <strong>Lý do thu hồi:</strong> {sub.withdrawnReason}
+                                  </div>
+                                )}
+                              </div>
                             ) : (
-                              <div className="text-xs text-purple-700 font-medium flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5" /> Đang chờ Trưởng phòng xem xét duyệt kết quả.
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded bg-purple-50/70 border border-purple-200">
+                                <div className="text-xs text-purple-800 font-medium flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                                  <span>Đang chờ Trưởng phòng xem xét duyệt kết quả.</span>
+                                </div>
+                                {task.status === "IN_REVIEW" && isAssignee && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setWithdrawReason("");
+                                      setShowWithdrawModal(true);
+                                    }}
+                                    className="gap-1 text-amber-800 border-amber-300 hover:bg-amber-50 text-[11px] py-0.5 h-7 self-start sm:self-auto shrink-0"
+                                  >
+                                    <Undo2 className="w-3 h-3 text-amber-700" /> Thu hồi báo cáo
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1901,17 +2175,145 @@ export function TaskDetailPage() {
           variant="primary"
           isLoading={isSubmittingAction}
           onConfirm={handleSubmitDeliverable}
-          onCancel={() => setShowSubmitModal(false)}
+          onCancel={() => {
+            setShowSubmitModal(false);
+            setSubmissionFiles([]);
+          }}
+          maxWidth="xl"
         >
-          <div className="space-y-3 pt-2 text-xs">
+          <div className="space-y-3.5 pt-1 text-xs">
+            {/* 1. Yêu cầu sản phẩm đầu ra đã giao */}
+            {task.deliverable && (
+              <div className="p-3 bg-brand-50/70 border border-brand-200/80 rounded-btn space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-brand-900">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-700" />
+                  <span>Yêu cầu sản phẩm đầu ra đã giao:</span>
+                </div>
+                <p className="text-brand-800 pl-5 leading-relaxed">{task.deliverable}</p>
+              </div>
+            )}
+
+            {/* 2. Tóm tắt kết quả (Bắt buộc) */}
             <Textarea
               label="Tóm tắt kết quả hoàn thành *"
-              placeholder="Mô tả cụ thể kết quả đã đạt được, số liệu hoặc đường link tài liệu sản phẩm..."
-              rows={4}
+              placeholder="Khái quát các nội dung chính đã hoàn thành, sản phẩm đạt được theo yêu cầu..."
+              rows={3}
               required
               value={submissionSummary}
               onChange={(e) => setSubmissionSummary(e.target.value)}
             />
+
+            {/* 3. Chi tiết kết quả & Khối lượng công việc đạt được (Tùy chọn) */}
+            <Textarea
+              label="Chi tiết kết quả & Số liệu cụ thể"
+              placeholder="Ghi rõ các số liệu định lượng, hạng mục hoàn thành (VD: Đã khảo sát 50/50 đơn vị, biên soạn 12 chuyên đề...)"
+              rows={2}
+              value={submissionDetails}
+              onChange={(e) => setSubmissionDetails(e.target.value)}
+            />
+
+            {/* 4. Đường dẫn tài liệu / sản phẩm trực tuyến (Tùy chọn) */}
+            <div>
+              <label className="block font-semibold text-text-primary mb-1">
+                Đường link sản phẩm / Kho lưu trữ trực tuyến (nếu có)
+              </label>
+              <div className="relative">
+                <input
+                  type="url"
+                  placeholder="https://drive.google.com/... hoặc đường dẫn tài liệu trực tuyến"
+                  value={submissionDeliverableUrl}
+                  onChange={(e) => setSubmissionDeliverableUrl(e.target.value)}
+                  className="w-full px-3 py-2 pl-8 border border-border rounded-btn bg-surface text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
+                />
+                <ExternalLink className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-2.5" />
+              </div>
+            </div>
+
+            {/* 5. Tự đánh giá & Kiến nghị (Tùy chọn) */}
+            <Textarea
+              label="Tự đánh giá & Kiến nghị, lưu ý (nếu có)"
+              placeholder="Tự đánh giá mức độ hoàn thành, khó khăn còn tồn tại hoặc kiến nghị Trưởng phòng xem xét thêm..."
+              rows={2}
+              value={submissionNotes}
+              onChange={(e) => setSubmissionNotes(e.target.value)}
+            />
+
+            {/* 6. Tệp tài liệu đính kèm kết quả (Attachments) */}
+            <div className="space-y-2 pt-2 border-t border-border/80">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-text-primary block">
+                    Tệp tài liệu đính kèm kết quả
+                  </span>
+                  <span className="text-[11px] text-text-muted">
+                    Hỗ trợ: PDF, Word (DOC/DOCX), Excel (XLS/XLSX), PPT, Hình ảnh (tối đa 20 MB/tệp)
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => submissionFileInputRef.current?.click()}
+                  className="gap-1.5 text-xs text-brand-700 border-brand-200 hover:bg-brand-50 shrink-0"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                  Chọn tệp
+                </Button>
+                <input
+                  ref={submissionFileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length === 0) return;
+                    const validFiles: File[] = [];
+                    for (const f of files) {
+                      const res = validateSelectedFile(f);
+                      if (!res.valid) {
+                        showToast(res.error || `Tệp ${f.name} không hợp lệ`, "error");
+                      } else {
+                        validFiles.push(f);
+                      }
+                    }
+                    if (validFiles.length > 0) {
+                      setSubmissionFiles((prev) => [...prev, ...validFiles]);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              {/* Danh sách tệp đã chọn */}
+              {submissionFiles.length > 0 && (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {submissionFiles.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 rounded border border-border bg-slate-50 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="w-3.5 h-3.5 text-brand-700 shrink-0" />
+                        <span className="font-medium text-text-primary truncate">{f.name}</span>
+                        <span className="text-[10px] text-text-muted shrink-0">
+                          ({(f.size / 1024).toFixed(0)} KB)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSubmissionFiles((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="text-text-muted hover:text-danger p-0.5 ml-2"
+                        title="Bỏ tệp này"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </ConfirmDialog>
 
@@ -1956,6 +2358,34 @@ export function TaskDetailPage() {
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
             />
+          </div>
+        </ConfirmDialog>
+
+        {/* --- MODAL 4B: THU HỒI BÁO CÁO KẾT QUẢ (ASSIGNEE) --- */}
+        <ConfirmDialog
+          isOpen={showWithdrawModal}
+          title="Thu hồi báo cáo kết quả công việc"
+          description="Báo cáo kết quả đang chờ duyệt sẽ được rút lại. Công việc sẽ chuyển về trạng thái ĐANG LÀM (IN_PROGRESS) để bạn chỉnh sửa nội dung, bổ sung tài liệu và nộp lại sau."
+          confirmLabel="Xác nhận thu hồi"
+          variant="danger"
+          isLoading={isSubmittingAction}
+          onConfirm={handleWithdrawSubmission}
+          onCancel={() => {
+            setShowWithdrawModal(false);
+            setWithdrawReason("");
+          }}
+        >
+          <div className="space-y-3 pt-2 text-xs">
+            <Textarea
+              label="Lý do thu hồi (tùy chọn)"
+              placeholder="Nhập lý do rút lại báo cáo (ví dụ: cần cập nhật thêm số liệu, bổ sung tệp đính kèm mới...)"
+              rows={3}
+              value={withdrawReason}
+              onChange={(e) => setWithdrawReason(e.target.value)}
+            />
+            <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+              <strong>Lưu ý:</strong> Sau khi thu hồi, Trưởng phòng sẽ nhận được thông báo về việc bạn đã rút lại báo cáo. Bạn có thể cập nhật tiến độ, chỉnh sửa tài liệu và nộp duyệt lại bất cứ lúc nào.
+            </div>
           </div>
         </ConfirmDialog>
 

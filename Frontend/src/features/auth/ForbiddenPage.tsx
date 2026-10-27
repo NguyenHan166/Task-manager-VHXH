@@ -18,6 +18,20 @@ export function ForbiddenPage({
   const navigate = useNavigate();
   const { currentUser, isManager, switchUser } = useSession();
 
+  const roleText =
+    currentUser?.role === "MANAGER"
+      ? "Trưởng phòng (MANAGER - Kiêm Quản trị)"
+      : currentUser?.role === "DEPUTY_MANAGER"
+      ? "Phó phòng (DEPUTY_MANAGER - Điều hành, không quản trị)"
+      : "Chuyên viên (STAFF)";
+
+  const roleColor =
+    currentUser?.role === "MANAGER"
+      ? "text-emerald-700"
+      : currentUser?.role === "DEPUTY_MANAGER"
+      ? "text-indigo-700"
+      : "text-blue-700";
+
   return (
     <AppShell>
       <div className="py-12 sm:py-20 flex items-center justify-center">
@@ -54,13 +68,13 @@ export function ForbiddenPage({
               </div>
               <div className="text-text-secondary">
                 Vai trò hiện tại:{" "}
-                <span className={`font-semibold ${isManager ? "text-emerald-700" : "text-blue-700"}`}>
-                  {isManager ? "Trưởng phòng (MANAGER)" : "Chuyên viên (STAFF)"}
+                <span className={`font-semibold ${roleColor}`}>
+                  {roleText}
                 </span>
               </div>
               {!isManager && (
                 <p className="text-[11px] text-text-muted pt-1 border-t border-border/60">
-                  Gợi ý kiểm thử: Chuyển sang tài khoản <strong>Nguyễn Văn An (Trưởng phòng)</strong> để có đầy đủ quyền quản trị và phê duyệt.
+                  Gợi ý kiểm thử: Chuyển sang tài khoản <strong>Nguyễn Văn An (Trưởng phòng)</strong> qua Dev Tools để có đầy đủ quyền Quản trị hệ thống.
                 </p>
               )}
             </div>

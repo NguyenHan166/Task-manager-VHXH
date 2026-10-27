@@ -49,11 +49,11 @@ ReactDOM.createRoot(rootElement).render(
             <Route path="/tasks/:id" element={<TaskDetailPage />} />
             <Route path="/personal-tasks" element={<PersonalTasksPage />} />
 
-            {/* Approvals (Manager Only) */}
+            {/* Approvals (Leaders: Manager & Deputy) */}
             <Route
               path="/approvals"
               element={
-                <RoleRouteGuard managerOnly featureName="Chờ duyệt kết quả">
+                <RoleRouteGuard leaderOnly featureName="Chờ duyệt kết quả">
                   <ApprovalsPage />
                 </RoleRouteGuard>
               }
@@ -63,15 +63,8 @@ ReactDOM.createRoot(rootElement).render(
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
 
-            {/* Recurrence Rules (Prompt 06 - Manager Only) */}
-            <Route
-              path="/recurrence"
-              element={
-                <RoleRouteGuard managerOnly featureName="Nhiệm vụ định kỳ">
-                  <RecurrencePage />
-                </RoleRouteGuard>
-              }
-            />
+            {/* Recurrence Tasks & Rules - accessible to all roles */}
+            <Route path="/recurrence" element={<RecurrencePage />} />
 
             {/* Calendar (Prompt 06) */}
             <Route path="/calendar" element={<CalendarPage />} />
@@ -85,21 +78,21 @@ ReactDOM.createRoot(rootElement).render(
             {/* Reports (Prompt 08) */}
             <Route path="/reports" element={<ReportsPage />} />
 
-            {/* Members (Manager Only - Prompt 08) */}
+            {/* Members (Admin Only - Manager kiêm Quản trị) */}
             <Route
               path="/members"
               element={
-                <RoleRouteGuard managerOnly featureName="Quản lý thành viên">
+                <RoleRouteGuard adminOnly featureName="Quản lý thành viên">
                   <MembersPage />
                 </RoleRouteGuard>
               }
             />
 
-            {/* Settings (Manager Only - Prompt 08) */}
+            {/* Settings (Admin Only - Manager kiêm Quản trị) */}
             <Route
               path="/settings"
               element={
-                <RoleRouteGuard managerOnly featureName="Cài đặt hệ thống & Nhật ký">
+                <RoleRouteGuard adminOnly featureName="Cài đặt hệ thống & Nhật ký">
                   <SettingsPage />
                 </RoleRouteGuard>
               }

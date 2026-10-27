@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 
 export function TasksPage() {
-  const { currentUser, isManager, users } = useSession();
+  const { currentUser, isManager, isLeader, users } = useSession();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,7 +57,7 @@ export function TasksPage() {
   const priorityFilter = (searchParams.get("priority") as TaskPriority | "ALL") || "ALL";
   const projectId = searchParams.get("projectId") || "ALL";
   const primaryAssigneeId = searchParams.get("primaryAssigneeId") || "ALL";
-  const scope = (searchParams.get("scope") as "ALL" | "OWNED" | "COLLABORATING" | "WATCHING") || (isManager ? "ALL" : "OWNED");
+  const scope = (searchParams.get("scope") as "ALL" | "OWNED" | "COLLABORATING" | "WATCHING") || (isLeader ? "ALL" : "OWNED");
   const isOverdueParam = searchParams.get("isOverdue") === "true";
   const sortBy = (searchParams.get("sortBy") as "UPDATED_AT" | "DUE_AT" | "PRIORITY") || "UPDATED_AT";
   const sortDirection = (searchParams.get("sortDirection") as "ASC" | "DESC") || "DESC";
@@ -131,7 +131,7 @@ export function TasksPage() {
       // PERSONAL: only creator
       if (t.type === "PERSONAL") return t.createdById === currentUser.id;
       // OFFICIAL: Manager sees all
-      if (t.type === "OFFICIAL" && isManager) return true;
+      if (t.type === "OFFICIAL" && isLeader) return true;
       // Owned or Assigned
       if (t.createdById === currentUser.id || t.primaryAssigneeId === currentUser.id) return true;
       // Accepted participant
@@ -251,17 +251,17 @@ export function TasksPage() {
     if (!currentUser) return;
 
     // Check transition permissions strictly
-    if (nextStatus === "DONE" && !isManager) {
-      showToast("Chỉ Trưởng phòng mới có quyền phê duyệt Hoàn thành (DONE) cho nhiệm vụ chính thức.", "error");
+    if (nextStatus === "DONE" && !isLeader) {
+      showToast("Chỉ Lãnh đạo phòng (Trưởng/Phó phòng) mới có quyền phê duyệt Hoàn thành (DONE) cho nhiệm vụ chính thức.", "error");
       return;
     }
 
-    if (task.status === "IN_REVIEW" && nextStatus === "IN_PROGRESS" && !isManager) {
-      showToast("Chỉ Trưởng phòng mới có quyền trả lại kết quả phê duyệt.", "error");
+    if (task.status === "IN_REVIEW" && nextStatus === "IN_PROGRESS" && !isLeader) {
+      showToast("Chỉ Lãnh đạo phòng (Trưởng/Phó phòng) mới có quyền trả lại kết quả phê duyệt.", "error");
       return;
     }
 
-    if (task.status === "DRAFT" && nextStatus !== "DRAFT" && !isManager && task.createdById !== currentUser.id) {
+    if (task.status === "DRAFT" && nextStatus !== "DRAFT" && !isLeader && task.createdById !== currentUser.id) {
       showToast("Bạn không có quyền phát hành bản nháp này.", "error");
       return;
     }
@@ -299,7 +299,7 @@ export function TasksPage() {
     (projectId !== "ALL" ? 1 : 0) +
     (primaryAssigneeId !== "ALL" ? 1 : 0) +
     (isOverdueParam ? 1 : 0) +
-    (scope !== (isManager ? "ALL" : "OWNED") ? 1 : 0);
+    (scope !== (isLeader ? "ALL" : "OWNED") ? 1 : 0);
 
   const clearAllFilters = () => {
     updateParams({
@@ -310,7 +310,7 @@ export function TasksPage() {
       projectId: undefined,
       primaryAssigneeId: undefined,
       isOverdue: undefined,
-      scope: isManager ? "ALL" : "OWNED",
+      scope: isLeader ? "ALL" : "OWNED",
       page: "1",
     });
   };
@@ -473,11 +473,11 @@ export function TasksPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <Breadcrumb items={[{ label: isManager ? "Tất cả công việc" : "Công việc của tôi" }]} />
+        <Breadcrumb items={[{ label: isLeader ? "Tất cả công việc" : "Công việc của tôi" }]} />
 
         {/* Page Header */}
         <PageHeader
-          title={isManager ? "Tất cả công việc phòng" : "Công việc của tôi"}
+          title={isLeader ? "Tất cả công việc phòng" : "Công việc của tôi"}
           subtitle={
             isManager
               ? "Xem toàn bộ các nhiệm vụ chính thức, nhiệm vụ nhóm và việc cá nhân do bạn tạo. Quản lý phân công và tiến độ."
@@ -512,7 +512,7 @@ export function TasksPage() {
               <Link to="/tasks/create">
                 <Button variant="primary" size="sm" className="gap-1.5 shadow-sm">
                   <PlusCircle className="w-4 h-4" />
-                  {isManager ? "Giao việc mới" : "Tạo việc mới"}
+                  {isLeader ? "Giao việc mới" : "Tạo việc mới"}
                 </Button>
               </Link>
             </div>

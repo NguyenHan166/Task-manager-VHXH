@@ -9,6 +9,7 @@ import { canSeeTask } from "../../shared/data-contract";
 import type { Task, Notification } from "../../shared/data-contract";
 import { formatRelativeVN } from "../../shared/datetime";
 import { StatusBadge, TaskTypeBadge } from "../ui/Badge";
+import { DevToolbar } from "../../features/dev/DevToolbar";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -37,7 +38,7 @@ import {
 } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { currentUser, isManager, users, switchUser } = useSession();
+  const { currentUser, isManager, isDeputy, users, switchUser } = useSession();
   const { settings } = useWorkspaceSettings();
   const location = useLocation();
   const navigate = useNavigate();
@@ -175,11 +176,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Cài đặt / Nhật ký", path: "/settings", icon: Settings },
   ];
 
+  // DEPUTY: Gồm toàn bộ quyền điều hành của Trưởng phòng nhưng KHÔNG CÓ Quản trị thành viên & Cài đặt hệ thống
+  const deputyNavItems = [
+    { label: "Tổng quan", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Tất cả công việc", path: "/tasks", icon: CheckSquare },
+    { label: "Giao việc", path: "/tasks/create", icon: PlusCircle },
+    { label: "Chờ duyệt", path: "/approvals", icon: FileCheck },
+    { label: "Dự án", path: "/projects", icon: FolderKanban },
+    { label: "Nhiệm vụ định kỳ", path: "/recurrence", icon: Repeat },
+    { label: "Lịch", path: "/calendar", icon: Calendar },
+    { label: "Tài liệu", path: "/files", icon: FileText },
+    { label: "Tin nhắn", path: "/chat", icon: MessageSquare },
+    { label: "Báo cáo", path: "/reports", icon: BarChart3 },
+  ];
+
   // STAFF: Tổng quan của tôi, Công việc của tôi, Việc cá nhân, Dự án, Lịch của tôi, Tài liệu, Tin nhắn, Báo cáo của tôi, Thông báo, Hồ sơ
   const staffNavItems = [
     { label: "Tổng quan của tôi", path: "/dashboard", icon: LayoutDashboard },
     { label: "Công việc của tôi", path: "/tasks", icon: CheckSquare },
     { label: "Việc cá nhân", path: "/personal-tasks", icon: UserIcon },
+    { label: "Nhiệm vụ định kỳ", path: "/recurrence", icon: Repeat },
     { label: "Dự án", path: "/projects", icon: FolderKanban },
     { label: "Lịch của tôi", path: "/calendar", icon: Calendar },
     { label: "Tài liệu", path: "/files", icon: FileText },
@@ -189,7 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Hồ sơ", path: "/profile", icon: UserIcon },
   ];
 
-  const currentNavItems = isManager ? managerNavItems : staffNavItems;
+  const currentNavItems = isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems;
 
   return (
     <div className="min-h-screen flex bg-canvas text-text-primary antialiased">
@@ -213,7 +229,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Navigation Links */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-3 mb-2">
-            {isManager ? "Quản trị & Điều hành" : "Không gian Chuyên viên"}
+            {isManager ? "Quản trị & Điều hành" : isDeputy ? "Điều hành & Phê duyệt" : "Không gian Chuyên viên"}
           </div>
 
           {currentNavItems.map((item) => {
@@ -275,6 +291,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {isManager ? (
                   <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
                     <Shield className="w-2.5 h-2.5" /> Trưởng phòng
+                  </span>
+                ) : isDeputy ? (
+                  <span className="text-indigo-700 font-semibold flex items-center gap-0.5">
+                    <Shield className="w-2.5 h-2.5" /> Phó phòng
                   </span>
                 ) : (
                   <span>Chuyên viên</span>
@@ -482,7 +502,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {currentUser?.displayName}
                   </div>
                   <div className="text-[10px] text-text-muted">
-                    {isManager ? "Trưởng phòng" : "Chuyên viên"}
+                    {isManager ? "Trưởng phòng" : isDeputy ? "Phó phòng" : "Chuyên viên"}
                   </div>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-text-muted hidden sm:block" />
@@ -498,8 +518,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="text-[11px] text-text-muted">
                       {currentUser?.jobTitle} •{" "}
-                      <span className={isManager ? "text-emerald-700 font-semibold" : "text-blue-700 font-semibold"}>
-                        {isManager ? "Trưởng phòng" : "Chuyên viên"}
+                      <span className={isManager ? "text-emerald-700 font-semibold" : isDeputy ? "text-indigo-700 font-semibold" : "text-blue-700 font-semibold"}>
+                        {isManager ? "Trưởng phòng" : isDeputy ? "Phó phòng" : "Chuyên viên"}
                       </span>
                     </div>
                   </div>
@@ -652,6 +672,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Floating Developer Tools & Role Switcher */}
+      <DevToolbar />
     </div>
   );
 }

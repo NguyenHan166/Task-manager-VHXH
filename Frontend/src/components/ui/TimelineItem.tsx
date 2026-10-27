@@ -37,6 +37,8 @@ export function TimelineItem({
         return <PlayCircle className="w-3.5 h-3.5 text-amber-600" />;
       case "SUBMITTED":
         return <FileCheck className="w-3.5 h-3.5 text-purple-600" />;
+      case "SUBMISSION_WITHDRAWN":
+        return <RotateCcw className="w-3.5 h-3.5 text-amber-700" />;
       case "APPROVED":
         return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />;
       case "RETURNED":
@@ -88,24 +90,6 @@ export function TimelineItem({
             {formatRelativeVN(event.createdAt)}
           </div>
         </div>
-
-        {/* Diff details if available */}
-        {(event.before || event.after) && (
-          <div className="mt-1.5 p-2 bg-slate-50 rounded-btn border border-border/60 text-[11px] font-mono text-text-secondary">
-            {event.before && (
-              <div>
-                <span className="text-text-muted">Trước: </span>
-                {JSON.stringify(event.before)}
-              </div>
-            )}
-            {event.after && (
-              <div>
-                <span className="text-text-muted">Sau: </span>
-                {JSON.stringify(event.after)}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

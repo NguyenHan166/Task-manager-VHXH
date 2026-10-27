@@ -81,47 +81,58 @@ export function StatCard({
       role={isClickable ? "button" : undefined}
       tabIndex={isClickable ? 0 : undefined}
       className={cn(
-        "rounded-card bg-surface border border-border shadow-card p-5 transition-all select-none",
+        "rounded-card bg-surface border border-border shadow-card p-3 sm:p-5 transition-all select-none flex flex-col justify-between h-full min-w-0",
         style.borderAccent,
-        isClickable && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-700",
+        isClickable && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-700 active:scale-[0.98]",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1.5 flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs leading-[18px] font-medium text-text-muted uppercase tracking-wider truncate">
-              {label}
-            </span>
-            {badge}
-          </div>
-          <div
-            className={cn(
-              "text-[28px] sm:text-[30px] leading-[36px] font-bold tabular-nums tracking-tight",
-              style.valueColor
-            )}
+      {/* Top Row: Label & Icon */}
+      <div className="flex items-start justify-between gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1 min-h-[28px] sm:min-h-0">
+          <span
+            className="text-[11px] sm:text-xs font-semibold text-text-muted uppercase tracking-tight sm:tracking-wider line-clamp-2 leading-tight"
+            title={label}
           >
-            {value}
-          </div>
-          {description && (
-            <div className="text-xs leading-[18px] text-text-secondary line-clamp-1">
-              {description}
-            </div>
-          )}
+            {label}
+          </span>
+          {badge}
         </div>
 
         {icon && (
           <div
             className={cn(
-              "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs",
+              "w-7 h-7 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs",
               style.iconBg,
               style.iconColor
             )}
           >
-            {icon}
+            <span className="[&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-5 sm:[&>svg]:h-5 flex items-center justify-center">
+              {icon}
+            </span>
           </div>
         )}
       </div>
+
+      {/* Middle: Big Value */}
+      <div
+        className={cn(
+          "text-2xl sm:text-[30px] leading-tight font-bold tabular-nums tracking-tight mt-1.5 sm:mt-2",
+          style.valueColor
+        )}
+      >
+        {value}
+      </div>
+
+      {/* Bottom: Description (Full Width) */}
+      {description && (
+        <div
+          className="text-[11px] sm:text-xs leading-normal text-text-secondary line-clamp-1 mt-1 truncate"
+          title={description}
+        >
+          {description}
+        </div>
+      )}
     </div>
   );
 }

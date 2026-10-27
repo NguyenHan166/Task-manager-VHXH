@@ -41,9 +41,10 @@ Nguồn nghiệp vụ: [`../../TONG_QUAN_UNG_DUNG_QUAN_LY_CONG_VIEC_NOI_BO.md`](
 
 ## Kiểm tra thủ công trước khi nhận kết quả
 
-1. Đổi vai trò demo giữa `MANAGER` và `STAFF`; sidebar, quyền thao tác, dữ liệu hiển thị thay đổi đúng.
-2. Trưởng phòng tạo và giao một việc `OFFICIAL`; chuyên viên chủ trì thấy việc, nộp kết quả; Trưởng phòng duyệt hoặc trả lại; dashboard và thông báo cùng cập nhật.
-3. Chuyên viên không tự duyệt, không sửa hạn/chủ trì việc chính thức, không xem việc cá nhân của người khác.
+1. Đổi vai trò demo giữa 3 vai trò `MANAGER`, `DEPUTY_MANAGER` và `STAFF` (bằng thanh Dev Toolbar nổi hoặc trang `/login`); sidebar, quyền thao tác, dữ liệu hiển thị thay đổi đúng. Bấm nút **"🔍 Preview ma trận quyền (3 vai trò)"** trên Dev Toolbar để kiểm tra bảng đối chiếu trực quan.
+2. Kiểm tra phân quyền Phó phòng (`DEPUTY_MANAGER`): Phó phòng có toàn quyền giao việc chính thức, duyệt bài, trả lại, gia hạn, xem Dashboard điều hành và Báo cáo toàn phòng như Trưởng phòng; nhưng khi cố truy cập `/members` hoặc `/settings` sẽ bị chặn và hiển thị trang 403 Forbidden nêu rõ lý do (chỉ Trưởng phòng kiêm Quản trị mới có quyền).
+3. Trưởng phòng hoặc Phó phòng tạo và giao một việc `OFFICIAL`; chuyên viên chủ trì thấy việc, nộp kết quả; Lãnh đạo duyệt hoặc trả lại; dashboard và thông báo cùng cập nhật.
+4. Chuyên viên không tự duyệt, không sửa hạn/chủ trì việc chính thức, không xem việc cá nhân của người khác, không vào được các tính năng lãnh đạo/quản trị.
 4. Bộ lọc, Kanban, lịch, báo cáo đều hiển thị từ cùng task store; tổng số không lệch nhau.
 5. Thử desktop, tablet và mobile; kiểm tra menu, bảng dữ liệu, form, modal, trạng thái rỗng/lỗi.
 6. Đối chiếu màu, font, badge, card và spacing của các trang với Prompt 01A; không để mỗi màn hình tự chọn một hệ màu.

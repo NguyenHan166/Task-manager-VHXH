@@ -26,9 +26,21 @@ Tiếp tục trên dự án hiện tại. Tạo các màn hình P1 để nhìn �
 - Trong chi tiết task, cho xem/tạo việc con tối đa 2 cấp. Việc con có status, chủ trì, hạn riêng. Nếu hạn con vượt hạn cha, yêu cầu người có quyền xác nhận điều chỉnh.
 - Hoàn thành toàn bộ việc con không tự chuyển task cha `OFFICIAL` sang `DONE`; vẫn cần nộp và duyệt.
 
-## Nhiệm vụ định kỳ (bản xem trước P1)
+## Nhiệm vụ định kỳ (Recurrence Rules)
 
-- Manager tạo/sửa/bật tắt mẫu `RecurrenceRule` hằng tuần hoặc hằng tháng. Hiển thị kỳ tạo tiếp theo và bản xem trước task sẽ sinh.
-- Nút demo “Sinh kỳ tiếp theo” tạo một `OFFICIAL` mới và `RecurrenceInstance` với khóa `(ruleId, periodKey)` duy nhất. Bấm lại cùng kỳ không tạo task trùng; không mở lại task cũ đã hoàn thành.
+- **Phân quyền & Truy cập**: Cả 3 vai trò đều có quyền truy cập màn hình `/recurrence`. Lãnh đạo (Manager và Deputy Manager) có quyền Quản trị & Điều hành CRUD; Chuyên viên (Staff) có quyền theo dõi các mẫu định kỳ được giao và **trực tiếp nộp báo cáo kết quả** ngay trên giao diện.
+- **Phạm vi giao việc linh hoạt**:
+  + `scope: "ALL"`: Giao cho **cả phòng** (Toàn bộ chuyên viên trong đơn vị). Khi sinh kỳ mới, hệ thống tự động sinh nhiệm vụ riêng cho từng chuyên viên để mỗi người tự giác nộp báo cáo.
+  + `scope: "CUSTOM"`: Giao cho **nhiều chuyên viên cụ thể** qua danh sách `assigneeIds`.
+- **Thao tác Quản trị CRUD (Lãnh đạo: Manager & Deputy Manager)**:
+  + **Tạo mới (Create)**: Chọn tên mẫu, tần suất (`WEEKLY` / `MONTHLY`), mức ưu tiên, phạm vi (Cả phòng / Danh sách chuyên viên), hạn nộp sau khi sinh (giờ), hướng dẫn nộp báo cáo.
+  + **Chỉnh sửa (Update)**: Cho phép sửa đổi toàn bộ thông tin mẫu định kỳ, phạm vi phân công và hạn nộp.
+  + **Xóa (Delete)**: Xóa mẫu định kỳ khỏi lịch lặp, bảo lưu các nhiệm vụ kỳ trước đã phát hành.
+  + **Bật / Tắt**: Tạm dừng hoặc kích hoạt lại mẫu lặp bất kỳ lúc nào.
+  + **Phát hành kỳ tiếp theo (Manual Trigger)**: Sinh ngay nhiệm vụ cho kỳ tới, kiểm tra chống sinh trùng lặp theo khóa `(ruleId, periodKey)`.
+- **Nghiệp vụ Chuyên viên nộp báo cáo trực tiếp**:
+  + Chuyên viên theo dõi tiến độ nộp của bản thân theo từng kỳ (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`).
+  + Với các nhiệm vụ chưa nộp, Chuyên viên bấm nút **"Báo cáo kỳ này"** để mở form nộp báo cáo trực tiếp ngay trên trang Nhiệm vụ định kỳ (nhập tóm tắt kết quả, liên kết sản phẩm, ghi chú gửi Lãnh đạo).
+  + Sau khi gửi, nhiệm vụ chuyển sang `IN_REVIEW`, phát thông báo cho Lãnh đạo duyệt; Chuyên viên có thể bấm xem lại nội dung đã nộp bất kỳ lúc nào.
 
 Kết thúc bằng cách kiểm tra lời mời `t10` cho `u05`, lời mời đã từ chối `t11` cho `u04`, việc riêng `t12` cho `u02`, và các dự án `p01`/`p02`.
