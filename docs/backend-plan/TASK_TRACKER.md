@@ -14,10 +14,10 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 01 — [Nền tảng](./PHASE_01_FOUNDATION.md)
 
-- [ ] BE-01-01 — NestJS app, module và README.
-- [ ] BE-01-02 — Runtime config, bảo mật HTTP và logging.
-- [ ] BE-01-03 — Migration PostgreSQL lõi.
-- [ ] BE-01-04 — Seed P0 có clock kiểm soát được.
+- [x] BE-01-01 — NestJS app, module và README; [bằng chứng](./phase-01/ACCEPTANCE.md).
+- [x] BE-01-02 — Runtime config, bảo mật HTTP và logging; [bằng chứng](./phase-01/ACCEPTANCE.md).
+- [x] BE-01-03 — Migration PostgreSQL lõi; [bằng chứng](./phase-01/ACCEPTANCE.md).
+- [x] BE-01-04 — Seed P0 có clock kiểm soát được; [bằng chứng](./phase-01/ACCEPTANCE.md).
 - [ ] BE-01-05 — CI và quy trình migration.
 
 ## Phase 02 — [Auth và users](./PHASE_02_AUTH_USERS.md)

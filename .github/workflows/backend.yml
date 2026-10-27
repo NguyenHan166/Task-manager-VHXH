@@ -1,0 +1,94 @@
+name: Backend foundation
+
+on:
+  push:
+    paths:
+      - 'Server/**'
+      - 'docs/backend-plan/phase-00/kpi-fixture.v1.json'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'Server/**'
+      - 'docs/backend-plan/phase-00/kpi-fixture.v1.json'
+      - '.github/workflows/backend.yml'
+
+jobs:
+  phase-01:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Server
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: office_workspace
+          POSTGRES_PASSWORD: ci_local_only
+          POSTGRES_DB: office_workspace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U office_workspace -d office_workspace"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      APP_ENV: local
+      PORT: '3000'
+      BUSINESS_TIMEZONE: Asia/Ho_Chi_Minh
+      DATABASE_URL: postgresql://office_workspace:ci_local_only@127.0.0.1:5432/office_workspace?schema=public
+      FRONTEND_ORIGINS: http://localhost:5173
+      ACCESS_TOKEN_SIGNING_KEY: ci_only_signing_key_please_never_use_outside_ci
+      DEMO_SEED_PASSWORD: ci_only_demo_seed_password
+      ACCESS_TOKEN_TTL_SECONDS: '900'
+      REFRESH_TOKEN_TTL_DAYS: '7'
+      REFRESH_COOKIE_SECURE: 'false'
+      REFRESH_COOKIE_HTTP_ONLY: 'true'
+      REFRESH_COOKIE_SAME_SITE: Lax
+      LOGIN_RATE_LIMIT_PER_MINUTE: '5'
+      R2_SIGNED_URL_TTL_SECONDS: '300'
+      MAX_FILE_SIZE_MB: '20'
+      FILE_REMOVED_RETENTION_DAYS: '90'
+      REMINDER_INTERVAL_MINUTES: '15'
+      REMINDER_BEFORE_HOURS: '24'
+      BACKUP_RETENTION_DAYS: '30'
+      REAL_DATA_APPROVED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: Server/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Format
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Apply migrations to a fresh database
+        run: npm run db:migrate
+      - name: Seed twice and check fixture
+        run: |
+          npm run db:seed
+          npm run db:check
+          npm run db:seed
+          npm run db:check
+          npm run db:status
+      - name: Check HTTP health and database readiness
+        run: |
+          node dist/main.js > server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health/ready | grep -q '"database":"ok"'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat server.log
+          exit 1
