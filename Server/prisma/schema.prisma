@@ -1,0 +1,449 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  MANAGER
+  DEPUTY_MANAGER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+enum TaskType {
+  OFFICIAL
+  TEAM
+  PERSONAL
+}
+
+enum TaskStatus {
+  DRAFT
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ParticipantRole {
+  COLLABORATOR
+  WATCHER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  RETURNED
+  WITHDRAWN
+}
+
+enum ApprovalDecision {
+  APPROVED
+  RETURNED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum FileStatus {
+  UPLOADING
+  READY
+  REMOVED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_DUE_SOON
+  TASK_OVERDUE
+  SUBMISSION_RECEIVED
+  SUBMISSION_WITHDRAWN
+  SUBMISSION_RETURNED
+  SUBMISSION_APPROVED
+  DEADLINE_REQUESTED
+  ASSIGNEE_REQUESTED
+  REQUEST_DECIDED
+  COMMENT_ADDED
+  TEAM_INVITED
+  CHAT_MESSAGE
+}
+
+model User {
+  id                  String                @id @default(uuid()) @db.Uuid
+  email               String                @unique
+  displayName         String                @map("display_name")
+  role                UserRole
+  status              UserStatus            @default(ACTIVE)
+  passwordHash        String                @map("password_hash")
+  jobTitle            String                @default("") @map("job_title")
+  phoneNumber         String?               @map("phone_number")
+  department          String?
+  avatarUrl           String?               @map("avatar_url")
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lastLoginAt         DateTime?             @map("last_login_at") @db.Timestamptz(3)
+  sessions            AuthSession[]
+  ownedProjects       Project[]
+  createdTasks        Task[]                @relation("TaskCreator")
+  assignedTasks       Task[]                @relation("TaskAssignee")
+  approvedTasks       Task[]                @relation("TaskApprover")
+  participations      TaskParticipant[]
+  comments            TaskComment[]
+  submissions         TaskSubmission[]
+  decisions           TaskApproval[]
+  deadlineRequests    TaskDeadlineRequest[] @relation("DeadlineRequester")
+  deadlineDecisions   TaskDeadlineRequest[] @relation("DeadlineDecider")
+  assigneeRequests    TaskAssigneeRequest[] @relation("AssigneeRequester")
+  assigneeDecisions   TaskAssigneeRequest[] @relation("AssigneeDecider")
+  proposedAssignments TaskAssigneeRequest[] @relation("ProposedAssignee")
+  events              TaskEvent[]
+  notifications       Notification[]
+  reminders           ReminderEvent[]
+  uploadedFiles       FileObject[]
+  audits              AuditLog[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model AuthSession {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  refreshHash   String    @unique @map("refresh_hash")
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
+  rotatedFromId String?   @map("rotated_from_id") @db.Uuid
+  device        String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@map("auth_sessions")
+}
+
+model AppSettings {
+  id                  Int    @id @default(1)
+  workspaceName       String @default("Office Workspace") @map("workspace_name")
+  timezone            String @default("Asia/Ho_Chi_Minh")
+  defaultDueHour      Int    @default(16) @map("default_due_hour")
+  reminderBeforeHours Int    @default(24) @map("reminder_before_hours")
+  maxFileSizeMb       Int    @default(20) @map("max_file_size_mb")
+
+  @@map("app_settings")
+}
+
+model BusinessCodeCounter {
+  prefix    String
+  year      Int
+  nextValue Int    @map("next_value")
+
+  @@id([prefix, year])
+  @@map("business_code_counters")
+}
+
+model Project {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  description String        @default("")
+  ownerId     String        @map("owner_id") @db.Uuid
+  startAt     DateTime?     @map("start_at") @db.Timestamptz(3)
+  endAt       DateTime?     @map("end_at") @db.Timestamptz(3)
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  tasks       Task[]
+
+  @@index([ownerId, status])
+  @@map("projects")
+}
+
+model Task {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  code                    String                 @unique
+  type                    TaskType
+  title                   String
+  description             String                 @default("")
+  deliverable             String                 @default("")
+  status                  TaskStatus
+  priority                TaskPriority           @default(NORMAL)
+  progressPercent         Int                    @default(0) @map("progress_percent")
+  createdById             String                 @map("created_by_id") @db.Uuid
+  primaryAssigneeId       String?                @map("primary_assignee_id") @db.Uuid
+  projectId               String?                @map("project_id") @db.Uuid
+  parentTaskId            String?                @map("parent_task_id") @db.Uuid
+  assignedAt              DateTime?              @map("assigned_at") @db.Timestamptz(3)
+  dueAt                   DateTime?              @map("due_at") @db.Timestamptz(3)
+  completedAt             DateTime?              @map("completed_at") @db.Timestamptz(3)
+  completionDueAtSnapshot DateTime?              @map("completion_due_at_snapshot") @db.Timestamptz(3)
+  approvedById            String?                @map("approved_by_id") @db.Uuid
+  approvedAt              DateTime?              @map("approved_at") @db.Timestamptz(3)
+  version                 Int                    @default(1)
+  isBlocked               Boolean                @default(false) @map("is_blocked")
+  blockedReason           String?                @map("blocked_reason")
+  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  archivedAt              DateTime?              @map("archived_at") @db.Timestamptz(3)
+  creator                 User                   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  primaryAssignee         User?                  @relation("TaskAssignee", fields: [primaryAssigneeId], references: [id], onDelete: Restrict)
+  approver                User?                  @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  project                 Project?               @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  parent                  Task?                  @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Restrict)
+  children                Task[]                 @relation("Subtasks")
+  participants            TaskParticipant[]
+  comments                TaskComment[]
+  submissions             TaskSubmission[]
+  approvals               TaskApproval[]
+  deadlineRequests        TaskDeadlineRequest[]
+  assigneeRequests        TaskAssigneeRequest[]
+  events                  TaskEvent[]
+  notifications           Notification[]
+  reminders               ReminderEvent[]
+  fileLinks               FileLink[]
+
+  @@index([type, status, dueAt])
+  @@index([primaryAssigneeId, status, dueAt])
+  @@index([projectId, status])
+  @@index([parentTaskId])
+  @@index([createdById, status])
+  @@map("tasks")
+}
+
+model TaskParticipant {
+  id               String           @id @default(uuid()) @db.Uuid
+  taskId           String           @map("task_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  role             ParticipantRole
+  invitationStatus InvitationStatus @default(ACCEPTED) @map("invitation_status")
+  invitedAt        DateTime         @default(now()) @map("invited_at") @db.Timestamptz(3)
+  respondedAt      DateTime?        @map("responded_at") @db.Timestamptz(3)
+  task             Task             @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([taskId, userId, role])
+  @@index([userId, invitationStatus])
+  @@map("task_participants")
+}
+
+model TaskComment {
+  id        String     @id @default(uuid()) @db.Uuid
+  taskId    String     @map("task_id") @db.Uuid
+  authorId  String     @map("author_id") @db.Uuid
+  body      String
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  editedAt  DateTime?  @map("edited_at") @db.Timestamptz(3)
+  task      Task       @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  fileLinks FileLink[]
+
+  @@index([taskId, createdAt, id])
+  @@map("task_comments")
+}
+
+model TaskSubmission {
+  id              String           @id @default(uuid()) @db.Uuid
+  taskId          String           @map("task_id") @db.Uuid
+  submittedById   String           @map("submitted_by_id") @db.Uuid
+  summary         String
+  details         String?
+  deliverableUrl  String?          @map("deliverable_url")
+  notes           String?
+  status          SubmissionStatus @default(PENDING)
+  submittedAt     DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  withdrawnAt     DateTime?        @map("withdrawn_at") @db.Timestamptz(3)
+  withdrawnReason String?          @map("withdrawn_reason")
+  task            Task             @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  submitter       User             @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  approval        TaskApproval?
+  fileLinks       FileLink[]
+
+  @@index([taskId, submittedAt, id])
+  @@map("task_submissions")
+}
+
+model TaskApproval {
+  id           String           @id @default(uuid()) @db.Uuid
+  taskId       String           @map("task_id") @db.Uuid
+  submissionId String           @unique @map("submission_id") @db.Uuid
+  decidedById  String           @map("decided_by_id") @db.Uuid
+  decision     ApprovalDecision
+  reason       String?
+  dueAtSnapshot DateTime?        @map("due_at_snapshot") @db.Timestamptz(3)
+  decidedAt    DateTime         @default(now()) @map("decided_at") @db.Timestamptz(3)
+  task         Task             @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  submission   TaskSubmission   @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  decider      User             @relation(fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([taskId, decidedAt, id])
+  @@map("task_approvals")
+}
+
+model TaskDeadlineRequest {
+  id             String        @id @default(uuid()) @db.Uuid
+  taskId         String        @map("task_id") @db.Uuid
+  requestedById  String        @map("requested_by_id") @db.Uuid
+  proposedDueAt  DateTime      @map("proposed_due_at") @db.Timestamptz(3)
+  reason         String
+  status         RequestStatus @default(PENDING)
+  decidedById    String?       @map("decided_by_id") @db.Uuid
+  decidedAt      DateTime?     @map("decided_at") @db.Timestamptz(3)
+  decisionReason String?       @map("decision_reason")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  task           Task          @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  requester      User          @relation("DeadlineRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  decider        User?         @relation("DeadlineDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([taskId, createdAt, id])
+  @@map("task_deadline_requests")
+}
+
+model TaskAssigneeRequest {
+  id                 String        @id @default(uuid()) @db.Uuid
+  taskId             String        @map("task_id") @db.Uuid
+  requestedById      String        @map("requested_by_id") @db.Uuid
+  proposedAssigneeId String        @map("proposed_assignee_id") @db.Uuid
+  reason             String
+  status             RequestStatus @default(PENDING)
+  decidedById        String?       @map("decided_by_id") @db.Uuid
+  decidedAt          DateTime?     @map("decided_at") @db.Timestamptz(3)
+  decisionReason     String?       @map("decision_reason")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  task               Task          @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  requester          User          @relation("AssigneeRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  proposedAssignee   User          @relation("ProposedAssignee", fields: [proposedAssigneeId], references: [id], onDelete: Restrict)
+  decider            User?         @relation("AssigneeDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([taskId, createdAt, id])
+  @@map("task_assignee_requests")
+}
+
+model TaskEvent {
+  id        String    @id @default(uuid()) @db.Uuid
+  taskId    String    @map("task_id") @db.Uuid
+  actorId   String    @map("actor_id") @db.Uuid
+  kind      String
+  note      String    @default("")
+  before    Json?
+  after     Json?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  actor     User      @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([taskId, createdAt, id])
+  @@map("task_events")
+}
+
+model Notification {
+  id              String           @id @default(uuid()) @db.Uuid
+  recipientId     String           @map("recipient_id") @db.Uuid
+  taskId          String           @map("task_id") @db.Uuid
+  type            NotificationType
+  title           String
+  body            String
+  businessEventId String           @map("business_event_id") @db.Uuid
+  readAt          DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  recipient       User             @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  task            Task             @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@unique([businessEventId, recipientId])
+  @@index([recipientId, readAt, createdAt, id])
+  @@map("notifications")
+}
+
+model ReminderEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  taskId       String   @map("task_id") @db.Uuid
+  recipientId  String   @map("recipient_id") @db.Uuid
+  reminderType String   @map("reminder_type")
+  milestoneKey String   @map("milestone_key")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  recipient    User     @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@unique([taskId, recipientId, reminderType, milestoneKey])
+  @@map("reminder_events")
+}
+
+model FileObject {
+  id           String     @id @default(uuid()) @db.Uuid
+  objectKey    String     @unique @map("object_key")
+  originalName String     @map("original_name")
+  mimeType     String     @map("mime_type")
+  sizeBytes    BigInt     @map("size_bytes")
+  checksum     String?
+  etag         String?
+  uploadedById String     @map("uploaded_by_id") @db.Uuid
+  status       FileStatus @default(UPLOADING)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  removedAt    DateTime?  @map("removed_at") @db.Timestamptz(3)
+  uploader     User       @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  links        FileLink[]
+
+  @@index([uploadedById, status])
+  @@map("file_objects")
+}
+
+model FileLink {
+  id           String          @id @default(uuid()) @db.Uuid
+  fileId       String          @map("file_id") @db.Uuid
+  taskId       String?         @map("task_id") @db.Uuid
+  submissionId String?         @map("submission_id") @db.Uuid
+  commentId    String?         @map("comment_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  removedAt    DateTime?       @map("removed_at") @db.Timestamptz(3)
+  file         FileObject      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  task         Task?           @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  submission   TaskSubmission? @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  comment      TaskComment?    @relation(fields: [commentId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([submissionId])
+  @@index([commentId])
+  @@map("file_links")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id") @db.Uuid
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt, id])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
