@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00 đã có [bằng chứng đối chiếu](./phase-00/ACCEPTANCE.md); các phase triển khai backend tiếp theo vẫn chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00 đã có [bằng chứng đối chiếu](./phase-00/ACCEPTANCE.md); Phase 01 đã có [bằng chứng local và CI](./phase-01/ACCEPTANCE.md). Các phase 02–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -18,7 +18,7 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 - [x] BE-01-02 — Runtime config, bảo mật HTTP và logging; [bằng chứng](./phase-01/ACCEPTANCE.md).
 - [x] BE-01-03 — Migration PostgreSQL lõi; [bằng chứng](./phase-01/ACCEPTANCE.md).
 - [x] BE-01-04 — Seed P0 có clock kiểm soát được; [bằng chứng](./phase-01/ACCEPTANCE.md).
-- [ ] BE-01-05 — CI và quy trình migration.
+- [x] BE-01-05 — CI và quy trình migration; [bằng chứng](./phase-01/ACCEPTANCE.md).
 
 ## Phase 02 — [Auth và users](./PHASE_02_AUTH_USERS.md)
 

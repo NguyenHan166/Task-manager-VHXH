@@ -2,6 +2,7 @@
 
 **Phụ thuộc:** Phase 00 khóa mô hình lõi, ORM và quy ước API.  
 **Mục tiêu:** Có backend có thể dựng lại từ repo trên máy mới và một DB migration/seed lặp lại được.  
+**Trạng thái:** Hoàn thành ngày 27/10/2026; [bằng chứng nghiệm thu](./phase-01/ACCEPTANCE.md).
 **Cổng qua phase:** API health chạy, migration từ DB rỗng thành công, seed fixture không nhân đôi khi chạy lại, tài liệu môi trường đủ để khởi động local.
 
 ## Task
