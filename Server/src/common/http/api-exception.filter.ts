@@ -11,7 +11,7 @@ import type { RequestWithId } from './request-id.middleware';
 type ErrorBody = {
   code?: string;
   message?: string | string[];
-  fieldErrors?: Record<string, string[]>;
+  fieldErrors?: Record<string, string | string[]>;
 };
 
 @Catch()
@@ -57,11 +57,19 @@ export class ApiExceptionFilter implements ExceptionFilter {
         })}\n`,
       );
     }
+    const fieldErrors = detail.fieldErrors
+      ? Object.fromEntries(
+          Object.entries(detail.fieldErrors).map(([field, value]) => [
+            field,
+            Array.isArray(value) ? value.join('; ') : value,
+          ]),
+        )
+      : undefined;
     response.status(status).json({
       error: {
         code: detail.code ?? codes[status] ?? 'INTERNAL_ERROR',
         message,
-        ...(detail.fieldErrors ? { fieldErrors: detail.fieldErrors } : {}),
+        ...(fieldErrors ? { fieldErrors } : {}),
       },
     });
   }

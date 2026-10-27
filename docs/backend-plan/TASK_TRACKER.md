@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00 đã có [bằng chứng đối chiếu](./phase-00/ACCEPTANCE.md); Phase 01 đã có [bằng chứng local và CI](./phase-01/ACCEPTANCE.md). Các phase 02–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00 đã có [bằng chứng đối chiếu](./phase-00/ACCEPTANCE.md); Phase 01 đã có [bằng chứng local và CI](./phase-01/ACCEPTANCE.md); Phase 02 đã có [bằng chứng triển khai và ma trận runtime](./phase-02/ACCEPTANCE.md). Phase 03–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -22,11 +22,11 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 02 — [Auth và users](./PHASE_02_AUTH_USERS.md)
 
-- [ ] BE-02-01 — Login/refresh/logout/logout-all.
-- [ ] BE-02-02 — RBAC và ACL dùng chung.
-- [ ] BE-02-03 — Hồ sơ và danh bạ người dùng.
-- [ ] BE-02-04 — Quản trị user chỉ MANAGER.
-- [ ] BE-02-05 — Ma trận kiểm tra phiên và quyền.
+- [x] BE-02-01 — Login/refresh/logout/logout-all; code trong `Server/src/modules/auth`; [runtime acceptance](./phase-02/ACCEPTANCE.md).
+- [x] BE-02-02 — RBAC và ACL dùng chung; guard/policy trong `Server/src/common/auth`; [runtime acceptance](./phase-02/ACCEPTANCE.md).
+- [x] BE-02-03 — Hồ sơ, danh bạ và workload; code trong `Server/src/modules/auth` và `Server/src/modules/users`; [runtime acceptance](./phase-02/ACCEPTANCE.md).
+- [x] BE-02-04 — Quản trị user chỉ MANAGER; code trong `Server/src/modules/users`; [runtime acceptance](./phase-02/ACCEPTANCE.md).
+- [x] BE-02-05 — [Ma trận kiểm tra phiên và quyền](./phase-02/ACCEPTANCE.md); PASS trên DB scratch.
 
 ## Phase 03 — [Task core](./PHASE_03_TASK_CORE.md)
 

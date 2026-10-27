@@ -17,7 +17,7 @@ npm run db:check
 npm run dev
 ```
 
-`db:init` creates an ignored `.env` with random local PostgreSQL password, signing key and demo password. It leaves an existing `.env` unchanged. Docker Compose uses only the local `postgres:16` image, persists data in `office-workspace-local_postgres_data`, and binds PostgreSQL to **127.0.0.1:5433**. The API runs on `http://localhost:3000/api/health`; readiness is `http://localhost:3000/api/health/ready`.
+`db:init` creates an ignored `.env` with random local PostgreSQL password, signing key and demo password. It leaves an existing `.env` unchanged. Docker Compose uses only the local `postgres:16` image, persists data in `office-workspace-local_postgres_data`, and binds PostgreSQL to **127.0.0.1:5433**. The API port comes from `PORT` (default `3000`); readiness is `http://localhost:<PORT>/api/health/ready`.
 
 To inspect or edit local records in a browser, open a second terminal in `Server/`:
 
@@ -25,7 +25,7 @@ To inspect or edit local records in a browser, open a second terminal in `Server
 npm run db:studio
 ```
 
-Open **http://localhost:5555**. Prisma Studio shows `users`, `tasks`, submissions, approvals and every other table. The database credentials are already read from `.env`; no separate UI image or account is needed. The demo login password is stored as `DEMO_SEED_PASSWORD` in your ignored local `.env` for Phase 02; Phase 01 has no login endpoint yet.
+Open **http://localhost:5556**. Prisma Studio shows `users`, `tasks`, submissions, approvals and every other table. The database credentials are already read from `.env`; no separate UI image or account is needed. The demo login password is stored as `DEMO_SEED_PASSWORD` in your ignored local `.env`.
 
 ## Everyday commands
 

@@ -62,6 +62,12 @@ export function validateEnv(
       errors.push(`${key} must be an integer between ${min} and ${max}`);
     }
   }
+  if (env.ACCESS_TOKEN_TTL_SECONDS !== '900') {
+    errors.push('ACCESS_TOKEN_TTL_SECONDS must be 900 (15 minutes)');
+  }
+  if (env.REFRESH_TOKEN_TTL_DAYS !== '7') {
+    errors.push('REFRESH_TOKEN_TTL_DAYS must be 7');
+  }
   for (const key of [
     'REFRESH_COOKIE_SECURE',
     'REFRESH_COOKIE_HTTP_ONLY',
@@ -76,8 +82,8 @@ export function validateEnv(
   if (appEnv !== 'local' && env.REFRESH_COOKIE_SECURE !== 'true') {
     errors.push('REFRESH_COOKIE_SECURE must be true outside local');
   }
-  if (!['Lax', 'Strict', 'None'].includes(env.REFRESH_COOKIE_SAME_SITE)) {
-    errors.push('REFRESH_COOKIE_SAME_SITE must be Lax, Strict, or None');
+  if (env.REFRESH_COOKIE_SAME_SITE !== 'Lax') {
+    errors.push('REFRESH_COOKIE_SAME_SITE must be Lax');
   }
   const r2Keys = [
     'R2_ACCOUNT_ID',
