@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type {
   Task,
   User,
@@ -79,28 +79,42 @@ export function ApprovalsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [allTasks, allUsers, allSubs, allApps, allDeadlines, allAssignees, allFiles, allLinks] =
-        await Promise.all([
-          mockRepository.getTasks(),
-          mockRepository.getUsers(),
-          mockRepository.getSubmissions(""),
-          mockRepository.getApprovals(),
-          mockRepository.getDeadlineRequests(),
-          mockRepository.getAssigneeRequests(),
-          mockRepository.getFiles(),
-          mockRepository.getFileLinks(),
+      if (isMockMode) {
+        const [allTasks, allUsers, allSubs, allApps, allDeadlines, allAssignees, allFiles] = await Promise.all([
+          workspaceRepository.getTasks(),
+          workspaceRepository.getUsers(),
+          workspaceRepository.getSubmissions(""),
+          workspaceRepository.getApprovals(),
+          workspaceRepository.getDeadlineRequests(),
+          workspaceRepository.getAssigneeRequests(),
+          workspaceRepository.getFiles(),
         ]);
-
-      setReviewTasks(allTasks.filter((t) => t.status === "IN_REVIEW"));
-      setUsers(allUsers);
-      setSubmissions(allSubs);
-      setApprovals(allApps);
-      setDeadlineRequests(allDeadlines);
-      setAssigneeRequests(allAssignees);
-      setFiles(allFiles);
-
-      // Link helper stored
-      void allLinks;
+        setReviewTasks(allTasks.filter((task) => task.status === "IN_REVIEW"));
+        setUsers(allUsers);
+        setSubmissions(allSubs);
+        setApprovals(allApps);
+        setDeadlineRequests(allDeadlines);
+        setAssigneeRequests(allAssignees);
+        setFiles(allFiles);
+      } else {
+        const [allTasks, allUsers, allFiles] = await Promise.all([
+          httpRepository.queryAllTasks({ type: "OFFICIAL", sortBy: "UPDATED_AT", sortDirection: "DESC" }),
+          workspaceRepository.getUsers(),
+          workspaceRepository.getFiles(),
+        ]);
+        const review = allTasks.filter((task) => task.status === "IN_REVIEW");
+        const [subBatches, approvalBatches] = await Promise.all([
+          Promise.all(review.map((task) => workspaceRepository.getSubmissions(task.id))),
+          Promise.all(allTasks.map((task) => workspaceRepository.getApprovals(task.id))),
+        ]);
+        setReviewTasks(review);
+        setUsers(allUsers);
+        setSubmissions(subBatches.flat());
+        setApprovals(approvalBatches.flat());
+        setDeadlineRequests([]);
+        setAssigneeRequests([]);
+        setFiles(allFiles);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +122,7 @@ export function ApprovalsPage() {
 
   useEffect(() => {
     loadData();
-    const unsub = mockRepository.subscribe(loadData);
+    const unsub = workspaceRepository.subscribe(loadData);
     return unsub;
   }, []);
 
@@ -118,11 +132,16 @@ export function ApprovalsPage() {
     setApprovalNote("");
     setDecisionMode("NONE");
 
-    const [subs, apps, links] = await Promise.all([
-      mockRepository.getSubmissions(task.id),
-      mockRepository.getApprovals(task.id),
-      mockRepository.getFileLinks(),
+    const [subs, apps] = await Promise.all([
+      workspaceRepository.getSubmissions(task.id),
+      workspaceRepository.getApprovals(task.id),
     ]);
+    const links = isMockMode
+      ? await workspaceRepository.getFileLinks()
+      : (await Promise.all([
+          workspaceRepository.getFileLinks("TASK", task.id),
+          ...subs.map((submission) => workspaceRepository.getFileLinks("SUBMISSION", submission.id)),
+        ])).flat();
 
     setTaskApprovals(apps);
 
@@ -152,7 +171,7 @@ export function ApprovalsPage() {
 
     setIsSubmittingDecision(true);
     try {
-      await mockRepository.decideApproval(
+      await workspaceRepository.decideApproval(
         selectedSub.id,
         decisionMode === "APPROVE" ? "APPROVED" : "RETURNED",
         approvalNote.trim() || null,
@@ -185,7 +204,7 @@ export function ApprovalsPage() {
     }
     setIsDecidingDeadline(true);
     try {
-      await mockRepository.decideDeadlineRequest(
+      await workspaceRepository.decideDeadlineRequest(
         activeDeadlineReq.id,
         {
           decision: deadlineDecision,
@@ -218,7 +237,7 @@ export function ApprovalsPage() {
     }
     setIsDecidingAssignee(true);
     try {
-      await mockRepository.decideAssigneeRequest(
+      await workspaceRepository.decideAssigneeRequest(
         activeAssigneeReq.id,
         {
           decision: assigneeDecision,
@@ -363,7 +382,7 @@ export function ApprovalsPage() {
             )}
           </button>
 
-          <button
+          {isMockMode && <button
             onClick={() => setActiveTab("DEADLINES")}
             className={`px-4 py-2.5 text-xs font-semibold rounded-t-btn border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "DEADLINES"
@@ -378,9 +397,9 @@ export function ApprovalsPage() {
                 {pendingDeadlines.length}
               </span>
             )}
-          </button>
+          </button>}
 
-          <button
+          {isMockMode && <button
             onClick={() => setActiveTab("ASSIGNEES")}
             className={`px-4 py-2.5 text-xs font-semibold rounded-t-btn border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "ASSIGNEES"
@@ -395,7 +414,7 @@ export function ApprovalsPage() {
                 {pendingAssignees.length}
               </span>
             )}
-          </button>
+          </button>}
 
           <button
             onClick={() => setActiveTab("HISTORY")}
@@ -519,7 +538,7 @@ export function ApprovalsPage() {
         )}
 
         {/* TAB 2: DEADLINE REQUESTS */}
-        {activeTab === "DEADLINES" && (
+        {isMockMode && activeTab === "DEADLINES" && (
           <div className="space-y-4">
             {pendingDeadlines.length === 0 ? (
               <EmptyState
@@ -608,7 +627,7 @@ export function ApprovalsPage() {
         )}
 
         {/* TAB 3: ASSIGNEE REQUESTS */}
-        {activeTab === "ASSIGNEES" && (
+        {isMockMode && activeTab === "ASSIGNEES" && (
           <div className="space-y-4">
             {pendingAssignees.length === 0 ? (
               <EmptyState

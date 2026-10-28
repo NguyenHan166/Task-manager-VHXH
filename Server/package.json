@@ -25,6 +25,11 @@
     "tasks:check": "tsx scripts/check-tasks.ts",
     "workflow:check": "tsx scripts/check-workflow.ts",
     "notifications:check": "tsx scripts/check-notifications.ts",
+    "backup:run": "tsx scripts/run-backup.ts",
+    "backup:drill": "tsx scripts/restore-drill.ts",
+    "phase07:check": "tsx scripts/check-phase07.ts",
+    "phase07:measure": "tsx scripts/measure-phase07.ts",
+    "phase07:perf-seed": "tsx scripts/seed-phase07-performance.ts",
     "files:cleanup": "tsx scripts/cleanup-files.ts",
     "files:check": "tsx scripts/check-files.ts"
   },

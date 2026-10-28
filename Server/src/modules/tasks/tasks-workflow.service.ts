@@ -18,6 +18,7 @@ import {
   UserStatus,
 } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
+import { RequestContextService } from '../../common/http/request-context.service';
 import { TaskAccessPolicy } from '../../common/auth/task-access.policy';
 import { PrismaService } from '../../database/prisma.service';
 import {
@@ -86,6 +87,7 @@ export class TasksWorkflowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: TaskAccessPolicy,
+    private readonly requestContext: RequestContextService,
   ) {}
 
   async publish(actor: AuthenticatedUser, taskId: string) {
@@ -1099,6 +1101,7 @@ export class TasksWorkflowService {
         before,
         after,
         createdAt,
+        requestId: this.requestContext.currentRequestId(),
       },
     });
     await tx.realtimeOutbox.create({

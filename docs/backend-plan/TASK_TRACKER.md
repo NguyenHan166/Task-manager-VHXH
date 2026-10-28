@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–06 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-06`; workflow Phase 04, file lifecycle Phase 05 và notification Phase 06 đều qua runtime matrix trên DB disposable. Phase 07–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–06 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-06`; workflow Phase 04, file lifecycle Phase 05 và notification Phase 06 đều qua runtime matrix trên DB disposable. Phase 07 BE-01 đến BE-04 đã triển khai và qua nghiệm thu local; phép đo tài nguyên staging BE-05 còn chờ. Phase 08 BE-01 đến BE-03 đã qua nghiệm thu local; staging/production BE-04 và Phase 09 còn chờ.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -63,17 +63,17 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 07 — [Báo cáo và vận hành](./PHASE_07_REPORTS_OPERATIONS.md)
 
-- [ ] BE-07-01 — Dashboard KPI theo vai trò.
-- [ ] BE-07-02 — Reports và CSV/XLSX.
-- [ ] BE-07-03 — Settings và audit quản trị.
-- [ ] BE-07-04 — Backup, restore, retention.
-- [ ] BE-07-05 — Metrics, log và tài nguyên.
+- [x] BE-07-01 — Dashboard KPI theo vai trò; fixed-clock acceptance [PASS](./phase-07/ACCEPTANCE.md).
+- [x] BE-07-02 — Reports và CSV/XLSX; runtime acceptance [PASS](./phase-07/ACCEPTANCE.md).
+- [x] BE-07-03 — Settings và audit quản trị; RBAC, redaction và append-only [PASS](./phase-07/ACCEPTANCE.md).
+- [x] BE-07-04 — Backup mã hóa, restore cô lập và retention [local PASS](./phase-07/ACCEPTANCE.md); cần xác nhận S3 staging ở BE-08-04.
+- [ ] BE-07-05 — Metrics/log có KPI p95 cửa sổ 512 mẫu, CPU/DB connection limit và request ID nối task event → notification; đã đo local với 50 request/concurrency 20 trên 50.000 task synthetic (KPI p95 74 ms, 20/100 DB connections). Còn xác nhận alert và đo trên staging/Railway; hoãn theo yêu cầu. Xem [runbook](./phase-07/RUNBOOK.md) và [kết quả hiện có](./phase-07/ACCEPTANCE.md).
 
 ## Phase 08 — [Kết nối FE và P0](./PHASE_08_INTEGRATION_RELEASE.md)
 
-- [ ] BE-08-01 — Repository interface/HTTP adapter, auth FE.
-- [ ] BE-08-02 — Nối route P0 và trạng thái lỗi.
-- [ ] BE-08-03 — Contract và journey nghiệm thu.
+- [x] BE-08-01 — Repository interface/HTTP adapter, auth FE; [route matrix và acceptance](./phase-08/ROUTE_MATRIX.md).
+- [x] BE-08-02 — Nối route P0 và trạng thái lỗi; [route matrix và acceptance](./phase-08/ROUTE_MATRIX.md).
+- [x] BE-08-03 — Contract và journey nghiệm thu; [biên bản local PASS](./phase-08/ACCEPTANCE.md).
 - [ ] BE-08-04 — Staging, production và runbook.
 
 ## Phase 09 — [P1 collaboration](./PHASE_09_P1_COLLABORATION.md)

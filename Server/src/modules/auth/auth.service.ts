@@ -68,6 +68,7 @@ export class AuthService {
     const candidateHash = user?.passwordHash ?? (await this.dummyPasswordHash);
     const passwordMatches = await compare(password, candidateHash);
     if (!user || !passwordMatches || user.status !== 'ACTIVE') {
+      await this.writeFailedLoginAudit();
       throw invalidCredentials();
     }
 
@@ -94,6 +95,16 @@ export class AuthService {
           refreshHash: digestToken(refreshToken),
           expiresAt: this.refreshExpiry(now),
           device: userAgent?.slice(0, 200) ?? null,
+          createdAt: now,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: 'LOGIN_SUCCEEDED',
+          entity: 'User',
+          entityId: user.id,
+          after: { result: 'SUCCEEDED' } satisfies Prisma.InputJsonObject,
           createdAt: now,
         },
       });
@@ -265,6 +276,20 @@ export class AuthService {
         },
       });
     });
+  }
+
+  private async writeFailedLoginAudit(): Promise<void> {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'LOGIN_FAILED',
+          entity: 'Auth',
+          after: { result: 'FAILED', reason: 'INVALID_CREDENTIALS' },
+        },
+      });
+    } catch {
+      // Failed credentials keep the same public response if audit storage is unavailable.
+    }
   }
 
   private refreshExpiry(now: Date): Date {

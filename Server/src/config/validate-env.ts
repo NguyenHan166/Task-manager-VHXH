@@ -1,3 +1,5 @@
+import { isAbsolute } from 'node:path';
+
 type Environment = 'local' | 'staging' | 'production';
 
 export function validateEnv(
@@ -16,6 +18,19 @@ export function validateEnv(
   }
   if (env.BUSINESS_TIMEZONE !== 'Asia/Ho_Chi_Minh') {
     errors.push('BUSINESS_TIMEZONE must be Asia/Ho_Chi_Minh');
+  }
+  if (env.SYSTEM_CLOCK_OVERRIDE) {
+    if (appEnv !== 'local') {
+      errors.push('SYSTEM_CLOCK_OVERRIDE is allowed only for local acceptance');
+    }
+    if (
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
+        env.SYSTEM_CLOCK_OVERRIDE,
+      ) ||
+      Number.isNaN(Date.parse(env.SYSTEM_CLOCK_OVERRIDE))
+    ) {
+      errors.push('SYSTEM_CLOCK_OVERRIDE must be an ISO 8601 UTC timestamp');
+    }
   }
   try {
     const databaseUrl = new URL(env.DATABASE_URL);
@@ -54,7 +69,7 @@ export function validateEnv(
     ['FILE_REMOVED_RETENTION_DAYS', 90, 3650],
     ['REMINDER_INTERVAL_MINUTES', 1, 1440],
     ['REMINDER_BEFORE_HOURS', 1, 720],
-    ['BACKUP_RETENTION_DAYS', 1, 3650],
+    ['BACKUP_RETENTION_DAYS', 30, 3650],
   ];
   for (const [key, min, max] of numbers) {
     const value = Number(env[key]);
@@ -143,13 +158,116 @@ export function validateEnv(
       errors.push('R2_ENDPOINT must be a valid URL');
     }
   }
+  const backupS3Keys = [
+    'BACKUP_BUCKET',
+    'BACKUP_S3_ENDPOINT',
+    'BACKUP_S3_ACCESS_KEY_ID',
+    'BACKUP_S3_SECRET_ACCESS_KEY',
+  ];
+  const suppliedBackupS3Keys = backupS3Keys.filter((key) => Boolean(env[key]));
+  const hasLocalBackupStorage = Boolean(env.BACKUP_LOCAL_DIR);
+  const hasBackupKey = Boolean(env.BACKUP_ENCRYPTION_KEY);
   if (
-    appEnv === 'production' &&
-    (!env.BACKUP_BUCKET || !env.BACKUP_ENCRYPTION_KEY)
+    suppliedBackupS3Keys.length > 0 &&
+    suppliedBackupS3Keys.length < backupS3Keys.length
   ) {
     errors.push(
-      'BACKUP_BUCKET and BACKUP_ENCRYPTION_KEY are required in production',
+      'S3 backup storage must provide the bucket, endpoint and dedicated credentials together',
     );
+  }
+  if (appEnv !== 'local') {
+    if (suppliedBackupS3Keys.length !== backupS3Keys.length || !hasBackupKey) {
+      errors.push(
+        'Encrypted backup storage with a dedicated private bucket is required outside local',
+      );
+    }
+  } else {
+    if (hasLocalBackupStorage && suppliedBackupS3Keys.length > 0) {
+      errors.push(
+        'Choose either BACKUP_LOCAL_DIR or dedicated S3 backup storage for local use',
+      );
+    }
+    if (
+      (hasLocalBackupStorage || suppliedBackupS3Keys.length > 0) &&
+      !hasBackupKey
+    ) {
+      errors.push(
+        'Configured local/S3 backup storage requires BACKUP_ENCRYPTION_KEY',
+      );
+    }
+    if (
+      hasBackupKey &&
+      !hasLocalBackupStorage &&
+      suppliedBackupS3Keys.length === 0
+    ) {
+      errors.push('BACKUP_ENCRYPTION_KEY requires configured backup storage');
+    }
+  }
+  if (
+    env.BACKUP_ENCRYPTION_KEY &&
+    !/^[a-f0-9]{64}$/i.test(env.BACKUP_ENCRYPTION_KEY)
+  ) {
+    errors.push(
+      'BACKUP_ENCRYPTION_KEY must be 32 bytes encoded as 64 hexadecimal characters',
+    );
+  }
+  if (
+    env.BACKUP_BUCKET &&
+    (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(env.BACKUP_BUCKET) ||
+      env.BACKUP_BUCKET === env.R2_FILE_BUCKET)
+  ) {
+    errors.push(
+      'BACKUP_BUCKET must be a valid bucket separate from R2_FILE_BUCKET',
+    );
+  }
+  if (env.BACKUP_S3_ENDPOINT) {
+    try {
+      const endpoint = new URL(env.BACKUP_S3_ENDPOINT);
+      const localEndpoint = ['localhost', '127.0.0.1', '::1'].includes(
+        endpoint.hostname,
+      );
+      if (
+        !['https:', 'http:'].includes(endpoint.protocol) ||
+        endpoint.username ||
+        endpoint.password ||
+        endpoint.search ||
+        endpoint.hash ||
+        (endpoint.protocol === 'http:' &&
+          (appEnv !== 'local' || !localEndpoint))
+      ) {
+        errors.push(
+          'BACKUP_S3_ENDPOINT must be HTTPS, or local HTTP for APP_ENV=local',
+        );
+      }
+    } catch {
+      errors.push('BACKUP_S3_ENDPOINT must be a valid URL');
+    }
+  }
+  if (
+    env.BACKUP_LOCAL_DIR &&
+    (appEnv !== 'local' || !isAbsolute(env.BACKUP_LOCAL_DIR))
+  ) {
+    errors.push(
+      'BACKUP_LOCAL_DIR must be an absolute path and is only allowed for APP_ENV=local',
+    );
+  }
+  if (
+    env.BACKUP_SCHEDULE_UTC &&
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(env.BACKUP_SCHEDULE_UTC)
+  ) {
+    errors.push('BACKUP_SCHEDULE_UTC must use 24-hour UTC HH:mm format');
+  }
+  if (env.PG_CLIENT_DOCKER_CONTAINER) {
+    if (appEnv !== 'local') {
+      errors.push('PG_CLIENT_DOCKER_CONTAINER is allowed only for local use');
+    }
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(env.PG_CLIENT_DOCKER_CONTAINER)
+    ) {
+      errors.push(
+        'PG_CLIENT_DOCKER_CONTAINER must be a Docker container name or ID',
+      );
+    }
   }
   if (errors.length)
     throw new Error(`Invalid backend configuration: ${errors.join('; ')}`);

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type {
     Task,
     Project,
@@ -14,6 +14,8 @@ import {
     getPriorityBreakdown,
     getManagerUrgentTasks,
     isTaskOverdue,
+    type ManagerDashboardStats,
+    type UserWorkloadStats,
 } from "../tasks/task-selectors";
 import {
     StatCard,
@@ -63,6 +65,8 @@ export function ManagerDashboard() {
     const [deadlineRequests, setDeadlineRequests] = useState<
         TaskDeadlineRequest[]
     >([]);
+    const [apiSummary, setApiSummary] = useState<ManagerDashboardStats | null>(null);
+    const [apiWorkloads, setApiWorkloads] = useState<UserWorkloadStats[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Filters state
@@ -83,17 +87,30 @@ export function ManagerDashboard() {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [allTasks, allProjects, allParticipants, allRequests] =
-                await Promise.all([
-                    mockRepository.getTasks(),
-                    mockRepository.getProjects(),
-                    mockRepository.getParticipants(),
-                    mockRepository.getDeadlineRequests(),
+            if (isMockMode) {
+              const [allTasks, allProjects, allParticipants, allRequests] = await Promise.all([
+                    workspaceRepository.getTasks(),
+                    workspaceRepository.getProjects(),
+                    workspaceRepository.getParticipants(),
+                    workspaceRepository.getDeadlineRequests(),
                 ]);
-            setTasks(allTasks);
-            setProjects(allProjects);
-            setParticipants(allParticipants);
-            setDeadlineRequests(allRequests);
+              setTasks(allTasks);
+              setProjects(allProjects);
+              setParticipants(allParticipants);
+              setDeadlineRequests(allRequests);
+              return;
+            }
+            const [report, taskPage] = await Promise.all([
+              httpRepository.getKpiReport(),
+              httpRepository.queryTasks({ type: "OFFICIAL", page: 1, pageSize: 100, sortBy: "DUE_AT", sortDirection: "ASC" }),
+            ]);
+            const taskParticipants = await httpRepository.getParticipantsForTasks(taskPage.items.map((task) => task.id));
+            setApiSummary(report.summary as unknown as ManagerDashboardStats);
+            setApiWorkloads(Array.isArray(report.workloads) ? report.workloads as unknown as UserWorkloadStats[] : []);
+            setTasks(taskPage.items);
+            setProjects([]);
+            setParticipants(taskParticipants);
+            setDeadlineRequests([]);
         } finally {
             setIsLoading(false);
         }
@@ -101,7 +118,7 @@ export function ManagerDashboard() {
 
     useEffect(() => {
         loadData();
-        const unsub = mockRepository.subscribe(loadData);
+        const unsub = workspaceRepository.subscribe(loadData);
         return unsub;
     }, []);
 
@@ -147,12 +164,14 @@ export function ManagerDashboard() {
     // Derived metrics from selectors
     const now = useMemo(() => new Date(), []);
     const kpiStats = useMemo(
-        () => getManagerDashboardStats(filteredTasks, now),
-        [filteredTasks, now],
+        () => !isMockMode && filterAssigneeId === "ALL" && filterPriority === "ALL" && filterProjectId === "ALL" && filterTimeRange === "ALL"
+            ? apiSummary ?? getManagerDashboardStats(filteredTasks, now)
+            : getManagerDashboardStats(filteredTasks, now),
+        [filteredTasks, now, apiSummary, filterAssigneeId, filterPriority, filterProjectId, filterTimeRange],
     );
     const workloadStats = useMemo(
-        () => getUserWorkloadStats(tasks, users, participants, now),
-        [tasks, users, participants, now],
+        () => !isMockMode && apiWorkloads.length > 0 ? apiWorkloads : getUserWorkloadStats(tasks, users, participants, now),
+        [tasks, users, participants, now, apiWorkloads],
     );
     const priorityBreakdown = useMemo(
         () => getPriorityBreakdown(filteredTasks),
@@ -190,7 +209,7 @@ export function ManagerDashboard() {
         if (!activeReq || !currentUser) return;
         setIsDecidingReq(true);
         try {
-            await mockRepository.decideDeadlineRequest(
+            await workspaceRepository.decideDeadlineRequest(
                 activeReq.id,
                 {
                     decision: reqDecision,

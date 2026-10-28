@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand Tokens */
+  --brand-700: #0F766E;
+  --brand-800: #115E59;
+  --brand-100: #CCFBF1;
+  --brand-50: #F0FDFA;
+
+  /* Surfaces & Canvas */
+  --canvas: #F7F9FB;
+  --surface: #FFFFFF;
+
+  /* Typography Colors */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+
+  /* Border */
+  --border: #E2E8F0;
+
+  /* Functional Status Colors */
+  --info: #2563EB;
+  --success: #15803D;
+  --warning: #B45309;
+  --danger: #B91C1C;
+  --review: #7C3AED;
+
+  /* Status Badges */
+  --status-draft-text: #475569;
+  --status-draft-bg: #F1F5F9;
+
+  --status-todo-text: #1D4ED8;
+  --status-todo-bg: #DBEAFE;
+
+  --status-in_progress-text: #B45309;
+  --status-in_progress-bg: #FEF3C7;
+
+  --status-in_review-text: #7C3AED;
+  --status-in_review-bg: #F3E8FF;
+
+  --status-done-text: #15803D;
+  --status-done-bg: #DCFCE7;
+
+  --status-cancelled-text: #64748B;
+  --status-cancelled-bg: #E2E8F0;
+}
+
+body {
+  margin: 0;
+  font-family: "Be Vietnam Pro", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--canvas);
+  color: var(--text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-700);
+  outline-offset: 2px;
+}

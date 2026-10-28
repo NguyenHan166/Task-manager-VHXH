@@ -4804,6 +4804,40 @@
             }
           },
           {
+            "name": "dueFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          },
+          {
+            "name": "dueTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "OFFICIAL",
+                "TEAM",
+                "PERSONAL"
+              ]
+            }
+          },
+          {
             "name": "projectId",
             "in": "query",
             "required": false,
@@ -4963,6 +4997,40 @@
               "type": "string",
               "format": "date-time",
               "pattern": "Z$"
+            }
+          },
+          {
+            "name": "dueFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          },
+          {
+            "name": "dueTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "OFFICIAL",
+                "TEAM",
+                "PERSONAL"
+              ]
             }
           },
           {
@@ -5957,6 +6025,68 @@
           }
         },
         "description": "MANAGER only. Metadata of latest backup/restore drill; no raw dump or signed URL."
+      }
+    },
+    "/operations/metrics": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "operationId": "getOperationsMetrics",
+        "summary": "getOperationsMetrics",
+        "x-release-phase": "P0",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OperationsMetrics"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "description": "MANAGER-only operational counters, memory, DB connections, KPI latency and backup status; counters are per instance and reset on restart."
       }
     },
     "/tasks/{id}/invitations/{participantId}/respond": {
@@ -9980,6 +10110,144 @@
           "retentionDays"
         ],
         "description": "No object key, signed URL, DB dump or credentials."
+      },
+      "OperationsMetrics": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "uptimeSeconds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "memoryBytes": {
+            "type": "object",
+            "properties": {
+              "rss": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "heapUsed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "external": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "rss",
+              "heapUsed",
+              "external"
+            ]
+          },
+          "cpuUsage": {
+            "type": "object",
+            "properties": {
+              "windowMs": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "userMicros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "systemMicros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "percentOfOneCore": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "windowMs",
+              "userMicros",
+              "systemMicros",
+              "percentOfOneCore"
+            ],
+            "description": "Process CPU time since the previous operations snapshot, normalized to one CPU core."
+          },
+          "counters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "kpiQueryLatencyMs": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "average": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "p95RecentWindow": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "recentSampleSize": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 512
+              },
+              "recentWindowCapacity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 512
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "count",
+              "average",
+              "max",
+              "p95RecentWindow",
+              "recentSampleSize",
+              "recentWindowCapacity"
+            ],
+            "description": "p95 is computed over the most recent bounded window of at most 512 KPI observations."
+          },
+          "databaseConnections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "databaseConnectionLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "backup": {
+            "$ref": "#/components/schemas/BackupStatus"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "generatedAt",
+          "uptimeSeconds",
+          "memoryBytes",
+          "cpuUsage",
+          "counters",
+          "kpiQueryLatencyMs",
+          "databaseConnections",
+          "databaseConnectionLimit",
+          "backup"
+        ],
+        "description": "MANAGER-only instance snapshot; counters reset at process restart. Contains no object keys or credentials."
       },
       "Project": {
         "type": "object",

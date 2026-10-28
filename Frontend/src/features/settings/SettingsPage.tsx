@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type {
   TaskEvent,
   Task,
@@ -62,10 +62,10 @@ export function SettingsPage() {
 
   const loadSettingsAndEvents = async () => {
     try {
-      const [currSettings, allEvents, allTasks] = await Promise.all([
-        mockRepository.getSettings(),
-        mockRepository.getEvents(),
-        mockRepository.getTasks(),
+      const [currSettings, rawEvents, allTasks] = await Promise.all([
+        workspaceRepository.getSettings(),
+        isMockMode ? workspaceRepository.getEvents() : httpRepository.getAuditLogs({ page: 1, pageSize: 100 }),
+        workspaceRepository.getTasks(),
       ]);
       setWorkspaceName(currSettings.workspaceName);
       setDefaultDueHour(currSettings.defaultDueHour);
@@ -73,6 +73,16 @@ export function SettingsPage() {
       setMaxFileSizeMb(currSettings.maxFileSizeMb);
 
       // Sort events newest first
+      const allEvents = isMockMode ? rawEvents as TaskEvent[] : (rawEvents as Array<Record<string, unknown>>).map((entry) => ({
+        id: String(entry.id),
+        taskId: entry.entityType === "Task" ? String(entry.entityId ?? "") : "",
+        actorId: String(entry.actorId ?? ""),
+        kind: String(entry.kind ?? "AUDIT") as TaskEvent["kind"],
+        note: `${String(entry.kind ?? "EVENT")} · ${String(entry.entityType ?? "")}`,
+        before: (entry.before as Record<string, unknown> | null) ?? null,
+        after: (entry.after as Record<string, unknown> | null) ?? null,
+        createdAt: String(entry.createdAt ?? ""),
+      }));
       const sortedEvents = [...allEvents].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
@@ -85,7 +95,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     loadSettingsAndEvents();
-    const unsub = mockRepository.subscribe(loadSettingsAndEvents);
+    const unsub = workspaceRepository.subscribe(loadSettingsAndEvents);
     return unsub;
   }, []);
 
@@ -114,7 +124,7 @@ export function SettingsPage() {
 
     setIsSavingSettings(true);
     try {
-      await mockRepository.updateSettings({
+      await workspaceRepository.updateSettings({
         workspaceName: workspaceName.trim(),
         defaultDueHour: Number(defaultDueHour),
         reminderBeforeHours: Number(reminderBeforeHours),
@@ -132,7 +142,8 @@ export function SettingsPage() {
   const handleConfirmResetSeed = async () => {
     setIsResetting(true);
     try {
-      await mockRepository.resetSeed();
+      if (!isMockMode) return;
+      await workspaceRepository.resetSeed();
       showToast("Đã khôi phục cơ sở dữ liệu mẫu về trạng thái gốc", "success");
       setIsResetConfirmOpen(false);
       await refreshSession();
@@ -415,7 +426,7 @@ export function SettingsPage() {
             </Card>
 
             {/* Danger Zone: Reset Seed */}
-            <Card className="border-red-200 bg-red-50/20">
+            {isMockMode && <Card className="border-red-200 bg-red-50/20">
               <CardHeader>
                 <div className="flex items-center gap-2 text-danger">
                   <AlertTriangle className="w-4 h-4" />
@@ -436,7 +447,7 @@ export function SettingsPage() {
                   Khôi phục dữ liệu mẫu (Reset Seed)
                 </Button>
               </CardContent>
-            </Card>
+            </Card>}
           </div>
         )}
 
@@ -611,7 +622,7 @@ export function SettingsPage() {
         )}
 
         {/* Confirm Reset Seed Dialog */}
-        <ConfirmDialog
+        {isMockMode && <ConfirmDialog
           isOpen={isResetConfirmOpen}
           title="Khôi phục toàn bộ dữ liệu mẫu?"
           description="Hệ thống sẽ làm mới kho dữ liệu mock về cấu hình chuẩn ban đầu. Mọi tài khoản, nhiệm vụ, bình luận và nhật ký bạn đã thao tác trong phiên thử nghiệm sẽ được đặt lại."
@@ -621,7 +632,7 @@ export function SettingsPage() {
           isLoading={isResetting}
           onConfirm={handleConfirmResetSeed}
           onCancel={() => setIsResetConfirmOpen(false)}
-        />
+        />}
       </div>
     </AppShell>
   );

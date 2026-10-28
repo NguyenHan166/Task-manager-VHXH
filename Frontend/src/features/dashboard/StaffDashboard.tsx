@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type { Task, TaskParticipant } from "../../shared/data-contract";
 import {
   getStaffDashboardStats,
@@ -46,17 +46,29 @@ export function StaffDashboard() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [participants, setParticipants] = useState<TaskParticipant[]>([]);
+  const [apiStaffStats, setApiStaffStats] = useState<Awaited<ReturnType<typeof httpRepository.getDashboardStats>> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [allTasks, allParts] = await Promise.all([
-        mockRepository.getTasks(),
-        mockRepository.getParticipants(),
-      ]);
-      setTasks(allTasks);
-      setParticipants(allParts);
+      if (isMockMode) {
+        const [allTasks, allParts] = await Promise.all([
+          workspaceRepository.getTasks(),
+          workspaceRepository.getParticipants(),
+        ]);
+        setTasks(allTasks);
+        setParticipants(allParts);
+      } else {
+        const [stats, allTasks] = await Promise.all([
+          httpRepository.getDashboardStats("STAFF"),
+          httpRepository.queryAllTasks({ page: 1, pageSize: 100, sortBy: "DUE_AT", sortDirection: "ASC" }),
+        ]);
+        const allParts = await httpRepository.getParticipantsForTasks(allTasks.map((task) => task.id));
+        setApiStaffStats(stats);
+        setTasks(allTasks);
+        setParticipants(allParts);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +76,7 @@ export function StaffDashboard() {
 
   useEffect(() => {
     loadData();
-    const unsub = mockRepository.subscribe(loadData);
+    const unsub = workspaceRepository.subscribe(loadData);
     return unsub;
   }, []);
 
@@ -73,8 +85,9 @@ export function StaffDashboard() {
   // Compute staff metrics
   const staffStats = useMemo(() => {
     if (!currentUser) return null;
+    if (!isMockMode && apiStaffStats) return apiStaffStats as unknown as ReturnType<typeof getStaffDashboardStats>;
     return getStaffDashboardStats(tasks, currentUser, participants, now);
-  }, [tasks, currentUser, participants, now]);
+  }, [tasks, currentUser, participants, now, apiStaffStats]);
 
   // Compute todo list sorted by urgency
   const todoList = useMemo(() => {
@@ -130,13 +143,15 @@ export function StaffDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
-          <Link to="/tasks/create">
-            <Button variant="primary" size="md" className="gap-2 shadow-sm">
-              <PlusCircle className="w-4 h-4" /> Tạo việc mới
-            </Button>
-          </Link>
-        </div>
+        {isMockMode && (
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Link to="/tasks/create">
+              <Button variant="primary" size="md" className="gap-2 shadow-sm">
+                <PlusCircle className="w-4 h-4" /> Tạo việc mới
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* 2. Row of 5 Staff KPI Cards */}
@@ -389,11 +404,13 @@ export function StaffDashboard() {
               {personalTasks.length === 0 ? (
                 <div className="text-center py-4 text-text-muted text-xs space-y-2">
                   <p>Chưa có ghi chú việc cá nhân nào.</p>
-                  <Link to="/tasks/create">
-                    <Button variant="outline" size="sm" className="h-7 text-xs">
-                      <PlusCircle className="w-3 h-3 mr-1" /> Thêm việc cá nhân
-                    </Button>
-                  </Link>
+                  {isMockMode && (
+                    <Link to="/tasks/create">
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <PlusCircle className="w-3 h-3 mr-1" /> Thêm việc cá nhân
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">

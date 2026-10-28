@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type { FileObject, FileLink, Task, TaskSubmission, Id } from "../../shared/data-contract";
 import {
   Breadcrumb,
@@ -24,6 +24,7 @@ import {
   formatFileSize,
   getFileCategoryIcon,
 } from "./file-session-store";
+import { downloadFile } from "./file-download";
 import {
   FileText,
   FileSpreadsheet,
@@ -64,6 +65,7 @@ export function FilesPage() {
 
   // Preview Modal
   const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
+  const [downloadingFileId, setDownloadingFileId] = useState<Id | null>(null);
 
   // Delete/Unlink Modal
   const [deletingFile, setDeletingFile] = useState<FileObject | null>(null);
@@ -72,10 +74,10 @@ export function FilesPage() {
     setIsLoading(true);
     try {
       const [allFiles, allLinks, allTasks, allSubs] = await Promise.all([
-        mockRepository.getFiles(),
-        mockRepository.getFileLinks(),
-        mockRepository.getTasks(),
-        mockRepository.getSubmissions(),
+        workspaceRepository.getFiles(),
+        workspaceRepository.getFileLinks(),
+        workspaceRepository.getTasks(),
+        workspaceRepository.getSubmissions(),
       ]);
       setFiles(allFiles);
       setLinks(allLinks);
@@ -90,9 +92,20 @@ export function FilesPage() {
 
   useEffect(() => {
     loadAllFiles();
-    const unsub = mockRepository.subscribe(loadAllFiles);
+    const unsub = workspaceRepository.subscribe(loadAllFiles);
     return unsub;
   }, []);
+
+  const handleDownloadFile = async (file: FileObject) => {
+    try {
+      setDownloadingFileId(file.id);
+      await downloadFile(file);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Không thể tải tệp", "error");
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   const handleSelectRealFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -110,6 +123,10 @@ export function FilesPage() {
 
   const handleExecuteUpload = async () => {
     if (!currentUser) return;
+    if (!isMockMode && (!selectedFile || !linkTaskId)) {
+      showToast("API yêu cầu chọn tệp thật và công việc cần đính kèm.", "error");
+      return;
+    }
     const fileName = selectedFile ? selectedFile.name : mockFileName.trim();
     if (!fileName) {
       showToast("Vui lòng chọn hoặc nhập tên tệp đính kèm", "error");
@@ -130,19 +147,18 @@ export function FilesPage() {
         else if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
       }
 
-      const uploaded = await mockRepository.uploadMockFile(
-        { originalName: fileName, mimeType, sizeBytes },
-        currentUser.id
-      );
+      const uploaded = isMockMode
+        ? await workspaceRepository.uploadMockFile({ originalName: fileName, mimeType, sizeBytes }, currentUser.id)
+        : await httpRepository.uploadFile(selectedFile!, "TASK", linkTaskId);
 
       // If user provided a real File object in browser, cache Object URL for session preview
-      if (selectedFile) {
+      if (selectedFile && isMockMode) {
         setSessionFile(uploaded.id, selectedFile);
       }
 
       // Link to selected task if any
-      if (linkTaskId) {
-        await mockRepository.createFileLink(uploaded.id, "TASK", linkTaskId);
+      if (linkTaskId && isMockMode) {
+        await workspaceRepository.createFileLink(uploaded.id, "TASK", linkTaskId);
       }
 
       showToast(`Đã lưu metadata tệp [${uploaded.originalName}] thành công`, "success");
@@ -162,7 +178,7 @@ export function FilesPage() {
   const handleDeleteFile = async () => {
     if (!currentUser || !deletingFile) return;
     try {
-      await mockRepository.deleteFile(deletingFile.id, currentUser.id);
+      await workspaceRepository.deleteFile(deletingFile.id, currentUser.id);
       showToast(`Đã xóa tệp [${deletingFile.originalName}]`, "success");
       setDeletingFile(null);
     } catch (err: unknown) {
@@ -556,16 +572,15 @@ export function FilesPage() {
                           <Eye className="w-3.5 h-3.5" /> Xem trước
                         </Button>
 
-                        <a
-                          href={getSessionFileUrl(f.id) || "#"}
-                          download={f.originalName}
-                          target="_blank"
-                          rel="noreferrer"
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={downloadingFileId === f.id}
+                          onClick={() => void handleDownloadFile(f)}
+                          className="h-7 px-2 text-xs gap-1 text-text-muted hover:text-text-primary"
                         >
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-text-muted hover:text-text-primary">
-                            <ExternalLink className="w-3.5 h-3.5" /> Tải về
-                          </Button>
-                        </a>
+                          <ExternalLink className="w-3.5 h-3.5" /> {downloadingFileId === f.id ? "Đang tải…" : "Tải về"}
+                        </Button>
                       </div>
 
                       {canDelete && (
@@ -703,14 +718,25 @@ export function FilesPage() {
                   <span className="text-text-muted">Trạng thái lưu trữ:</span>
                   <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{previewFile.status}</span>
                 </div>
-                <div className="flex justify-between py-1">
+                {isMockMode && <div className="flex justify-between py-1">
                   <span className="text-text-muted">Cloud Object Key:</span>
                   <span className="text-text-muted italic">null (Môi trường phát triển cục bộ)</span>
-                </div>
+                </div>}
               </div>
 
               {/* In-Session Object URL Preview if available */}
-              {getSessionFileUrl(previewFile.id) ? (
+              {!isMockMode ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-text-secondary">Tệp được tải qua liên kết có chữ ký từ kho lưu trữ riêng.</p>
+                  <Button
+                    variant="primary"
+                    disabled={downloadingFileId === previewFile.id}
+                    onClick={() => void handleDownloadFile(previewFile)}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> {downloadingFileId === previewFile.id ? "Đang tải…" : "Tải tệp"}
+                  </Button>
+                </div>
+              ) : getSessionFileUrl(previewFile.id) ? (
                 <div className="space-y-2">
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded text-emerald-900 leading-relaxed">
                     <strong>Đang có bản xem thử trong phiên:</strong> Tệp được chọn từ máy trong phiên làm việc này. Bạn có thể mở xem trực tiếp bên dưới.

@@ -2,8 +2,9 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import { canSeeTask } from "../../shared/data-contract";
+import { joinTaskRoom } from "../../shared/realtime";
 import type {
   Task,
   User,
@@ -20,6 +21,7 @@ import type {
 } from "../../shared/data-contract";
 import { ForbiddenPage } from "../auth/ForbiddenPage";
 import { validateSelectedFile, setSessionFile, getSessionFileUrl } from "../files/file-session-store";
+import { downloadFile } from "../files/file-download";
 import {
   Breadcrumb,
   Button,
@@ -76,6 +78,7 @@ export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { currentUser, isLeader } = useSession();
   const { showToast } = useToast();
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
   // Data states
   const [task, setTask] = useState<Task | null>(null);
@@ -89,6 +92,7 @@ export function TaskDetailPage() {
   const [deadlineRequests, setDeadlineRequests] = useState<TaskDeadlineRequest[]>([]);
   const [assigneeRequests, setAssigneeRequests] = useState<TaskAssigneeRequest[]>([]);
   const [files, setFiles] = useState<FileObject[]>([]);
+  const [commentAttachments, setCommentAttachments] = useState<Record<string, FileObject[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
 
@@ -118,7 +122,9 @@ export function TaskDetailPage() {
 
   // Comment input state
   const [commentBody, setCommentBody] = useState("");
+  const [commentFiles, setCommentFiles] = useState<File[]>([]);
   const [isSendingComment, setIsSendingComment] = useState(false);
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Modal Dialogs state
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -200,19 +206,17 @@ export function TaskDetailPage() {
         taskDeadlines,
         taskAssignees,
         allFiles,
-        allLinks,
       ] = await Promise.all([
-        mockRepository.getTaskById(id),
-        mockRepository.getParticipants(id),
-        mockRepository.getUsers(),
-        mockRepository.getEvents(id),
-        mockRepository.getComments(id),
-        mockRepository.getSubmissions(id),
-        mockRepository.getApprovals(id),
-        mockRepository.getDeadlineRequests(id),
-        mockRepository.getAssigneeRequests(id),
-        mockRepository.getFiles(),
-        mockRepository.getFileLinks(),
+        workspaceRepository.getTaskById(id),
+        workspaceRepository.getParticipants(id),
+        workspaceRepository.getUsers(),
+        workspaceRepository.getEvents(id),
+        workspaceRepository.getComments(id),
+        workspaceRepository.getSubmissions(id),
+        workspaceRepository.getApprovals(id),
+        workspaceRepository.getDeadlineRequests(id),
+        workspaceRepository.getAssigneeRequests(id),
+        workspaceRepository.getFiles(),
       ]);
 
       if (!foundTask) {
@@ -230,6 +234,14 @@ export function TaskDetailPage() {
         return;
       }
 
+      const [taskLinks, submissionLinkGroups, commentLinkGroups] = await Promise.all([
+        workspaceRepository.getFileLinks("TASK", id),
+        Promise.all(taskSubs.map((submission) => workspaceRepository.getFileLinks("SUBMISSION", submission.id))),
+        Promise.all(taskComments.map((comment) => workspaceRepository.getFileLinks("COMMENT", comment.id))),
+      ]);
+      const submissionLinks = submissionLinkGroups.flat();
+      const commentLinks = commentLinkGroups.flat();
+
       setTask(foundTask);
       setProgressInput(foundTask.progressPercent);
       setIsBlockedInput(foundTask.isBlocked);
@@ -244,7 +256,7 @@ export function TaskDetailPage() {
       setAssigneeRequests(taskAssignees);
 
       // Load subtasks and hierarchy
-      const allTasks = await mockRepository.getTasks();
+      const allTasks = await workspaceRepository.getTasks();
       const mySubtasks = allTasks.filter((t) => t.parentTaskId === foundTask.id);
       setSubtasks(mySubtasks);
 
@@ -266,7 +278,7 @@ export function TaskDetailPage() {
       setGrandParentTask(gpTask);
 
       if (foundTask.projectId) {
-        const p = await mockRepository.getProjectById(foundTask.projectId);
+        const p = await workspaceRepository.getProjectById(foundTask.projectId);
         setProject(p);
       } else {
         setProject(null);
@@ -274,13 +286,18 @@ export function TaskDetailPage() {
 
       // Filter files linked to this task or its submissions
       const subIds = new Set(taskSubs.map((s) => s.id));
-      const relevantLinks = allLinks.filter(
-        (l) =>
-          (l.entityType === "TASK" && l.entityId === id) ||
-          (l.entityType === "SUBMISSION" && subIds.has(l.entityId))
+      const relevantLinks = [...taskLinks, ...submissionLinks].filter(
+        (link) => (link.entityType === "TASK" && link.entityId === id) ||
+          (link.entityType === "SUBMISSION" && subIds.has(link.entityId))
       );
       const linkedFileIds = new Set(relevantLinks.map((l) => l.fileId));
       setFiles(allFiles.filter((f) => linkedFileIds.has(f.id)));
+      const commentFilesById: Record<string, FileObject[]> = {};
+      for (const comment of taskComments) {
+        const fileIds = new Set(commentLinks.filter((link) => link.entityId === comment.id).map((link) => link.fileId));
+        commentFilesById[comment.id] = allFiles.filter((file) => fileIds.has(file.id));
+      }
+      setCommentAttachments(commentFilesById);
     } finally {
       setIsLoading(false);
     }
@@ -288,9 +305,25 @@ export function TaskDetailPage() {
 
   useEffect(() => {
     loadAllTaskData();
-    const unsub = mockRepository.subscribe(loadAllTaskData);
+    const unsub = workspaceRepository.subscribe(loadAllTaskData);
     return unsub;
   }, [id, currentUser]);
+
+  useEffect(() => {
+    if (isMockMode || !task?.id) return;
+    return joinTaskRoom(task.id);
+  }, [task?.id]);
+
+  const handleDownloadFile = async (file: FileObject) => {
+    try {
+      setDownloadingFileId(file.id);
+      await downloadFile(file);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Không thể tải tệp", "error");
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   // Action 1: Send Comment
   const handleSendComment = async (e: React.FormEvent) => {
@@ -299,9 +332,31 @@ export function TaskDetailPage() {
 
     setIsSendingComment(true);
     try {
-      await mockRepository.addComment(task.id, commentBody.trim(), currentUser.id);
+      const createdComment = await workspaceRepository.addComment(task.id, commentBody.trim(), currentUser.id);
       setCommentBody("");
-      showToast("Đã gửi bình luận.", "success");
+      const failedFiles: string[] = [];
+      for (const file of commentFiles) {
+        try {
+          const validation = validateSelectedFile(file);
+          if (!validation.valid) throw new Error(validation.error || "Tệp không hợp lệ.");
+          const uploaded = isMockMode
+            ? await workspaceRepository.uploadMockFile({ originalName: file.name, mimeType: file.type || "application/octet-stream", sizeBytes: file.size }, currentUser.id)
+            : await httpRepository.uploadFile(file, "COMMENT", createdComment.id);
+          if (isMockMode) {
+            setSessionFile(uploaded.id, file);
+            await workspaceRepository.createFileLink(uploaded.id, "COMMENT", createdComment.id);
+          }
+        } catch (error) {
+          failedFiles.push(`${file.name}: ${error instanceof Error ? error.message : "Không tải được tệp"}`);
+        }
+      }
+      setCommentFiles([]);
+      await loadAllTaskData().catch(() => undefined);
+      if (failedFiles.length > 0) {
+        showToast(`Đã gửi bình luận, nhưng ${failedFiles.length} tệp đính kèm chưa tải được. ${failedFiles.join("; ")}`, "error");
+      } else {
+        showToast(commentFiles.length ? "Đã gửi bình luận và tải tệp đính kèm." : "Đã gửi bình luận.", "success");
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi gửi bình luận", "error");
     } finally {
@@ -309,12 +364,27 @@ export function TaskDetailPage() {
     }
   };
 
+  const handleCommentFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files || []);
+    const accepted: File[] = [];
+    for (const file of selected) {
+      const validation = validateSelectedFile(file);
+      if (!validation.valid) {
+        showToast(`${file.name}: ${validation.error || "Tệp không hợp lệ."}`, "error");
+        continue;
+      }
+      if (!commentFiles.some((existing) => existing.name === file.name && existing.size === file.size)) accepted.push(file);
+    }
+    if (accepted.length > 0) setCommentFiles((previous) => [...previous, ...accepted]);
+    event.target.value = "";
+  };
+
   // Action 2: Start task (TODO -> IN_PROGRESS)
   const handleStartTask = async () => {
     if (!task || !currentUser) return;
     setIsSubmittingAction(true);
     try {
-      await mockRepository.startTask(task.id, currentUser.id);
+      await workspaceRepository.startTask(task.id, currentUser.id);
       showToast("Đã bắt đầu thực hiện công việc.", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi cập nhật", "error");
@@ -328,7 +398,7 @@ export function TaskDetailPage() {
     if (!task || !currentUser) return;
     setIsSubmittingAction(true);
     try {
-      await mockRepository.publishTask(task.id, currentUser.id);
+      await workspaceRepository.publishTask(task.id, currentUser.id);
       setShowPublishModal(false);
       showToast(`Đã phát hành và giao việc thành công: ${task.code}`, "success");
     } catch (err) {
@@ -347,7 +417,7 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
-      await mockRepository.updateTaskProgress(
+      await workspaceRepository.updateTaskProgress(
         task.id,
         {
           progressPercent: progressInput,
@@ -392,15 +462,15 @@ export function TaskDetailPage() {
       for (const f of submissionFiles) {
         const ext = f.name.split(".").pop()?.toLowerCase() || "";
         const mimeType = f.type || mimeMap[ext] || "application/octet-stream";
-        const uploaded = await mockRepository.uploadMockFile(
-          { originalName: f.name, mimeType, sizeBytes: f.size },
-          currentUser.id
-        );
-        setSessionFile(uploaded.id, f);
+        const actualFile = f.type ? f : new File([f], f.name, { type: mimeType });
+        const uploaded = isMockMode
+          ? await workspaceRepository.uploadMockFile({ originalName: f.name, mimeType, sizeBytes: f.size }, currentUser.id)
+          : await httpRepository.uploadFile(actualFile, "TASK", task.id);
+        if (isMockMode) setSessionFile(uploaded.id, f);
         uploadedFileIds.push(uploaded.id);
       }
 
-      await mockRepository.addSubmission(
+      await workspaceRepository.addSubmission(
         task.id,
         {
           summary: submissionSummary.trim(),
@@ -431,7 +501,7 @@ export function TaskDetailPage() {
     setIsSubmittingAction(true);
     try {
       const latestSub = submissions[0];
-      await mockRepository.decideApproval(
+      await workspaceRepository.decideApproval(
         latestSub.id,
         "APPROVED",
         approveReason.trim() || null,
@@ -457,7 +527,7 @@ export function TaskDetailPage() {
     setIsSubmittingAction(true);
     try {
       const latestSub = submissions[0];
-      await mockRepository.decideApproval(
+      await workspaceRepository.decideApproval(
         latestSub.id,
         "RETURNED",
         returnReason.trim(),
@@ -478,7 +548,7 @@ export function TaskDetailPage() {
     if (!task || !currentUser) return;
     setIsSubmittingAction(true);
     try {
-      await mockRepository.withdrawSubmission(task.id, currentUser.id, withdrawReason);
+      await workspaceRepository.withdrawSubmission(task.id, currentUser.id, withdrawReason);
       setShowWithdrawModal(false);
       setWithdrawReason("");
       showToast("Đã thu hồi báo cáo kết quả. Công việc chuyển về Đang làm (IN_PROGRESS).", "success");
@@ -506,7 +576,7 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
-      await mockRepository.createDeadlineRequest(
+      await workspaceRepository.createDeadlineRequest(
         task.id,
         {
           proposedDueAt: new Date(proposedDueDate).toISOString(),
@@ -533,7 +603,7 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
-      await mockRepository.managerUpdateTaskDetails(
+      await workspaceRepository.managerUpdateTaskDetails(
         task.id,
         {
           dueAt: editDueAt ? new Date(editDueAt).toISOString() : task.dueAt,
@@ -562,7 +632,7 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
-      await mockRepository.cancelTask(task.id, cancelReason.trim(), currentUser.id);
+      await workspaceRepository.cancelTask(task.id, cancelReason.trim(), currentUser.id);
       setShowCancelModal(false);
       setCancelReason("");
       showToast("Đã hủy nhiệm vụ thành công.", "info");
@@ -582,7 +652,7 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
-      await mockRepository.reopenTask(task.id, reopenReason.trim(), currentUser.id);
+      await workspaceRepository.reopenTask(task.id, reopenReason.trim(), currentUser.id);
       setShowReopenModal(false);
       setReopenReason("");
       showToast("Đã mở lại công việc hoàn thành.", "success");
@@ -606,7 +676,7 @@ export function TaskDetailPage() {
     }
     setIsSubmittingAction(true);
     try {
-      await mockRepository.createAssigneeRequest(
+      await workspaceRepository.createAssigneeRequest(
         task.id,
         {
           proposedAssigneeId,
@@ -629,7 +699,7 @@ export function TaskDetailPage() {
     if (!activeDecideDeadline || !currentUser) return;
     setIsSubmittingAction(true);
     try {
-      await mockRepository.decideDeadlineRequest(
+      await workspaceRepository.decideDeadlineRequest(
         activeDecideDeadline.req.id,
         {
           decision: activeDecideDeadline.decision,
@@ -657,7 +727,7 @@ export function TaskDetailPage() {
     if (!activeDecideAssignee || !currentUser) return;
     setIsSubmittingAction(true);
     try {
-      await mockRepository.decideAssigneeRequest(
+      await workspaceRepository.decideAssigneeRequest(
         activeDecideAssignee.req.id,
         {
           decision: activeDecideAssignee.decision,
@@ -718,16 +788,23 @@ export function TaskDetailPage() {
       };
       const mimeType = selectedUploadFile?.type || mimeMap[ext] || "application/octet-stream";
 
-      const uploaded = await mockRepository.uploadMockFile(
-        { originalName: fileName, mimeType, sizeBytes },
-        currentUser.id
-      );
+      if (!isMockMode && !selectedUploadFile) {
+        showToast("Hãy chọn tệp thực để tải lên API.", "error");
+        return;
+      }
+      const uploaded = isMockMode
+        ? await workspaceRepository.uploadMockFile({ originalName: fileName, mimeType, sizeBytes }, currentUser.id)
+        : await httpRepository.uploadFile(
+            selectedUploadFile!.type ? selectedUploadFile! : new File([selectedUploadFile!], selectedUploadFile!.name, { type: mimeType }),
+            "TASK",
+            task.id,
+          );
 
       if (selectedUploadFile) {
         setSessionFile(uploaded.id, selectedUploadFile);
       }
 
-      await mockRepository.createFileLink(uploaded.id, "TASK", task.id);
+      if (isMockMode) await workspaceRepository.createFileLink(uploaded.id, "TASK", task.id);
 
       setShowFileUploadModal(false);
       setUploadFileName("");
@@ -761,7 +838,7 @@ export function TaskDetailPage() {
     if (!currentUser || !invite) return;
     try {
       setIsSubmittingAction(true);
-      await mockRepository.respondInvitation(invite.id, decision, currentUser.id);
+      await workspaceRepository.respondInvitation(invite.id, decision, currentUser.id);
       showToast(
         decision === "ACCEPTED"
           ? "Đã đồng ý tham gia công việc nhóm thành công"
@@ -782,7 +859,7 @@ export function TaskDetailPage() {
     if (!currentUser || !task) return;
     try {
       setIsSubmittingAction(true);
-      await mockRepository.changeTaskStatus(
+      await workspaceRepository.changeTaskStatus(
         task.id,
         "DONE",
         currentUser.id,
@@ -812,7 +889,7 @@ export function TaskDetailPage() {
 
     try {
       setIsSubmittingAction(true);
-      const converted = await mockRepository.convertTeamToOfficial(
+      const converted = await workspaceRepository.convertTeamToOfficial(
         task.id,
         {
           primaryAssigneeId: convertAssigneeId,
@@ -849,7 +926,7 @@ export function TaskDetailPage() {
 
     try {
       setIsSubmittingAction(true);
-      const newSub = await mockRepository.createSubtask(
+      const newSub = await workspaceRepository.createSubtask(
         task.id,
         {
           title: subtaskTitle.trim(),
@@ -953,7 +1030,7 @@ export function TaskDetailPage() {
         />
 
         {/* Pending Team Invitation Response Banner */}
-        {myInvite && (
+        {isMockMode && myInvite && (
           <div className="bg-amber-50 border-2 border-amber-300 rounded-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-scale-up">
             <div className="flex items-start gap-3.5">
               <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
@@ -1096,7 +1173,7 @@ export function TaskDetailPage() {
               )}
 
               {/* TEAM: Confirm Done directly without Manager review */}
-              {task.type === "TEAM" && task.status === "IN_PROGRESS" && (isAssignee || isCreator) && (
+              {isMockMode && task.type === "TEAM" && task.status === "IN_PROGRESS" && (isAssignee || isCreator) && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1109,7 +1186,7 @@ export function TaskDetailPage() {
               )}
 
               {/* TEAM: Convert to OFFICIAL (Manager only) */}
-              {task.type === "TEAM" && task.status !== "CANCELLED" && isLeader && (
+              {isMockMode && task.type === "TEAM" && task.status !== "CANCELLED" && isLeader && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1126,7 +1203,7 @@ export function TaskDetailPage() {
               )}
 
               {/* IN_PROGRESS: Propose Assignee Change (Primary Assignee only) */}
-              {task.status === "IN_PROGRESS" && isAssignee && task.type === "OFFICIAL" && (
+              {isMockMode && task.status === "IN_PROGRESS" && isAssignee && task.type === "OFFICIAL" && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1181,7 +1258,7 @@ export function TaskDetailPage() {
               )}
 
               {/* Request Deadline Extension (Assignee when active) */}
-              {task.status !== "DONE" && task.status !== "CANCELLED" && task.status !== "DRAFT" && isAssignee && (
+              {isMockMode && task.status !== "DONE" && task.status !== "CANCELLED" && task.status !== "DRAFT" && isAssignee && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1273,7 +1350,7 @@ export function TaskDetailPage() {
         )}
 
         {/* Pending Deadline Request Banner */}
-        {pendingDeadline && (
+        {isMockMode && pendingDeadline && (
           <div className="p-4 bg-amber-50 border border-amber-300 rounded-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <Clock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
@@ -1320,7 +1397,7 @@ export function TaskDetailPage() {
         )}
 
         {/* Pending Assignee Request Banner */}
-        {pendingAssignee && (
+        {isMockMode && pendingAssignee && (
           <div className="p-4 bg-blue-50 border border-blue-300 rounded-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <UserCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
@@ -1490,7 +1567,7 @@ export function TaskDetailPage() {
                   Bình luận ({comments.length})
                 </button>
 
-                <button
+                {isMockMode && <button
                   type="button"
                   onClick={() => setActiveTab("subtasks")}
                   className={`py-3 px-3 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
@@ -1501,7 +1578,7 @@ export function TaskDetailPage() {
                 >
                   <GitFork className="w-3.5 h-3.5" />
                   Việc con ({subtasks.length})
-                </button>
+                </button>}
 
                 <button
                   type="button"
@@ -1557,7 +1634,7 @@ export function TaskDetailPage() {
                 )}
 
                 {/* TAB: Việc con (Subtasks) */}
-                {activeTab === "subtasks" && (
+                {isMockMode && activeTab === "subtasks" && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="text-xs text-text-secondary">
@@ -1695,7 +1772,42 @@ export function TaskDetailPage() {
                         onChange={(e) => setCommentBody(e.target.value)}
                         required
                       />
-                      <div className="flex justify-end">
+                      <input
+                        ref={commentFileInputRef}
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={handleCommentFilesSelected}
+                      />
+                      {commentFiles.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {commentFiles.map((file, index) => (
+                            <span key={`${file.name}-${file.size}-${index}`} className="inline-flex max-w-full items-center gap-1 rounded border border-border bg-slate-50 px-2 py-1 text-[11px] text-text-secondary">
+                              <Paperclip className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{file.name}</span>
+                              <button
+                                type="button"
+                                aria-label={`Bỏ tệp ${file.name}`}
+                                className="ml-1 rounded p-0.5 hover:bg-slate-200"
+                                onClick={() => setCommentFiles((previous) => previous.filter((_, fileIndex) => fileIndex !== index))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          type="button"
+                          className="gap-1.5"
+                          onClick={() => commentFileInputRef.current?.click()}
+                        >
+                          <Paperclip className="w-3.5 h-3.5" /> Đính kèm tệp
+                        </Button>
                         <Button
                           variant="primary"
                           size="sm"
@@ -1734,6 +1846,23 @@ export function TaskDetailPage() {
                                 </span>
                               </div>
                               <p className="text-text-secondary pl-7 whitespace-pre-wrap">{c.body}</p>
+                              {(commentAttachments[c.id] || []).length > 0 && (
+                                <div className="pl-7 flex flex-wrap gap-2 pt-1">
+                                  {commentAttachments[c.id].map((file) => (
+                                    <button
+                                      key={file.id}
+                                      type="button"
+                                      className="inline-flex max-w-full items-center gap-1.5 rounded border border-brand-200 bg-white px-2 py-1 text-[11px] text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                                      onClick={() => void handleDownloadFile(file)}
+                                      disabled={downloadingFileId === file.id}
+                                      title={file.originalName}
+                                    >
+                                      <Download className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{file.originalName}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1859,7 +1988,16 @@ export function TaskDetailPage() {
                                               </div>
                                             </div>
                                           </div>
-                                          {fileUrl ? (
+                                          {!isMockMode ? (
+                                            <button
+                                              type="button"
+                                              disabled={downloadingFileId === file.id}
+                                              onClick={() => void handleDownloadFile(file)}
+                                              className="text-brand-700 hover:underline text-[11px] font-semibold shrink-0 ml-2 flex items-center gap-0.5 disabled:opacity-50"
+                                            >
+                                              <Download className="w-3 h-3" /> {downloadingFileId === file.id ? "Đang tải…" : "Tải về"}
+                                            </button>
+                                          ) : fileUrl ? (
                                             <a
                                               href={fileUrl}
                                               download={file.originalName}

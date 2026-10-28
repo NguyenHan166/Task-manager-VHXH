@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type {
     Task,
     Project,
@@ -58,6 +58,7 @@ export function ReportsPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [participants, setParticipants] = useState<TaskParticipant[]>([]);
+    const [apiReportKpi, setApiReportKpi] = useState<Record<string, unknown> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     // Filter states
@@ -75,27 +76,36 @@ export function ReportsPage() {
         "WORKLOAD" | "OVERDUE" | "IN_REVIEW" | "ALL_TASKS"
     >("WORKLOAD");
 
-    const loadData = async () => {
+    const loadData = async (reportFilters: Record<string, string | number | boolean | null | undefined>) => {
         setIsLoading(true);
         try {
-            const [allTasks, allProjects, allParticipants] = await Promise.all([
-                mockRepository.getTasks(),
-                mockRepository.getProjects(),
-                mockRepository.getParticipants(),
-            ]);
-            setTasks(allTasks);
-            setProjects(allProjects);
-            setParticipants(allParticipants);
+            if (isMockMode) {
+                const [allTasks, allProjects, allParticipants] = await Promise.all([
+                    workspaceRepository.getTasks(),
+                    workspaceRepository.getProjects(),
+                    workspaceRepository.getParticipants(),
+                ]);
+                setTasks(allTasks);
+                setProjects(allProjects);
+                setParticipants(allParticipants);
+                setApiReportKpi(null);
+            } else {
+                const [reportTasks, allProjects, reportKpi] = await Promise.all([
+                    httpRepository.queryReportTasks({ ...reportFilters, type: "OFFICIAL" }),
+                    workspaceRepository.getProjects(),
+                    httpRepository.getReportKpi({ ...reportFilters, type: "OFFICIAL" }),
+                ]);
+                setTasks(reportTasks);
+                setProjects(allProjects);
+                setParticipants([]);
+                setApiReportKpi(reportKpi);
+            }
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : "Không thể tải báo cáo từ máy chủ.", "error");
         } finally {
             setIsLoading(false);
         }
     };
-
-    useEffect(() => {
-        loadData();
-        const unsub = mockRepository.subscribe(loadData);
-        return unsub;
-    }, []);
 
     const now = useMemo(() => new Date(), []);
 
@@ -162,6 +172,33 @@ export function ReportsPage() {
             endOfYear,
         };
     }, []);
+
+    const reportFilters = useMemo(() => {
+        let start: Date | undefined;
+        let end: Date | undefined;
+        if (timeRange === "THIS_WEEK") { start = timeBounds.startOfWeek; end = timeBounds.endOfWeek; }
+        else if (timeRange === "THIS_MONTH") { start = timeBounds.startOfMonth; end = timeBounds.endOfMonth; }
+        else if (timeRange === "THIS_QUARTER") { start = timeBounds.startOfQuarter; end = timeBounds.endOfQuarter; }
+        else if (timeRange === "THIS_YEAR") { start = timeBounds.startOfYear; end = timeBounds.endOfYear; }
+        else if (timeRange === "CUSTOM") {
+            if (customFrom) start = new Date(`${customFrom}T00:00:00`);
+            if (customTo) end = new Date(`${customTo}T23:59:59.999`);
+        }
+        return {
+            ...(start ? { dueFrom: start.toISOString() } : {}),
+            ...(end ? { dueTo: end.toISOString() } : {}),
+            ...(filterAssigneeId !== "ALL" ? { primaryAssigneeId: filterAssigneeId } : {}),
+            ...(filterProjectId !== "ALL" ? { projectId: filterProjectId } : {}),
+            ...(filterPriority !== "ALL" ? { priority: filterPriority } : {}),
+            ...(filterStatus !== "ALL" ? { status: filterStatus } : {}),
+        };
+    }, [timeRange, customFrom, customTo, filterAssigneeId, filterProjectId, filterPriority, filterStatus, timeBounds]);
+
+    useEffect(() => {
+        void loadData(reportFilters);
+        const unsub = workspaceRepository.subscribe(() => void loadData(reportFilters));
+        return unsub;
+    }, [reportFilters]);
 
     // Filter tasks
     const filteredTasks = useMemo(() => {
@@ -321,7 +358,7 @@ export function ReportsPage() {
         const late = done - onTime;
         const onTimeRate = done > 0 ? Math.round((onTime / done) * 100) : 0;
 
-        return {
+        const localStats = {
             total: filteredTasks.length,
             todo,
             inProgress,
@@ -332,14 +369,33 @@ export function ReportsPage() {
             late,
             onTimeRate,
         };
-    }, [filteredTasks, now]);
+        if (isMockMode || !apiReportKpi || !apiReportKpi.summary || typeof apiReportKpi.summary !== "object") return localStats;
+        const summary = apiReportKpi.summary as Record<string, unknown>;
+        const remoteDone = Number(summary.doneCount ?? localStats.done);
+        const remoteOnTime = Number(summary.completedOnTimeCount ?? localStats.onTime);
+        return {
+            total: Number(summary.totalActivePublished ?? summary.totalAssigned ?? localStats.total),
+            todo: Number(summary.todoCount ?? localStats.todo),
+            inProgress: Number(summary.inProgressCount ?? localStats.inProgress),
+            inReview: Number(summary.inReviewCount ?? localStats.inReview),
+            done: remoteDone,
+            overdue: Number(summary.overdueCount ?? localStats.overdue),
+            onTime: remoteOnTime,
+            late: Math.max(remoteDone - remoteOnTime, 0),
+            onTimeRate: remoteDone > 0 ? Math.round((remoteOnTime / remoteDone) * 100) : 0,
+        };
+    }, [filteredTasks, now, apiReportKpi, isMockMode]);
 
     // Staff Workload Breakdown
     const staffWorkload = useMemo(() => {
         // Only active users for workload display
         const activeUsers = users.filter((u) => u.status === "ACTIVE");
+        const remoteRows = Array.isArray(apiReportKpi?.workloads)
+            ? apiReportKpi.workloads as Array<Record<string, unknown>>
+            : [];
 
         return activeUsers.map((user) => {
+            const remote = remoteRows.find((row) => (row.user as Record<string, unknown> | undefined)?.id === user.id);
             // Primary tasks assigned to this user from the filtered set
             const userPrimary = filteredTasks.filter(
                 (t) => t.primaryAssigneeId === user.id,
@@ -367,7 +423,6 @@ export function ReportsPage() {
                         }
                     }
                 });
-            const late = done - onTime;
             const onTimeRate = done > 0 ? Math.round((onTime / done) * 100) : 0;
 
             // Collab count: strictly counted from accepted invitations
@@ -390,20 +445,23 @@ export function ReportsPage() {
                     t.status !== "CANCELLED",
             ).length;
 
+            const remoteDone = Number(remote?.doneCount ?? done);
+            const remoteOnTime = Number(remote?.doneOnTimeCount ?? onTime);
+
             return {
                 user,
-                primaryCount: userPrimary.length,
+                primaryCount: Number(remote?.primaryCount ?? userPrimary.length),
                 todo,
                 inProgress,
                 inReview,
-                done,
-                onTime,
-                late,
-                onTimeRate,
-                collabCount,
+                done: remoteDone,
+                onTime: remoteOnTime,
+                late: Math.max(remoteDone - remoteOnTime, 0),
+                onTimeRate: Number(remote?.onTimeRate ?? onTimeRate),
+                collabCount: Number(remote?.collabCount ?? collabCount),
             };
         });
-    }, [users, filteredTasks, participants, tasks]);
+    }, [users, filteredTasks, participants, tasks, apiReportKpi]);
 
     // Urgent lists
     const overdueTasks = useMemo(() => {
@@ -415,7 +473,7 @@ export function ReportsPage() {
     }, [filteredTasks]);
 
     // CSV Export
-    const handleExportCsv = () => {
+    const handleExportCsv = async () => {
         if (!isLeader) {
             showToast(
                 "Chỉ Lãnh đạo phòng (Trưởng/Phó phòng) mới có quyền xuất báo cáo toàn phòng",
@@ -425,6 +483,19 @@ export function ReportsPage() {
         }
 
         try {
+            if (!isMockMode) {
+                const { blob, filename } = await httpRepository.exportReport({ ...reportFilters, type: "OFFICIAL" }, "CSV");
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = filename || `bao-cao-cong-viec-${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.append(link);
+                link.click();
+                link.remove();
+                window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+                showToast("Xuất báo cáo từ máy chủ thành công", "success");
+                return;
+            }
             const exportTime = formatDateTimeVN(new Date().toISOString());
             const exporterName = currentUser?.displayName || "Quản trị viên";
             const exporterRole =
@@ -676,7 +747,7 @@ export function ReportsPage() {
                             )}
 
                             {/* Project */}
-                            <div>
+                            {isMockMode && <div>
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
                                     Dự án / Chuyên đề
                                 </label>
@@ -694,7 +765,7 @@ export function ReportsPage() {
                                         </option>
                                     ))}
                                 </select>
-                            </div>
+                            </div>}
 
                             {/* Priority */}
                             <div>
@@ -776,7 +847,7 @@ export function ReportsPage() {
                         )}
 
                         {/* Include Team Tasks Checkbox */}
-                        {isLeader && (
+                        {isLeader && isMockMode && (
                             <div className="flex items-center gap-2 pt-2 border-t border-border/60">
                                 <input
                                     type="checkbox"

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
 import {
     PageHeader,
     Breadcrumb,
@@ -68,7 +68,7 @@ export function TaskCreatePage() {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     useEffect(() => {
-        mockRepository.getProjects().then(setProjects);
+        workspaceRepository.getProjects().then(setProjects);
     }, []);
 
     const calculateDueAt = (): string => {
@@ -125,7 +125,7 @@ export function TaskCreatePage() {
         try {
             const dueAt = calculateDueAt();
 
-            const created = await mockRepository.createTask(
+            const created = await workspaceRepository.createTask(
                 {
                     type,
                     title:

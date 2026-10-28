@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
@@ -20,10 +20,16 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { OperationsModule } from './modules/operations/operations.module';
+import { ObservabilityModule } from './modules/observability/observability.module';
+import { RequestMetricsInterceptor } from './modules/observability/request-metrics.interceptor';
+import { ClockModule } from './common/time/clock.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    ObservabilityModule,
+    ClockModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       { name: 'default', ttl: 60_000, limit: 60 },
@@ -61,8 +67,10 @@ import { AuditModule } from './modules/audit/audit.module';
     ReportsModule,
     SettingsModule,
     AuditModule,
+    OperationsModule,
   ],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },

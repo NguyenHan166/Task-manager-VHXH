@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import {
   Breadcrumb,
   PageHeader,
@@ -26,6 +26,7 @@ import type {
   TaskType,
   Project,
   TaskParticipant,
+  TaskQuery,
 } from "../../shared/data-contract";
 import {
   PlusCircle,
@@ -68,6 +69,7 @@ export function TasksPage() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [participants, setParticipants] = useState<TaskParticipant[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   // Drag and drop state for Kanban
@@ -84,27 +86,61 @@ export function TasksPage() {
     });
   };
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [tList, pList, partList] = await Promise.all([
-        mockRepository.getTasks(),
-        mockRepository.getProjects(),
-        mockRepository.getParticipants(),
-      ]);
-      setAllTasks(tList);
-      setProjects(pList);
-      setParticipants(partList);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  const queryKey = searchParams.toString();
   useEffect(() => {
-    loadData();
-    const unsub = mockRepository.subscribe(loadData);
-    return unsub;
-  }, []);
+    let live = true;
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        if (isMockMode) {
+          const [tList, pList, partList] = await Promise.all([
+            workspaceRepository.getTasks(),
+            workspaceRepository.getProjects(),
+            workspaceRepository.getParticipants(),
+          ]);
+          if (!live) return;
+          setAllTasks(tList);
+          setProjects(pList);
+          setParticipants(partList);
+          setServerTotal(tList.length);
+          return;
+        }
+        const params = new URLSearchParams(queryKey);
+        const query: TaskQuery = {
+          page: viewMode === "kanban" ? 1 : Math.max(1, Number(params.get("page") || 1)),
+          pageSize: viewMode === "kanban" ? 100 : Math.min(100, Math.max(1, Number(params.get("pageSize") || 10))),
+          scope: (params.get("scope") as TaskQuery["scope"]) || (isLeader ? "ALL" : "OWNED"),
+          type: (params.get("type") as TaskQuery["type"]) || "ALL",
+          status: (params.get("status") as TaskQuery["status"]) || "ALL",
+          priority: (params.get("priority") as TaskQuery["priority"]) || "ALL",
+          primaryAssigneeId: params.get("primaryAssigneeId") || "ALL",
+          search: params.get("search") || "",
+          isOverdue: params.get("isOverdue") === "true",
+          sortBy: (params.get("sortBy") as TaskQuery["sortBy"]) || "UPDATED_AT",
+          sortDirection: (params.get("sortDirection") as TaskQuery["sortDirection"]) || "DESC",
+        };
+        const [pageData, pList] = await Promise.all([
+          viewMode === "kanban"
+            ? httpRepository.queryAllTasks(query).then((items) => ({ items, total: items.length }))
+            : httpRepository.queryTasks(query),
+          workspaceRepository.getProjects(),
+        ]);
+        const visibleParts = await httpRepository.getParticipantsForTasks(pageData.items.map((task) => task.id));
+        if (!live) return;
+        setAllTasks(pageData.items);
+        setProjects(pList);
+        setParticipants(visibleParts);
+        setServerTotal(pageData.total);
+      } catch (error) {
+        if (live) showToast(error instanceof Error ? error.message : "Không thể tải công việc.", "error");
+      } finally {
+        if (live) setIsLoading(false);
+      }
+    };
+    void loadData();
+    const unsubscribe = workspaceRepository.subscribe(() => { void loadData(); });
+    return () => { live = false; unsubscribe(); };
+  }, [queryKey, currentUser?.id, isLeader, viewMode, showToast]);
 
   // Update query params helper
   const updateParams = (updates: Record<string, string | undefined>) => {
@@ -122,6 +158,7 @@ export function TasksPage() {
   // Filter tasks synchronously based on URL params and user permissions
   const filteredTasks = useMemo(() => {
     if (!currentUser) return [];
+    if (!isMockMode) return allTasks;
 
     const now = new Date();
     // 1. Permission filter
@@ -240,11 +277,12 @@ export function TasksPage() {
   ]);
 
   // Pagination slice
-  const total = filteredTasks.length;
+  const total = isMockMode ? filteredTasks.length : serverTotal;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paginatedTasks = useMemo(() => {
     if (viewMode === "kanban") return filteredTasks; // Kanban displays by columns
+    if (!isMockMode) return filteredTasks;
     const start = (currentPage - 1) * pageSize;
     return filteredTasks.slice(start, start + pageSize);
   }, [filteredTasks, currentPage, pageSize, viewMode]);
@@ -270,7 +308,7 @@ export function TasksPage() {
     }
 
     try {
-      await mockRepository.changeTaskStatus(
+      await workspaceRepository.changeTaskStatus(
         task.id,
         nextStatus,
         currentUser.id,
@@ -512,12 +550,14 @@ export function TasksPage() {
                 </button>
               </div>
 
-              <Link to="/tasks/create">
-                <Button variant="primary" size="sm" className="gap-1.5 shadow-sm">
-                  <PlusCircle className="w-4 h-4" />
-                  {isLeader ? "Giao việc mới" : "Tạo việc mới"}
-                </Button>
-              </Link>
+              {(isLeader || isMockMode) && (
+                <Link to="/tasks/create">
+                  <Button variant="primary" size="sm" className="gap-1.5 shadow-sm">
+                    <PlusCircle className="w-4 h-4" />
+                    {isLeader ? "Giao việc mới" : "Tạo việc mới"}
+                  </Button>
+                </Link>
+              )}
             </div>
           }
         />
@@ -701,13 +741,13 @@ export function TasksPage() {
                     <Button variant="outline" size="sm" onClick={clearAllFilters}>
                       Xóa bộ lọc
                     </Button>
-                  ) : (
+                  ) : (isLeader || isMockMode) ? (
                     <Link to="/tasks/create">
                       <Button variant="primary" size="sm">
                         <PlusCircle className="w-4 h-4 mr-1.5" /> Giao việc mới
                       </Button>
                     </Link>
-                  )
+                  ) : undefined
                 }
               />
             ) : (

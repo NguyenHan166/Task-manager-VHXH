@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import type { User, UserRole, UserStatus, Task, TaskParticipant } from "../../shared/data-contract";
 import { getUserWorkloadStats } from "../tasks/task-selectors";
 import { AppShell } from "../../components/layout/AppShell";
@@ -51,6 +51,7 @@ export function MembersPage() {
   // Tasks & Participants state for workload analytics in Detail modal
   const [tasks, setTasks] = useState<Task[]>([]);
   const [participants, setParticipants] = useState<TaskParticipant[]>([]);
+  const [apiWorkloads, setApiWorkloads] = useState<Array<Awaited<ReturnType<typeof getUserWorkloadStats>>[number]>>([]);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,12 +107,17 @@ export function MembersPage() {
   // Load tasks & participants for detail modal analytics
   const loadWorkloadData = async () => {
     try {
-      const [tList, pList] = await Promise.all([
-        mockRepository.getTasks(),
-        mockRepository.getParticipants(),
-      ]);
-      setTasks(tList);
-      setParticipants(pList);
+      if (isMockMode) {
+        const [tList, pList] = await Promise.all([
+          workspaceRepository.getTasks(),
+          workspaceRepository.getParticipants(),
+        ]);
+        setTasks(tList);
+        setParticipants(pList);
+      } else {
+        const workloadRecords = await Promise.all(users.map((user) => httpRepository.getWorkload(user.id)));
+        setApiWorkloads(workloadRecords as unknown as Array<Awaited<ReturnType<typeof getUserWorkloadStats>>[number]>);
+      }
     } catch {
       // Ignored silently
     }
@@ -119,19 +125,21 @@ export function MembersPage() {
 
   useEffect(() => {
     loadWorkloadData();
-    const unsub = mockRepository.subscribe(loadWorkloadData);
+    const unsub = workspaceRepository.subscribe(loadWorkloadData);
     return unsub;
-  }, []);
+  }, [users]);
 
   // Compute workload stats map for Detail Modal
   const workloadStatsMap = useMemo(() => {
-    const list = getUserWorkloadStats(tasks, users, participants);
+    const list = !isMockMode && apiWorkloads.length > 0
+      ? apiWorkloads
+      : getUserWorkloadStats(tasks, users, participants);
     const map = new Map<string, (typeof list)[0]>();
     list.forEach((st) => {
       map.set(st.user.id, st);
     });
     return map;
-  }, [tasks, users, participants]);
+  }, [tasks, users, participants, apiWorkloads]);
 
   // Active Managers count to prevent locking or demoting the last active manager
   const activeManagersCount = useMemo(() => {
@@ -267,7 +275,7 @@ export function MembersPage() {
     setIsCreating(true);
     setCreateError("");
     try {
-      const created = await mockRepository.createUser(
+      const created = await workspaceRepository.createUser(
         {
           displayName: createDisplayName.trim(),
           email: cleanEmail,
@@ -304,7 +312,7 @@ export function MembersPage() {
     setEditJobTitle(user.jobTitle);
     setEditDepartment(user.department || "");
     setEditPhone(user.phoneNumber || "");
-    setEditRole(user.role);
+    setEditRole(user.role ?? "STAFF");
     setEditError("");
   };
 
@@ -350,7 +358,7 @@ export function MembersPage() {
     setIsEditing(true);
     setEditError("");
     try {
-      await mockRepository.updateUser(
+      await workspaceRepository.updateUser(
         editingUser.id,
         {
           displayName: editDisplayName.trim(),
@@ -396,7 +404,7 @@ export function MembersPage() {
     setIsResettingPassword(true);
     setResetPasswordError("");
     try {
-      const res = await mockRepository.resetPassword(
+      const res = await workspaceRepository.resetPassword(
         resetPasswordUser.id,
         newPasswordInput.trim(),
         currentUser.id
@@ -428,7 +436,7 @@ export function MembersPage() {
 
     setIsTogglingLock(true);
     try {
-      await mockRepository.updateUser(
+      await workspaceRepository.updateUser(
         userToToggleLock.id,
         { status: nextStatus },
         currentUser.id
@@ -697,7 +705,7 @@ export function MembersPage() {
                             </div>
                           </td>
                           <td className="py-3 px-3 text-center">
-                            {renderRoleBadge(u.role)}
+                            {u.role ? renderRoleBadge(u.role) : <span className="text-xs text-text-muted">Chỉ hiển thị trong danh bạ</span>}
                           </td>
                           <td className="py-3 px-3 text-center">
                             {statusBadge}
@@ -835,7 +843,7 @@ export function MembersPage() {
                       <div className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-lg border border-slate-200/70">
                         <div className="flex items-center gap-1">
                           <span className="text-text-muted text-[11px]">Vai trò:</span>
-                          {renderRoleBadge(u.role)}
+                          {u.role ? renderRoleBadge(u.role) : <span className="text-xs text-text-muted">Chỉ hiển thị trong danh bạ</span>}
                         </div>
 
                         {u.phoneNumber && (
@@ -1526,7 +1534,7 @@ export function MembersPage() {
                 </div>
                 <div>
                   <span className="text-text-muted block text-[11px]">Vai trò:</span>
-                  <div className="mt-0.5">{renderRoleBadge(detailUser.role)}</div>
+                  <div className="mt-0.5">{detailUser.role ? renderRoleBadge(detailUser.role) : <span className="text-xs text-text-muted">Không được cung cấp</span>}</div>
                 </div>
                 <div>
                   <span className="text-text-muted block text-[11px]">Tên đăng nhập (Email):</span>

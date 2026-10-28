@@ -1,6 +1,6 @@
-# Office Workspace backend — Phase 05
+# Office Workspace backend — Phase 07
 
-NestJS + Prisma + PostgreSQL backend for the single-room Office Workspace application. Phase 01–05 provide the database, demo data, auth/users, task core APIs, OFFICIAL workflow and private R2 file lifecycle. The contract is in [`docs/backend-plan/phase-00`](../docs/backend-plan/phase-00/); see the [Phase 03 task matrix](../docs/backend-plan/phase-03/ACCEPTANCE.md), [Phase 04 workflow record](../docs/backend-plan/phase-04/ACCEPTANCE.md), and [Phase 05 file runbook](../docs/backend-plan/phase-05/RUNBOOK.md).
+NestJS + Prisma + PostgreSQL backend for the single-room Office Workspace application. Phase 01–07 provide the database, demo data, auth/users, OFFICIAL workflow, private R2 file lifecycle, notifications, dashboard/reports, settings, audit and encrypted backup operations. The API contract is in [`docs/backend-plan/phase-00`](../docs/backend-plan/phase-00/); see the [Phase 03 task matrix](../docs/backend-plan/phase-03/ACCEPTANCE.md), [Phase 04 workflow record](../docs/backend-plan/phase-04/ACCEPTANCE.md), [Phase 05 file runbook](../docs/backend-plan/phase-05/RUNBOOK.md), and [Phase 07 operations runbook](../docs/backend-plan/phase-07/RUNBOOK.md).
 
 ## Local setup (Windows PowerShell)
 
@@ -45,10 +45,18 @@ Open **http://localhost:5556**. Prisma Studio shows `users`, `tasks`, submission
 | `npm run files:cleanup` | Mark expired uploads removed and purge due unlinked objects in a bounded batch |
 | `npm run files:check` | Run the Phase 05 HTTP/storage matrix against a seeded disposable DB using local S3 test storage |
 | `npm run files:check -- --r2` | Run the same matrix against the configured private R2 bucket and verify its CORS response |
+| `npm run phase07:check` | Run Phase 07 dashboard, report/export, settings, audit and permissions acceptance against a seeded disposable DB named `office_workspace_phase07_verify*` |
+| `npm run phase07:perf-seed -- --tasks=10000` | Add at most 50,000 synthetic OFFICIAL tasks to a separate localhost DB named `office_workspace_phase07_perf_verify*` for Phase 07 load measurements; deletes/replaces only `PERF07-*` rows |
+| `npm run backup:run -- --confirm` | Create one encrypted backup using the configured private S3 bucket, or an explicit local-only path |
+| `npm run backup:drill -- --confirm` | Restore the latest retained backup into an empty isolated `office_workspace_restore_verify*` database and compare metadata counts |
 | `npm run db:clean -- --confirm` | **Delete all data in the local DB** and reapply migrations; seed again afterward |
 | `npm run typecheck`, `lint`, `format:check`, `build` | Local quality gates |
 
 The seed uses the fixed clock `2026-10-27T09:00:00.000Z` and the `u01`–`u06`, `t01`–`t13` fixture. It excludes `t14`–`t17` and recurrence/chat tables until Phase 09. It does not seed fake READY file metadata: a file becomes READY only after R2 confirms the object and the server verifies its bytes. See the [Phase 05 runbook](../docs/backend-plan/phase-05/RUNBOOK.md) before configuring a private bucket.
+
+Phase 07 uses database-side aggregation for dashboard and report KPIs. Managers and deputy managers can export department reports; department report rows are published OFFICIAL tasks only. Settings and audit writes/reads, backup metadata and operations metrics require MANAGER. `SYSTEM_CLOCK_OVERRIDE` is accepted only with `APP_ENV=local`, for fixed-clock acceptance runs.
+
+Encrypted PostgreSQL backup uses `pg_dump`, `pg_restore` and `psql` client binaries. Outside local, configure a dedicated private `BACKUP_BUCKET`, separate credentials/endpoint, and a 32-byte hex `BACKUP_ENCRYPTION_KEY`; never reuse the R2 file bucket or commit the key. Set a separate database URL for `RESTORE_DRILL_DATABASE_URL`, on a distinct host in production. Local acceptance may use an absolute `BACKUP_LOCAL_DIR` and `PG_CLIENT_DOCKER_CONTAINER` (for a local Postgres container without host client binaries) only with `APP_ENV=local`. See the [operations runbook](../docs/backend-plan/phase-07/RUNBOOK.md) for retention, restore drills, alerts and resource measurements.
 
 The DB URL in `.env` is local only. For another PostgreSQL server, change `DATABASE_URL` and configure environment variables in `.env.example`; do not commit `.env`. Local/staging demo seed refuses `APP_ENV=production`. `db:clean` refuses non-local databases and requires `--confirm`.
 
@@ -69,9 +77,9 @@ The DB URL in `.env` is local only. For another PostgreSQL server, change `DATAB
 | `src/health` | Liveness/readiness and `/api/health` contract |
 | `src/modules/{auth,users,tasks}` | Auth, users, task core APIs, and transactional OFFICIAL workflow commands |
 | `src/modules/files` | Signed R2 uploads/downloads, metadata, ACL, removal and cleanup |
-| `src/modules/{notifications,reminders,dashboard,reports,settings,audit}` | Reserved feature boundaries for later phases |
+| `src/modules/{notifications,reminders,dashboard,reports,settings,audit,operations,observability}` | Notifications, DB-side reporting, admin settings/audit, encrypted backups and runtime metrics |
 | `prisma/schema.prisma`, `prisma/migrations` | Data model and ordered PostgreSQL migration |
-| `prisma/seed.ts`, `scripts/check-seed.ts`, `scripts/check-workflow.ts` | Fixed-clock fake fixture, DB comparison, and OFFICIAL journey acceptance |
+| `prisma/seed.ts`, `scripts/check-seed.ts`, `scripts/check-workflow.ts`, `scripts/check-phase07.ts` | Fixed-clock fake fixture, DB comparison, OFFICIAL journey and Phase 07 acceptance |
 
 Task list/detail/comment/event reads use the shared task policy in database queries. Later modules must reuse that policy when exposing related records.
 

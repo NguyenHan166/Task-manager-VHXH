@@ -7,7 +7,7 @@ import type {
   TaskParticipant,
   TaskQuery,
 } from "../../shared/data-contract";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
 import { taskService } from "./task-service";
 import { useSession } from "../auth/SessionContext";
 import {
@@ -59,7 +59,7 @@ export function useTasks(customQuery?: Partial<TaskQuery>) {
 
   useEffect(() => {
     fetchTasks();
-    const unsubscribe = mockRepository.subscribe(() => {
+      const unsubscribe = workspaceRepository.subscribe(() => {
       fetchTasks();
     });
     return unsubscribe;
@@ -86,17 +86,24 @@ export function useTaskStats() {
       setIsLoading(true);
       setError(null);
 
-      const [allTasks, participants] = await Promise.all([
-        mockRepository.getTasks(),
-        mockRepository.getParticipants(),
-      ]);
-
-      const now = new Date();
-      const mStats = getManagerDashboardStats(allTasks, now);
-      const sStats = getStaffDashboardStats(allTasks, currentUser, participants, now);
-
-      setManagerStats(mStats);
-      setStaffStats(sStats);
+      if (isMockMode) {
+        const [allTasks, participants] = await Promise.all([
+          workspaceRepository.getTasks(),
+          workspaceRepository.getParticipants(),
+        ]);
+        const now = new Date();
+        setManagerStats(getManagerDashboardStats(allTasks, now));
+        setStaffStats(getStaffDashboardStats(allTasks, currentUser, participants, now));
+      } else {
+        const stats = await httpRepository.getDashboardStats(currentUser.role === "STAFF" ? "STAFF" : "DEPT");
+        if (currentUser.role === "STAFF") {
+          setStaffStats(stats as unknown as StaffDashboardStats);
+          setManagerStats(null);
+        } else {
+          setManagerStats(stats as unknown as ManagerDashboardStats);
+          setStaffStats(null);
+        }
+      }
     } catch (err) {
       if (err instanceof DomainError) {
         setError(err.toAppError());
@@ -113,7 +120,7 @@ export function useTaskStats() {
 
   useEffect(() => {
     calculateStats();
-    const unsubscribe = mockRepository.subscribe(() => {
+    const unsubscribe = workspaceRepository.subscribe(() => {
       calculateStats();
     });
     return unsubscribe;
@@ -137,7 +144,7 @@ export function useWorkspaceSettings() {
     try {
       setIsLoading(true);
       setError(null);
-      const s = await mockRepository.getSettings();
+      const s = await workspaceRepository.getSettings();
       setSettings(s);
     } catch (err) {
       if (err instanceof DomainError) {
@@ -155,7 +162,7 @@ export function useWorkspaceSettings() {
 
   useEffect(() => {
     fetchSettings();
-    const unsubscribe = mockRepository.subscribe(() => {
+    const unsubscribe = workspaceRepository.subscribe(() => {
       fetchSettings();
     });
     return unsubscribe;
@@ -169,7 +176,7 @@ export function useParticipants(taskId?: string) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    mockRepository
+    workspaceRepository
       .getParticipants(taskId)
       .then(setParticipants)
       .finally(() => setIsLoading(false));

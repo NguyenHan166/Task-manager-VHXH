@@ -14,6 +14,7 @@ import type { Namespace, Socket } from 'socket.io';
 import { TaskAccessPolicy } from '../../common/auth/task-access.policy';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
 import { PrismaService } from '../../database/prisma.service';
+import { OperationsMetricsService } from '../observability/operations-metrics.service';
 
 type AccessClaims = { sub: string; sid: string; iat: number; exp: number };
 type SocketIdentity = {
@@ -57,6 +58,7 @@ export class NotificationsGateway
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly access: TaskAccessPolicy,
+    private readonly metrics: OperationsMetricsService,
   ) {}
 
   afterInit(namespace: Namespace): void {
@@ -81,6 +83,7 @@ export class NotificationsGateway
     const timer = this.sessionTimers.get(client.id);
     if (timer) clearInterval(timer);
     this.sessionTimers.delete(client.id);
+    this.metrics.increment('socket_disconnects');
   }
 
   @SubscribeMessage('room:join')

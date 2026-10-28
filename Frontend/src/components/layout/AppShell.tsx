@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../../features/auth/SessionContext";
 import { useWorkspaceSettings } from "../../features/tasks/use-tasks";
 import { UserAvatar } from "../ui/Avatar";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, httpRepository } from "../../shared/repository";
 import { getUnreadCount } from "../../features/tasks/task-selectors";
 import { canSeeTask } from "../../shared/data-contract";
 import type { Task, Notification } from "../../shared/data-contract";
@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { currentUser, isManager, isDeputy, users, switchUser } = useSession();
+  const { currentUser, isManager, isDeputy, users, switchUser, logout, isMockMode } = useSession();
   const { settings } = useWorkspaceSettings();
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,8 +67,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const updateNotifications = async () => {
     if (!currentUser) return;
     try {
-      const notifs = await mockRepository.getNotifications(currentUser.id);
-      setUnreadCount(getUnreadCount(notifs, currentUser.id));
+      const notifs = await workspaceRepository.getNotifications(currentUser.id);
+      setUnreadCount(isMockMode ? getUnreadCount(notifs, currentUser.id) : await httpRepository.getUnreadNotificationCount());
       setRecentNotifs(notifs.slice(0, 5));
     } catch {
       // ignore
@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     updateNotifications();
-    const unsub = mockRepository.subscribe(updateNotifications);
+    const unsub = workspaceRepository.subscribe(updateNotifications);
     return unsub;
   }, [currentUser]);
 
@@ -118,20 +118,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const [allTasks, participants] = await Promise.all([
-          mockRepository.getTasks(),
-          mockRepository.getParticipants(),
-        ]);
-        const q = searchQuery.toLowerCase().trim();
-        const matched = allTasks.filter((t) => {
-          const matchText =
-            t.code.toLowerCase().includes(q) ||
-            t.title.toLowerCase().includes(q) ||
-            t.deliverable.toLowerCase().includes(q);
-          if (!matchText) return false;
-          return canSeeTask(t, currentUser, participants);
-        });
-        setSearchResults(matched.slice(0, 6));
+        if (isMockMode) {
+          const [allTasks, participants] = await Promise.all([
+            workspaceRepository.getTasks(),
+            workspaceRepository.getParticipants(),
+          ]);
+          const q = searchQuery.toLowerCase().trim();
+          const matched = allTasks.filter((task) => {
+            const matchText = task.code.toLowerCase().includes(q) || task.title.toLowerCase().includes(q) || task.deliverable.toLowerCase().includes(q);
+            return matchText && canSeeTask(task, currentUser, participants);
+          });
+          setSearchResults(matched.slice(0, 6));
+        } else {
+          const page = await httpRepository.queryTasks({ search: searchQuery.trim(), page: 1, pageSize: 6, sortBy: "UPDATED_AT", sortDirection: "DESC" });
+          setSearchResults(page.items);
+        }
         setShowSearchDropdown(true);
       } finally {
         setIsSearching(false);
@@ -154,7 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         "Khôi phục toàn bộ kho dữ liệu mock về seed chuẩn? Các thao tác thử nghiệm sẽ được làm mới."
       )
     ) {
-      await mockRepository.resetSeed();
+      if (isMockMode) await workspaceRepository.resetSeed();
       setShowUserDropdown(false);
     }
   };
@@ -205,7 +206,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Hồ sơ", path: "/profile", icon: UserIcon },
   ];
 
-  const currentNavItems = isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems;
+  const currentNavItems = (isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems)
+    .filter((item) => isMockMode || !["/personal-tasks", "/projects", "/calendar", "/recurrence", "/chat"].includes(item.path));
   const isP1Route = ["/personal-tasks", "/projects", "/calendar", "/recurrence", "/chat"].some(
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
@@ -266,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          <div className="pt-3 border-t border-border/60 my-2">
+          {isMockMode && <div className="pt-3 border-t border-border/60 my-2">
             <Link
               to="/ui-kit"
               className={`flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
@@ -278,7 +280,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Palette className="w-4 h-4 text-brand-700" />
               <span>Hệ thống Design System</span>
             </Link>
-          </div>
+          </div>}
         </nav>
 
         {/* Active User Card at bottom of Sidebar */}
@@ -434,7 +436,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <button
                       onClick={async () => {
                         if (currentUser) {
-                          await mockRepository.markAllNotificationsAsRead(currentUser.id);
+                          await workspaceRepository.markAllNotificationsAsRead(currentUser.id);
                           setUnreadCount(0);
                         }
                       }}
@@ -454,13 +456,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           onClick={async () => {
                             setShowNotifDropdown(false);
                             if (!n.readAt) {
-                              await mockRepository.markNotificationAsRead(n.id);
+                              await workspaceRepository.markNotificationAsRead(n.id);
                             }
                             if (n.type === "TEAM_INVITED") {
                               navigate("/notifications");
-                            } else if (n.entityType === "TASK") {
+                            } else if (n.entityType === "TASK" && n.entityId) {
                               navigate(`/tasks/${n.entityId}`);
-                            } else if (n.entityType === "CHAT") {
+                            } else if (n.entityType === "CHAT" && isMockMode) {
                               navigate(`/chat?roomId=${n.entityId}`);
                             }
                           }}
@@ -540,8 +542,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <span>Hồ sơ tài khoản</span>
                     </Link>
 
-                    {/* Quick switch between 5 seed accounts */}
-                    <div className="pt-2 border-t border-border/60">
+                    {isMockMode ? <div className="pt-2 border-t border-border/60">
                       <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-2.5 mb-1.5">
                         Đổi tài khoản demo:
                       </div>
@@ -574,7 +575,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           );
                         })}
                       </div>
-                    </div>
+                    </div> : (
+                      <button
+                        type="button"
+                        onClick={async () => { await logout(); navigate("/login", { replace: true }); }}
+                        className="mt-2 w-full rounded px-2.5 py-2 text-left text-sm text-danger hover:bg-red-50"
+                      >
+                        Đăng xuất
+                      </button>
+                    )}
 
                     {/* Reset seed data */}
                     <div className="pt-2 border-t border-border/60">
@@ -659,7 +668,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
 
-            <div className="pt-2 border-t border-border mt-2">
+            {isMockMode && <div className="pt-2 border-t border-border mt-2">
               <Link
                 to="/ui-kit"
                 onClick={() => setMobileMenuOpen(false)}
@@ -668,7 +677,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Palette className="w-4 h-4" />
                 <span>Design System (UI Kit)</span>
               </Link>
-            </div>
+            </div>}
           </div>
         )}
 
@@ -689,7 +698,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Floating Developer Tools & Role Switcher */}
-      <DevToolbar />
+      {isMockMode && <DevToolbar />}
     </div>
   );
 }

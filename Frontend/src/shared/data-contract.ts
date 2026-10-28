@@ -19,8 +19,9 @@ export interface User {
   username: string; // Tên đăng nhập (Email công vụ)
   email: string; // Email công vụ (bắt buộc, dùng làm tên đăng nhập)
   displayName: string;
-  role: UserRole;
-  status: UserStatus;
+  /** Directory responses intentionally omit role/status for non-managers. */
+  role?: UserRole;
+  status?: UserStatus;
   jobTitle: string;
   phoneNumber?: string;
   department?: string;
@@ -285,7 +286,7 @@ export interface TaskQuery {
 }
 
 export interface AppError {
-  code: "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "VALIDATION" | "CONFLICT" | "MOCK_FAILURE";
+  code: "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "VALIDATION" | "CONFLICT" | "RATE_LIMITED" | "NETWORK_ERROR" | "SERVER_ERROR" | "MOCK_FAILURE";
   message: string;
   fieldErrors?: Record<string, string>;
 }

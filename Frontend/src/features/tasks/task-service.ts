@@ -18,7 +18,8 @@ import type {
   User,
 } from "../../shared/data-contract";
 import { canSeeTask, isTaskOverdue } from "../../shared/data-contract";
-import { mockRepository, MockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, type WorkspaceRepository } from "../../shared/repository";
+import { httpRepository, isMockMode } from "../../shared/repository";
 import { DomainError } from "../../shared/errors";
 
 const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
@@ -29,12 +30,13 @@ const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
 };
 
 export class TaskService {
-  constructor(private repo: MockRepository = mockRepository) {}
+  constructor(private repo: WorkspaceRepository = workspaceRepository) {}
 
   /**
    * Queries tasks with visibility security, filtering, sorting, and pagination.
    */
   public async queryTasks(query: TaskQuery, viewer: User): Promise<Page<Task>> {
+    if (!isMockMode) return httpRepository.queryTasks(query);
     const [allTasks, participants] = await Promise.all([
       this.repo.getTasks(),
       this.repo.getParticipants(),

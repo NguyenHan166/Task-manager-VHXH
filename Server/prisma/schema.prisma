@@ -103,6 +103,12 @@ enum RealtimeOutboxType {
   TASK_UPDATED
 }
 
+enum BackupRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 model User {
   id                  String                @id @default(uuid()) @db.Uuid
   email               String                @unique
@@ -243,6 +249,7 @@ model Task {
   @@index([projectId, status])
   @@index([parentTaskId])
   @@index([createdById, status])
+  @@index([createdAt, status, primaryAssigneeId, projectId], map: "tasks_report_created_idx")
   @@map("tasks")
 }
 
@@ -358,6 +365,7 @@ model TaskEvent {
   id        String   @id @default(uuid()) @db.Uuid
   taskId    String   @map("task_id") @db.Uuid
   actorId   String   @map("actor_id") @db.Uuid
+  requestId String?  @map("request_id") @db.VarChar(128)
   kind      String
   note      String   @default("")
   before    Json?
@@ -367,6 +375,7 @@ model TaskEvent {
   actor     User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([taskId, createdAt, id])
+  @@index([requestId, createdAt], map: "task_events_request_id_created_at_idx")
   @@map("task_events")
 }
 
@@ -481,4 +490,25 @@ model AuditLog {
   @@index([createdAt, id])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+model BackupRun {
+  id                 String          @id @default(uuid()) @db.Uuid
+  scheduledFor       DateTime        @unique @map("scheduled_for") @db.Timestamptz(3)
+  status             BackupRunStatus
+  objectKey          String?         @map("object_key")
+  checksum           String?
+  sizeBytes          BigInt?         @map("size_bytes")
+  startedAt          DateTime        @map("started_at") @db.Timestamptz(3)
+  completedAt        DateTime?       @map("completed_at") @db.Timestamptz(3)
+  errorCode          String?         @map("error_code") @db.VarChar(80)
+  expiredAt          DateTime?       @map("expired_at") @db.Timestamptz(3)
+  sourceCounts       Json?           @map("source_counts")
+  restoreDrillAt     DateTime?       @map("restore_drill_at") @db.Timestamptz(3)
+  restoreDrillStatus String?         @map("restore_drill_status") @db.VarChar(20)
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([status, completedAt])
+  @@index([expiredAt, completedAt])
+  @@map("backup_runs")
 }

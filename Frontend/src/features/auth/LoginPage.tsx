@@ -14,9 +14,12 @@ import {
 } from "lucide-react";
 
 export function LoginPage() {
-  const { users, currentUser, switchUser, isLoading } = useSession();
+  const { users, currentUser, switchUser, isLoading, isMockMode, login, error: sessionError } = useSession();
   const [selectedUserId, setSelectedUserId] = useState<string>(currentUser?.id || "u01");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
   const navigate = useNavigate();
 
   const handleSelectAccount = (userId: string) => {
@@ -42,6 +45,55 @@ export function LoginPage() {
   }, [users, selectedUserId]);
 
   const isSelectedUserLocked = selectedUser?.status !== "ACTIVE";
+
+  const handleApiLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setLoginError("");
+    try {
+      await login(email, password);
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Không thể đăng nhập.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isMockMode) {
+    return (
+      <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
+        <main className="w-full max-w-md rounded-card border border-border bg-surface p-7 shadow-lg">
+          <div className="mb-7 text-center">
+            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-700 text-white">
+              <Layers className="h-6 w-6" />
+            </div>
+            <h1 className="text-xl font-bold text-text-primary">Đăng nhập Office Workspace</h1>
+            <p className="mt-1 text-sm text-text-secondary">Dùng tài khoản đã được cấp để tiếp tục.</p>
+          </div>
+          {(loginError || sessionError) && (
+            <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {loginError || sessionError?.message}
+            </div>
+          )}
+          <form onSubmit={handleApiLogin} className="space-y-4">
+            <label className="block text-sm font-medium text-text-primary">
+              Email công vụ
+              <input autoComplete="username" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 h-10 w-full rounded-btn border border-border bg-surface px-3 outline-none focus:ring-2 focus:ring-brand-700" />
+            </label>
+            <label className="block text-sm font-medium text-text-primary">
+              Mật khẩu
+              <input autoComplete="current-password" type="password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 h-10 w-full rounded-btn border border-border bg-surface px-3 outline-none focus:ring-2 focus:ring-brand-700" />
+            </label>
+            <Button type="submit" variant="primary" isLoading={isSubmitting || isLoading} className="w-full">
+              Đăng nhập
+            </Button>
+          </form>
+          <p className="mt-5 text-center text-xs text-text-muted">Phiên đăng nhập được bảo vệ bằng access token trong bộ nhớ và refresh cookie HttpOnly.</p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col justify-between p-4 sm:p-6 lg:p-8">

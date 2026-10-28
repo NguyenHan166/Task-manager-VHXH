@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, isMockMode } from "../../shared/repository";
 import {
   Breadcrumb,
   PageHeader,
@@ -18,7 +18,7 @@ import { CheckCircle2, Edit2, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export function ProfilePage() {
-  const { currentUser, isManager, users, switchUser, refreshSession } = useSession();
+  const { currentUser, isManager, isDeputy, users, switchUser, refreshSession, logout } = useSession();
   const { showToast } = useToast();
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -54,14 +54,11 @@ export function ProfilePage() {
 
     setIsSaving(true);
     try {
-      await mockRepository.updateUser(
-        currentUser.id,
-        {
-          displayName: displayName.trim(),
-          jobTitle: jobTitle.trim(),
-        },
-        currentUser.id
-      );
+      if (isMockMode) {
+        await workspaceRepository.updateUser(currentUser.id, { displayName: displayName.trim(), jobTitle: jobTitle.trim() }, currentUser.id);
+      } else {
+        await workspaceRepository.updateOwnProfile({ displayName: displayName.trim(), jobTitle: jobTitle.trim() });
+      }
       showToast("Cập nhật thông tin hồ sơ thành công", "success");
       setIsEditOpen(false);
       await refreshSession();
@@ -112,7 +109,7 @@ export function ProfilePage() {
                       : "bg-blue-100 text-blue-800 border border-blue-200"
                   }`}
                 >
-                  {isManager ? "Trưởng phòng (MANAGER)" : "Chuyên viên (STAFF)"}
+                  {isManager ? "Trưởng phòng (MANAGER)" : isDeputy ? "Phó phòng (DEPUTY_MANAGER)" : "Chuyên viên (STAFF)"}
                 </span>
               </div>
             </div>
@@ -133,17 +130,15 @@ export function ProfilePage() {
                 <Edit2 className="w-3.5 h-3.5" />
                 Chỉnh sửa thông tin
               </Button>
-              <Link to="/login">
-                <Button variant="ghost" size="sm" className="w-full text-xs text-text-muted">
-                  Chọn tài khoản khác
-                </Button>
-              </Link>
+              {isMockMode ? <Link to="/login">
+                <Button variant="ghost" size="sm" className="w-full text-xs text-text-muted">Chọn tài khoản khác</Button>
+              </Link> : <Button variant="ghost" size="sm" className="w-full text-xs text-text-muted" onClick={async () => { await logout(); window.location.assign("/login"); }}>Đăng xuất</Button>}
             </div>
           </Card>
 
           {/* Permissions & Details */}
           <div className="md:col-span-2 space-y-6">
-            <Card>
+            {isMockMode && <Card>
               <CardHeader>
                 <CardTitle>Quyền hạn & Phạm vi xử lý</CardTitle>
               </CardHeader>
@@ -192,7 +187,7 @@ export function ProfilePage() {
                   </ul>
                 )}
               </CardContent>
-            </Card>
+            </Card>}
 
             {/* Quick Switch Accounts List */}
             <Card>

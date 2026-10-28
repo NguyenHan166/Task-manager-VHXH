@@ -21,6 +21,7 @@ import {
   type TaskEvent,
 } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
+import { RequestContextService } from '../../common/http/request-context.service';
 import { TaskAccessPolicy } from '../../common/auth/task-access.policy';
 import { BusinessCodeService } from '../../database/business-code.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -86,6 +87,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly access: TaskAccessPolicy,
     private readonly codes: BusinessCodeService,
+    private readonly requestContext: RequestContextService,
   ) {}
 
   async list(
@@ -443,7 +445,7 @@ export class TasksService {
     actor: AuthenticatedUser,
     taskId: string,
     query: TaskPageQueryDto,
-  ): Promise<Page<TaskEvent>> {
+  ): Promise<Page<Omit<TaskEvent, 'requestId'>>> {
     return this.prisma.$transaction(
       async (tx) => {
         await this.assertVisible(tx, actor, taskId);
@@ -453,6 +455,16 @@ export class TasksService {
             orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             skip: (query.page - 1) * query.pageSize,
             take: query.pageSize,
+            select: {
+              id: true,
+              taskId: true,
+              actorId: true,
+              kind: true,
+              note: true,
+              before: true,
+              after: true,
+              createdAt: true,
+            },
           }),
           tx.taskEvent.count({ where: { taskId } }),
         ]);
@@ -602,7 +614,12 @@ export class TasksService {
     tx: Prisma.TransactionClient,
     data: Prisma.TaskEventUncheckedCreateInput,
   ) {
-    const event = await tx.taskEvent.create({ data });
+    const event = await tx.taskEvent.create({
+      data: {
+        ...data,
+        requestId: this.requestContext.currentRequestId(),
+      },
+    });
     await tx.realtimeOutbox.create({
       data: {
         type: 'TASK_UPDATED',

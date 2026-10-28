@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type { RequestWithId } from './request-id.middleware';
+import { OperationsMetricsService } from '../../modules/observability/operations-metrics.service';
 
 type ErrorBody = {
   code?: string;
@@ -16,12 +17,25 @@ type ErrorBody = {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  constructor(private readonly metrics: OperationsMetricsService) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const request = context.getRequest<RequestWithId>();
     const response = context.getResponse<Response>();
     const status =
       exception instanceof HttpException ? exception.getStatus() : 500;
+    if (status >= 400 && status < 500) {
+      this.metrics.increment('http_4xx_errors');
+    } else if (status >= 500) {
+      this.metrics.increment('http_5xx_errors');
+    }
+    if (status >= 400 && request.path.startsWith('/api/files')) {
+      this.metrics.increment('file_request_failures');
+    }
+    if (request.path === '/api/auth/login' && status >= 400) {
+      this.metrics.increment('login_failures');
+    }
     const payload =
       exception instanceof HttpException ? exception.getResponse() : null;
     const detail: ErrorBody =

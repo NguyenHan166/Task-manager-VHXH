@@ -16,6 +16,7 @@ import {
 import { createHash } from 'node:crypto';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '../../database/prisma.service';
+import { OperationsMetricsService } from '../observability/operations-metrics.service';
 
 const BUSINESS_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const ACTIVE_STATUSES = [
@@ -75,6 +76,7 @@ export class RemindersService
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly scheduler: SchedulerRegistry,
+    private readonly metrics: OperationsMetricsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -147,9 +149,13 @@ export class RemindersService
     let due = 0;
     let overdue = 0;
     const overdueOfficial: typeof tasks = [];
-    const beforeHours = Number(
-      this.config.get<string>('REMINDER_BEFORE_HOURS', '24'),
-    );
+    const settings = await this.prisma.appSettings.findUnique({
+      where: { id: 1 },
+      select: { reminderBeforeHours: true },
+    });
+    const beforeHours =
+      settings?.reminderBeforeHours ??
+      Number(this.config.get<string>('REMINDER_BEFORE_HOURS', '24'));
     const soonBoundary = new Date(now.getTime() + beforeHours * 60 * 60_000);
     const isReminderWorkHours =
       clock.hour >= REMINDER_WORKDAY_START_HOUR &&
@@ -248,7 +254,7 @@ export class RemindersService
     body: string,
     now: Date,
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.reminderEvent.createMany({
         data: [
           {
@@ -298,6 +304,9 @@ export class RemindersService
       });
       return true;
     });
+    if (created) this.metrics.increment('cron_reminder_notifications_created');
+    else this.metrics.increment('cron_reminder_duplicates');
+    return created;
   }
 
   private async createLeaderDigest(
@@ -306,7 +315,7 @@ export class RemindersService
     dayKey: string,
     now: Date,
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const reminders = await tx.reminderEvent.createMany({
         data: overdueTasks.map((task) => ({
           taskId: task.id,
@@ -360,16 +369,28 @@ export class RemindersService
       });
       return digest.count === 1;
     });
+    if (created) this.metrics.increment('cron_leader_digests_created');
+    else this.metrics.increment('cron_reminder_duplicates');
+    return created;
   }
 
   private async runSafely(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    this.metrics.increment('cron_runs_started');
     try {
-      await this.runDueReminders();
+      const counts = await this.runDueReminders();
+      this.metrics.increment('cron_runs_succeeded');
+      this.logger.log(
+        JSON.stringify({ event: 'reminder_scan_succeeded', ...counts }),
+      );
     } catch {
+      this.metrics.increment('cron_runs_failed');
       this.logger.error(
-        'Reminder scan failed; it will retry on the next interval',
+        JSON.stringify({
+          event: 'reminder_scan_failed',
+          reason: 'REMINDER_SCAN_FAILED',
+        }),
       );
     } finally {
       this.running = false;

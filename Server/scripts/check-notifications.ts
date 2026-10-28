@@ -13,6 +13,7 @@ import {
 import { io, type Socket } from 'socket.io-client';
 import type { PrismaService } from '../src/database/prisma.service';
 import { RemindersService } from '../src/modules/reminders/reminders.service';
+import { OperationsMetricsService } from '../src/modules/observability/operations-metrics.service';
 
 type FixtureUser = { alias: string; email: string };
 type Fixture = { users: FixtureUser[] };
@@ -314,6 +315,7 @@ async function main(): Promise<void> {
       prisma as unknown as PrismaService,
       { get: (_key: string, fallback: string) => fallback } as ConfigService,
       {} as never,
+      new OperationsMetricsService(),
     );
     const nonce = randomUUID().slice(0, 8);
     const createTask = async (

@@ -9,6 +9,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { once } from 'node:events';
+import { createRequire } from 'node:module';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -38,6 +39,12 @@ type Page<T> = { items: T[]; total: number; page: number; pageSize: number };
 type MockObject = { bytes: Buffer; mimeType: string };
 
 const liveR2 = process.argv.includes('--r2');
+const serverRequire = createRequire(resolve(process.cwd(), 'package.json'));
+process.env.BACKUP_SCHEDULE_UTC = '23:59';
+process.env.BACKUP_LOCAL_DIR = resolve(
+  process.cwd(),
+  '.phase08-acceptance-backups/files-check',
+);
 const databaseUrl = process.env.DATABASE_URL;
 const demoPassword = process.env.DEMO_SEED_PASSWORD;
 const frontendOrigin = (process.env.FRONTEND_ORIGINS ?? '')
@@ -546,7 +553,9 @@ async function assertLiveCors(ticket: UploadTicket): Promise<void> {
 async function configureCleanupContext(): Promise<void> {
   if (appContext) return;
   const { NestFactory } = await import('@nestjs/core');
-  const { AppModule } = await import('../src/app.module');
+  const { AppModule } = serverRequire(
+    './dist/app.module.js',
+  ) as typeof import('../src/app.module');
   appContext = await NestFactory.createApplicationContext(AppModule, {
     logger: false,
   });
@@ -570,9 +579,9 @@ async function cleanupTrackedFiles(): Promise<void> {
     `;
   }
   await configureCleanupContext();
-  const { FilesCleanupService } = await import(
-    '../src/modules/files/files-cleanup.service'
-  );
+  const { FilesCleanupService } = serverRequire(
+    './dist/modules/files/files-cleanup.service.js',
+  ) as typeof import('../src/modules/files/files-cleanup.service');
   const cleanup = appContext!.get(FilesCleanupService) as {
     run: (batchSize: number) => Promise<{
       failed: number;
@@ -870,12 +879,12 @@ async function main(): Promise<void> {
     WHERE id = ${commentFile.id}::uuid
   `;
   await configureCleanupContext();
-  const { FilesCleanupService } = await import(
-    '../src/modules/files/files-cleanup.service'
-  );
-  const { R2StorageService } = await import(
-    '../src/modules/files/r2-storage.service'
-  );
+  const { FilesCleanupService } = serverRequire(
+    './dist/modules/files/files-cleanup.service.js',
+  ) as typeof import('../src/modules/files/files-cleanup.service');
+  const { R2StorageService } = serverRequire(
+    './dist/modules/files/r2-storage.service.js',
+  ) as typeof import('../src/modules/files/r2-storage.service');
   const cleanupService = appContext!.get(FilesCleanupService) as {
     run: (batchSize: number) => Promise<{ failed: number }>;
   };

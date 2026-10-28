@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository, isMockMode } from "../../shared/repository";
 import type { Notification, Task, TaskParticipant } from "../../shared/data-contract";
 import { canSeeTask } from "../../shared/data-contract";
 import {
@@ -48,7 +48,7 @@ export function NotificationsPage() {
     if (!currentUser) return;
     setIsLoading(true);
     try {
-      const notifs = await mockRepository.getNotifications(currentUser.id);
+      const notifs = await workspaceRepository.getNotifications(currentUser.id);
       setNotifications(notifs);
     } finally {
       setIsLoading(false);
@@ -57,18 +57,18 @@ export function NotificationsPage() {
 
   useEffect(() => {
     loadNotifications();
-    const unsub = mockRepository.subscribe(loadNotifications);
+    const unsub = workspaceRepository.subscribe(loadNotifications);
     return unsub;
   }, [currentUser]);
 
   const handleMarkAllRead = async () => {
     if (!currentUser) return;
-    await mockRepository.markAllNotificationsAsRead(currentUser.id);
+    await workspaceRepository.markAllNotificationsAsRead(currentUser.id);
     showToast("Đã đánh dấu tất cả thông báo là đã đọc", "success");
   };
 
   const handleMarkRead = async (id: string) => {
-    await mockRepository.markNotificationAsRead(id);
+    await workspaceRepository.markNotificationAsRead(id);
   };
 
   // Trigger Mock Reminders Demo
@@ -76,7 +76,7 @@ export function NotificationsPage() {
     if (!currentUser) return;
     setIsTriggeringReminder(true);
     try {
-      const res = await mockRepository.triggerMockReminders(currentUser.id);
+      const res = await workspaceRepository.triggerMockReminders(currentUser.id);
       if (res.createdCount > 0) {
         showToast(
           `Đã chạy nhắc hạn mẫu: Tạo ${res.createdCount} thông báo mới (Mô phỏng scheduler 24h/quá hạn)`,
@@ -100,18 +100,27 @@ export function NotificationsPage() {
   const handleOpenNotification = async (n: Notification) => {
     await handleMarkRead(n.id);
 
+    if (!isMockMode && !n.entityId) {
+      showToast("Thông báo đã được đọc nhưng không còn công việc có thể mở theo quyền hiện tại.", "warning");
+      return;
+    }
+
     if (n.entityType === "CHAT") {
       navigate(`/chat?roomId=${n.entityId}`);
       return;
     }
 
     if (n.entityType === "TASK") {
+      if (!isMockMode) {
+        navigate(`/tasks/${n.entityId}`);
+        return;
+      }
       // If TEAM_INVITED, open limited invitation card
       if (n.type === "TEAM_INVITED") {
         try {
           const [foundTask, parts] = await Promise.all([
-            mockRepository.getTaskById(n.entityId),
-            mockRepository.getParticipants(n.entityId),
+            workspaceRepository.getTaskById(n.entityId),
+            workspaceRepository.getParticipants(n.entityId),
           ]);
           if (!foundTask) {
             showToast("Nhiệm vụ này không còn tồn tại.", "error");
@@ -141,8 +150,8 @@ export function NotificationsPage() {
       // Check access permission for standard task notifications
       try {
         const [foundTask, parts] = await Promise.all([
-          mockRepository.getTaskById(n.entityId),
-          mockRepository.getParticipants(n.entityId),
+          workspaceRepository.getTaskById(n.entityId),
+          workspaceRepository.getParticipants(n.entityId),
         ]);
         if (!foundTask || !currentUser) {
           showToast("Không tìm thấy nhiệm vụ tương ứng.", "error");
@@ -170,12 +179,12 @@ export function NotificationsPage() {
     if (!currentUser || !inviteModalData) return;
     setIsRespondingInvite(true);
     try {
-      await mockRepository.respondInvitation(
+      await workspaceRepository.respondInvitation(
         inviteModalData.participant.id,
         decision,
         currentUser.id
       );
-      await mockRepository.markNotificationAsRead(inviteModalData.notification.id);
+      await workspaceRepository.markNotificationAsRead(inviteModalData.notification.id);
 
       showToast(
         decision === "ACCEPTED"
@@ -213,7 +222,7 @@ export function NotificationsPage() {
           subtitle="Nhật ký các sự kiện liên quan đến công việc được giao, kết quả duyệt, lời mời và tin nhắn."
           actions={
             <div className="flex items-center gap-2 flex-wrap">
-              <Button
+              {isMockMode && <Button
                 variant="outline"
                 size="sm"
                 onClick={handleTriggerMockReminders}
@@ -222,7 +231,7 @@ export function NotificationsPage() {
                 title="Mô phỏng scheduler quét hạn 24h & quá hạn"
               >
                 <BellRing className="w-3.5 h-3.5 text-brand-700" /> Chạy nhắc hạn mẫu (Demo)
-              </Button>
+              </Button>}
 
               <Button
                 variant="outline"
@@ -237,12 +246,12 @@ export function NotificationsPage() {
         />
 
         {/* Scheduler Disclaimer */}
-        <div className="p-3 bg-slate-50 border border-border/80 rounded-lg text-xs text-text-secondary flex items-start gap-2">
+        {isMockMode && <div className="p-3 bg-slate-50 border border-border/80 rounded-lg text-xs text-text-secondary flex items-start gap-2">
           <Clock className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
           <div className="leading-relaxed">
             <strong>Mô phỏng nhắc hạn:</strong> Nút "Chạy nhắc hạn mẫu" quét các mốc 24 giờ trước hạn và quá hạn theo <code>dueAt</code>. Hệ thống ngăn chặn việc gửi trùng lặp cho cùng người và nhiệm vụ. Đây là mô phỏng scheduler, không chạy cron ngầm trong trình duyệt.
           </div>
-        </div>
+        </div>}
 
         {/* Filter tabs */}
         <div className="flex items-center gap-2 border-b border-border pb-2">
