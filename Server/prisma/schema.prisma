@@ -84,6 +84,7 @@ enum NotificationType {
   TASK_ASSIGNED
   TASK_UPDATED
   TASK_DUE_SOON
+  TASK_DUE
   TASK_OVERDUE
   SUBMISSION_RECEIVED
   SUBMISSION_WITHDRAWN
@@ -95,6 +96,11 @@ enum NotificationType {
   COMMENT_ADDED
   TEAM_INVITED
   CHAT_MESSAGE
+}
+
+enum RealtimeOutboxType {
+  NOTIFICATION_NEW
+  TASK_UPDATED
 }
 
 model User {
@@ -128,6 +134,7 @@ model User {
   events              TaskEvent[]
   notifications       Notification[]
   reminders           ReminderEvent[]
+  realtimeOutbox      RealtimeOutbox[]
   uploadedFiles       FileObject[]
   audits              AuditLog[]
 
@@ -228,6 +235,7 @@ model Task {
   events                  TaskEvent[]
   notifications           Notification[]
   reminders               ReminderEvent[]
+  realtimeOutbox          RealtimeOutbox[]
   fileLinks               FileLink[]
 
   @@index([type, status, dueAt])
@@ -365,7 +373,7 @@ model TaskEvent {
 model Notification {
   id              String           @id @default(uuid()) @db.Uuid
   recipientId     String           @map("recipient_id") @db.Uuid
-  taskId          String           @map("task_id") @db.Uuid
+  taskId          String?          @map("task_id") @db.Uuid
   type            NotificationType
   title           String
   body            String
@@ -373,11 +381,33 @@ model Notification {
   readAt          DateTime?        @map("read_at") @db.Timestamptz(3)
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   recipient       User             @relation(fields: [recipientId], references: [id], onDelete: Restrict)
-  task            Task             @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  task            Task?            @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  realtimeOutbox  RealtimeOutbox?
 
   @@unique([businessEventId, recipientId])
   @@index([recipientId, readAt, createdAt, id])
   @@map("notifications")
+}
+
+model RealtimeOutbox {
+  id              String             @id @default(uuid()) @db.Uuid
+  type            RealtimeOutboxType
+  idempotencyKey  String             @unique @map("idempotency_key")
+  businessEventId String             @map("business_event_id") @db.Uuid
+  taskId          String?            @map("task_id") @db.Uuid
+  recipientId     String?            @map("recipient_id") @db.Uuid
+  notificationId  String?            @unique @map("notification_id") @db.Uuid
+  attempts        Int                @default(0)
+  nextAttemptAt   DateTime           @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  deliveredAt     DateTime?          @map("delivered_at") @db.Timestamptz(3)
+  lastError       String?            @map("last_error") @db.VarChar(500)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  task            Task?              @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  recipient       User?              @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  notification    Notification?      @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+
+  @@index([deliveredAt, nextAttemptAt, createdAt])
+  @@map("realtime_outbox")
 }
 
 model ReminderEvent {

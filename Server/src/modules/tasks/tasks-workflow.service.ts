@@ -1080,7 +1080,7 @@ export class TasksWorkflowService {
     return tx.task.findUniqueOrThrow({ where: { id: task.id } });
   }
 
-  private event(
+  private async event(
     tx: Prisma.TransactionClient,
     actor: AuthenticatedUser,
     task: Task,
@@ -1090,7 +1090,7 @@ export class TasksWorkflowService {
     after: Prisma.InputJsonObject,
     createdAt: Date,
   ) {
-    return tx.taskEvent.create({
+    const event = await tx.taskEvent.create({
       data: {
         taskId: task.id,
         actorId: actor.id,
@@ -1101,6 +1101,16 @@ export class TasksWorkflowService {
         createdAt,
       },
     });
+    await tx.realtimeOutbox.create({
+      data: {
+        type: 'TASK_UPDATED',
+        idempotencyKey: `task:${event.id}`,
+        businessEventId: event.id,
+        taskId: task.id,
+        createdAt,
+      },
+    });
+    return event;
   }
 
   private async activeLeaders(
@@ -1164,8 +1174,30 @@ export class TasksWorkflowService {
         businessEventId: eventId,
         createdAt: now,
       }));
-    if (data.length)
+    if (data.length) {
       await tx.notification.createMany({ data, skipDuplicates: true });
+      const persisted = await tx.notification.findMany({
+        where: {
+          businessEventId: eventId,
+          recipientId: { in: data.map((item) => item.recipientId) },
+        },
+        select: { id: true, recipientId: true },
+      });
+      if (persisted.length) {
+        await tx.realtimeOutbox.createMany({
+          data: persisted.map((notification) => ({
+            type: 'NOTIFICATION_NEW',
+            idempotencyKey: `notification:${notification.id}`,
+            businessEventId: eventId,
+            taskId: task.id,
+            recipientId: notification.recipientId,
+            notificationId: notification.id,
+            createdAt: now,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
   }
 
   private async resolveDueDate(

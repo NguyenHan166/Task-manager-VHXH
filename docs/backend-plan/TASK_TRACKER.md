@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–05 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-05`; workflow Phase 04 và file lifecycle Phase 05 đều qua runtime matrix trên DB disposable (xem [`phase-04/ACCEPTANCE.md`](./phase-04/ACCEPTANCE.md) và [`phase-05/ACCEPTANCE.md`](./phase-05/ACCEPTANCE.md)). Phase 06–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–06 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-06`; workflow Phase 04, file lifecycle Phase 05 và notification Phase 06 đều qua runtime matrix trên DB disposable. Phase 07–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -55,11 +55,11 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 06 — [Notifications](./PHASE_06_NOTIFICATIONS.md)
 
-- [ ] BE-06-01 — Notification API và recipient matrix.
-- [ ] BE-06-02 — Transaction/outbox/socket.
-- [ ] BE-06-03 — Scheduler nhắc hạn chống trùng.
-- [ ] BE-06-04 — Reconnect và trạng thái đọc.
-- [ ] BE-06-05 — Nghiệm thu thông báo.
+- [x] BE-06-01 — Notification API và recipient matrix; [runtime acceptance](./phase-06/ACCEPTANCE.md).
+- [x] BE-06-02 — Transaction/outbox/socket; [runtime acceptance](./phase-06/ACCEPTANCE.md).
+- [x] BE-06-03 — Scheduler nhắc hạn chống trùng; [runtime acceptance](./phase-06/ACCEPTANCE.md).
+- [x] BE-06-04 — Reconnect và trạng thái đọc; [runtime acceptance](./phase-06/ACCEPTANCE.md).
+- [x] BE-06-05 — Nghiệm thu thông báo; [runtime acceptance](./phase-06/ACCEPTANCE.md).
 
 ## Phase 07 — [Báo cáo và vận hành](./PHASE_07_REPORTS_OPERATIONS.md)
 

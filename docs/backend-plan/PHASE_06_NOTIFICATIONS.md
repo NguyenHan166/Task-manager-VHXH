@@ -40,3 +40,7 @@
 - **Thực hiện:** Đi các luồng publish, comment, submit, withdraw, approve, return, đổi hạn/chủ trì và overdue; kiểm tra người nhận, dedupe, thứ tự commit, giờ Việt Nam, server restart, socket reconnect và user bị khóa.
 - **Đầu ra:** Bảng `event → recipient → notification → socket → REST` cùng kết quả kiểm tra.
 - **Hoàn thành khi:** Mỗi event có đúng recipient; một mốc cron không tạo bản ghi trùng trong các tình huống đã liệt kê.
+
+## Kết quả triển khai — 2026-10-28
+
+BE-06-01 đến BE-06-05 đã hoàn thành. Runtime acceptance trên database scratch xác nhận recipient ACL, API đọc và cursor reconnect, outbox/socket/room, session bị khóa, dedupe reminder theo giờ Việt Nam, loại trừ trạng thái không hoạt động và dữ liệu pending qua server restart. `workflow:check`, lint, typecheck, format check và build đều PASS; xem [bảng kết quả chi tiết](./phase-06/ACCEPTANCE.md).

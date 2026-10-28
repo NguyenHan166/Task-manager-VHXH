@@ -24,6 +24,7 @@
     "auth:check": "tsx scripts/check-auth.ts",
     "tasks:check": "tsx scripts/check-tasks.ts",
     "workflow:check": "tsx scripts/check-workflow.ts",
+    "notifications:check": "tsx scripts/check-notifications.ts",
     "files:cleanup": "tsx scripts/cleanup-files.ts",
     "files:check": "tsx scripts/check-files.ts"
   },
@@ -35,7 +36,10 @@
     "@nestjs/core": "11.2.8",
     "@nestjs/jwt": "12.0.3",
     "@nestjs/platform-express": "11.2.8",
+    "@nestjs/platform-socket.io": "11.2.8",
+    "@nestjs/schedule": "12.0.2",
     "@nestjs/throttler": "6.5.0",
+    "@nestjs/websockets": "11.2.8",
     "@prisma/client": "6.19.3",
     "bcryptjs": "2.4.3",
     "class-transformer": "0.5.1",
@@ -44,7 +48,8 @@
     "file-type": "21.3.4",
     "helmet": "8.1.0",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "socket.io": "4.8.4"
   },
   "devDependencies": {
     "@eslint/js": "9.32.0",
@@ -55,6 +60,7 @@
     "eslint": "9.32.0",
     "prettier": "3.6.2",
     "prisma": "6.19.3",
+    "socket.io-client": "4.8.4",
     "tsx": "4.20.3",
     "typescript": "5.9.2",
     "typescript-eslint": "8.39.0"

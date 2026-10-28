@@ -8,6 +8,7 @@ import {
 import {
   FileStatus,
   InvitationStatus,
+  NotificationType,
   ParticipantRole,
   Prisma,
   TaskPriority,
@@ -311,21 +312,19 @@ export class TasksService {
       if (participants.length) {
         await tx.taskParticipant.createMany({ data: participants });
       }
-      await tx.taskEvent.create({
-        data: {
-          taskId: task.id,
-          actorId: actor.id,
-          kind: 'CREATED',
-          after: {
-            code: task.code,
-            type: task.type,
-            status: task.status,
-            title: task.title,
-            primaryAssigneeId: task.primaryAssigneeId,
-            dueAt: task.dueAt?.toISOString() ?? null,
-          } satisfies Prisma.InputJsonObject,
-          createdAt: now,
-        },
+      await this.recordTaskEvent(tx, {
+        taskId: task.id,
+        actorId: actor.id,
+        kind: 'CREATED',
+        after: {
+          code: task.code,
+          type: task.type,
+          status: task.status,
+          title: task.title,
+          primaryAssigneeId: task.primaryAssigneeId,
+          dueAt: task.dueAt?.toISOString() ?? null,
+        } satisfies Prisma.InputJsonObject,
+        createdAt: now,
       });
       return toPublicTask(task);
     });
@@ -406,14 +405,12 @@ export class TasksService {
       const updated = await tx.task.findUniqueOrThrow({
         where: { id: taskId },
       });
-      await tx.taskEvent.create({
-        data: {
-          taskId,
-          actorId: actor.id,
-          kind: 'DETAILS_UPDATED',
-          before,
-          after,
-        },
+      await this.recordTaskEvent(tx, {
+        taskId,
+        actorId: actor.id,
+        kind: 'DETAILS_UPDATED',
+        before,
+        after,
       });
       return toPublicTask(updated);
     });
@@ -498,14 +495,72 @@ export class TasksService {
       const comment = await tx.taskComment.create({
         data: { taskId, authorId: actor.id, body: input.body },
       });
-      await tx.taskEvent.create({
-        data: {
-          taskId,
-          actorId: actor.id,
-          kind: 'COMMENT_ADDED',
-          after: { commentId: comment.id } satisfies Prisma.InputJsonObject,
-        },
+      const event = await this.recordTaskEvent(tx, {
+        taskId,
+        actorId: actor.id,
+        kind: 'COMMENT_ADDED',
+        after: { commentId: comment.id } satisfies Prisma.InputJsonObject,
       });
+      const participants = await tx.taskParticipant.findMany({
+        where: { taskId, invitationStatus: InvitationStatus.ACCEPTED },
+        select: { userId: true },
+      });
+      const recipients = await tx.user.findMany({
+        where: {
+          status: UserStatus.ACTIVE,
+          OR: [
+            { role: { in: [UserRole.MANAGER, UserRole.DEPUTY_MANAGER] } },
+            {
+              id: {
+                in: [
+                  task.createdById,
+                  task.primaryAssigneeId,
+                  ...participants.map((participant) => participant.userId),
+                ].filter((id): id is string => Boolean(id)),
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      const recipientIds = [
+        ...new Set(recipients.map((user) => user.id)),
+      ].filter((id) => id !== actor.id);
+      if (recipientIds.length) {
+        await tx.notification.createMany({
+          data: recipientIds.map((recipientId) => ({
+            recipientId,
+            taskId,
+            type: NotificationType.COMMENT_ADDED,
+            title: 'Bình luận mới',
+            body: `[${task.code}] ${task.title} có bình luận mới.`,
+            businessEventId: event.id,
+            createdAt: event.createdAt,
+          })),
+          skipDuplicates: true,
+        });
+        const persisted = await tx.notification.findMany({
+          where: {
+            businessEventId: event.id,
+            recipientId: { in: recipientIds },
+          },
+          select: { id: true, recipientId: true },
+        });
+        if (persisted.length) {
+          await tx.realtimeOutbox.createMany({
+            data: persisted.map((notification) => ({
+              type: 'NOTIFICATION_NEW',
+              idempotencyKey: `notification:${notification.id}`,
+              businessEventId: event.id,
+              taskId,
+              recipientId: notification.recipientId,
+              notificationId: notification.id,
+              createdAt: event.createdAt,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
       return comment;
     });
   }
@@ -541,6 +596,23 @@ export class TasksService {
     });
     const hour = String(settings?.defaultDueHour ?? 16).padStart(2, '0');
     return new Date(`${input.dueDate}T${hour}:00:00+07:00`);
+  }
+
+  private async recordTaskEvent(
+    tx: Prisma.TransactionClient,
+    data: Prisma.TaskEventUncheckedCreateInput,
+  ) {
+    const event = await tx.taskEvent.create({ data });
+    await tx.realtimeOutbox.create({
+      data: {
+        type: 'TASK_UPDATED',
+        idempotencyKey: `task:${event.id}`,
+        businessEventId: event.id,
+        taskId: event.taskId,
+        createdAt: event.createdAt,
+      },
+    });
+    return event;
   }
 
   private listFilters(

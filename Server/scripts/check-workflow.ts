@@ -51,7 +51,8 @@ if (
 const databaseName = decodeURIComponent(new URL(databaseUrl).pathname.slice(1));
 if (
   process.env.CI !== 'true' &&
-  !databaseName.startsWith('office_workspace_phase04_verify')
+  !databaseName.startsWith('office_workspace_phase04_verify') &&
+  !databaseName.startsWith('office_workspace_phase06_verify')
 ) {
   throw new Error(
     'Use a disposable database named office_workspace_phase04_verify*; the normal local database is refused.',
@@ -190,6 +191,9 @@ async function main(): Promise<void> {
     );
 
     const rollbackTask = await createDraft('Phase 04 injected rollback');
+    const rollbackOutboxBefore = await prisma.realtimeOutbox.count({
+      where: { taskId: rollbackTask.id },
+    });
     try {
       await prisma.$executeRawUnsafe(`
         DROP TRIGGER IF EXISTS workflow_check_fail_notifications ON notifications
@@ -237,6 +241,11 @@ async function main(): Promise<void> {
     assert.equal(
       await prisma.notification.count({ where: { taskId: rollbackTask.id } }),
       0,
+    );
+    assert.equal(
+      await prisma.realtimeOutbox.count({ where: { taskId: rollbackTask.id } }),
+      rollbackOutboxBefore,
+      'failed workflow transaction leaves no realtime outbox event',
     );
 
     const journey = await createDraft('Phase 04 main journey', userId('u02'), [
