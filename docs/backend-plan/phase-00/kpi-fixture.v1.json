@@ -445,26 +445,7 @@
       "dueAtSnapshot": "2026-10-24T09:00:00.000Z"
     }
   ],
-  "files": [
-    {
-      "alias": "f01",
-      "owner": "u02",
-      "status": "READY",
-      "linkedTo": {
-        "type": "SUBMISSION",
-        "alias": "s03"
-      }
-    },
-    {
-      "alias": "f02",
-      "owner": "u03",
-      "status": "READY",
-      "linkedTo": {
-        "type": "SUBMISSION",
-        "alias": "s01"
-      }
-    }
-  ],
+  "files": [],
   "recurrence": {
     "phase": "P1",
     "rules": [

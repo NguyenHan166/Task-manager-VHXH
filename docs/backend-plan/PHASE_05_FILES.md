@@ -10,7 +10,7 @@
 
 - **Phụ thuộc:** BE-00-03, BE-01-03, D-06.
 - **Thực hiện:** Áp dụng D-06/D-10: BE dùng `UPLOADING/READY/REMOVED`, ánh xạ `MOCK_LOCAL` chỉ cho FE demo; file tạm gắn với TASK trước khi có submission ID và chỉ được liên kết với SUBMISSION lúc gửi duyệt. Cấu hình bucket private, credentials server-only, CORS cho origin FE và PUT headers; TTL URL ngắn, giới hạn mặc định 20 MB và MIME allowlist.
-- **Đầu ra:** Migration/status, config, runbook bucket và danh sách MIME.
+- **Đầu ra:** Migration/status, config, [runbook bucket](./phase-05/RUNBOOK.md), [danh sách MIME](./phase-05/MIME_ALLOWLIST.md) và [ma trận nghiệm thu](./phase-05/ACCEPTANCE.md).
 - **Hoàn thành khi:** Không có R2 secret trong FE hoặc log; bucket không cho đọc công khai.
 
 ### BE-05-02 — Cấp signed PUT URL
@@ -23,7 +23,7 @@
 ### BE-05-03 — Complete, verify và liên kết file
 
 - **Phụ thuộc:** BE-05-02, BE-04-02.
-- **Thực hiện:** `POST /api/files/complete` xác minh fileId thuộc actor, HEAD object R2, kích thước thực và trạng thái; không coi `Content-Type` do client đặt hoặc ETag là bằng chứng nội dung thật. Chốt cách kiểm tra loại tệp thực tế (ví dụ đọc phần đầu object bằng range request và kiểm tra định dạng) cùng chính sách checksum trước khi READY. Tạo FileLink trong transaction cho TASK hoặc chuyển file tạm sang SUBMISSION khi submit, không để file của user/task khác vào `fileIds`. Complete lặp an toàn.
+- **Thực hiện:** `POST /api/files/complete` xác minh fileId thuộc actor, HEAD object R2, kích thước thực và trạng thái; không coi `Content-Type` do client đặt hoặc ETag là bằng chứng nội dung thật. Backend stream object từ R2 để đếm byte và tính SHA-256, đồng thời chỉ giữ tối đa 256 KiB đầu file để dò định dạng thực tế. Chỉ đánh dấu READY sau khi MIME phát hiện khớp allowlist/declaration và kích thước khớp; ghi SHA-256 làm checksum. Tạo FileLink trong transaction cho TASK hoặc chuyển file tạm sang SUBMISSION khi submit, không để file của user/task khác vào `fileIds`. Complete lặp an toàn.
 - **Đầu ra:** Metadata READY và liên kết tới entity hợp lệ.
 - **Hoàn thành khi:** Upload thất bại không tạo READY; size/MIME client khai khác thực tế bị xử lý theo policy; submit không tham chiếu file chưa READY.
 
@@ -40,3 +40,5 @@
 - **Thực hiện:** Kiểm tra file hợp lệ, >20 MB, MIME bị cấm, upload gián đoạn, URL hết hạn, complete hai lần, mất liên kết, file thuộc task riêng của người khác, file submission đã thu hồi. Đảm bảo backend không proxy bytes upload/download qua RAM.
 - **Đầu ra:** Bảng nghiệm thu và hướng dẫn xử lý file dở.
 - **Hoàn thành khi:** Mọi file READY có object thật; lỗi R2 không biến thành thông báo upload thành công giả.
+
+**Nghiệm thu:** [Ma trận HTTP, storage và R2](./phase-05/ACCEPTANCE.md); quy trình cấu hình/vận hành ở [RUNBOOK.md](./phase-05/RUNBOOK.md).

@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–03 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-03`. Phase 04 implementation và runtime matrix đã được bổ sung; chưa đánh dấu hoàn thành cho đến khi matrix chạy qua trên DB disposable (xem [`phase-04/ACCEPTANCE.md`](./phase-04/ACCEPTANCE.md)). Phase 05–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–05 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-05`; workflow Phase 04 và file lifecycle Phase 05 đều qua runtime matrix trên DB disposable (xem [`phase-04/ACCEPTANCE.md`](./phase-04/ACCEPTANCE.md) và [`phase-05/ACCEPTANCE.md`](./phase-05/ACCEPTANCE.md)). Phase 06–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -47,11 +47,11 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 05 — [R2 files](./PHASE_05_FILES.md)
 
-- [ ] BE-05-01 — Storage model, R2 và CORS.
-- [ ] BE-05-02 — Signed PUT URL.
-- [ ] BE-05-03 — Complete/verify/file link.
-- [ ] BE-05-04 — Signed GET/list/remove/cleanup.
-- [ ] BE-05-05 — Nghiệm thu file và lỗi R2.
+- [x] BE-05-01 — Storage model, R2 và CORS.
+- [x] BE-05-02 — Signed PUT URL.
+- [x] BE-05-03 — Complete/verify/file link.
+- [x] BE-05-04 — Signed GET/list/remove/cleanup.
+- [x] BE-05-05 — Nghiệm thu file và lỗi R2.
 
 ## Phase 06 — [Notifications](./PHASE_06_NOTIFICATIONS.md)
 

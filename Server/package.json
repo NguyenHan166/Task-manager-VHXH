@@ -23,9 +23,13 @@
     "db:check": "tsx scripts/check-seed.ts",
     "auth:check": "tsx scripts/check-auth.ts",
     "tasks:check": "tsx scripts/check-tasks.ts",
-    "workflow:check": "tsx scripts/check-workflow.ts"
+    "workflow:check": "tsx scripts/check-workflow.ts",
+    "files:cleanup": "tsx scripts/cleanup-files.ts",
+    "files:check": "tsx scripts/check-files.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1158.0",
+    "@aws-sdk/s3-request-presigner": "3.1158.0",
     "@nestjs/common": "11.2.8",
     "@nestjs/config": "4.0.2",
     "@nestjs/core": "11.2.8",
@@ -37,6 +41,7 @@
     "class-transformer": "0.5.1",
     "class-validator": "0.14.2",
     "dotenv": "16.6.1",
+    "file-type": "21.3.4",
     "helmet": "8.1.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"

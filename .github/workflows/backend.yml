@@ -15,6 +15,8 @@ on:
       - 'docs/backend-plan/phase-03/**'
       - 'docs/backend-plan/PHASE_04_OFFICIAL_WORKFLOW.md'
       - 'docs/backend-plan/phase-04/**'
+      - 'docs/backend-plan/PHASE_05_FILES.md'
+      - 'docs/backend-plan/phase-05/**'
       - 'docs/backend-plan/phase-00/build_openapi.py'
       - 'docs/backend-plan/phase-00/openapi.v1.json'
       - 'docs/backend-plan/phase-00/API_CONTRACT.md'
@@ -33,6 +35,8 @@ on:
       - 'docs/backend-plan/phase-03/**'
       - 'docs/backend-plan/PHASE_04_OFFICIAL_WORKFLOW.md'
       - 'docs/backend-plan/phase-04/**'
+      - 'docs/backend-plan/PHASE_05_FILES.md'
+      - 'docs/backend-plan/phase-05/**'
       - 'docs/backend-plan/phase-00/build_openapi.py'
       - 'docs/backend-plan/phase-00/openapi.v1.json'
       - 'docs/backend-plan/phase-00/API_CONTRACT.md'
@@ -134,3 +138,4 @@ jobs:
           start_server
           npm run auth:check
           stop_server
+          npm run files:check

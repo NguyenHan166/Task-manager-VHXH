@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import { hash } from 'bcryptjs';
 import {
   ApprovalDecision,
-  FileStatus,
   InvitationStatus,
   ParticipantRole,
   PrismaClient,
@@ -62,12 +61,6 @@ type FixtureApproval = {
   decision: ApprovalDecision;
   at: string;
 };
-type FixtureFile = {
-  alias: string;
-  owner: string;
-  status: FileStatus;
-  linkedTo: { type: string; alias: string };
-};
 type Fixture = {
   clock: string;
   users: FixtureUser[];
@@ -76,7 +69,6 @@ type Fixture = {
   participants: FixtureParticipant[];
   submissions: FixtureSubmission[];
   approvals: FixtureApproval[];
-  files: FixtureFile[];
 };
 
 const fixture = JSON.parse(
@@ -285,32 +277,6 @@ async function main(): Promise<void> {
             },
             update: {},
           });
-        }
-
-        for (const file of fixture.files) {
-          const saved = await tx.fileObject.upsert({
-            where: { objectKey: `demo/${file.alias}` },
-            create: {
-              objectKey: `demo/${file.alias}`,
-              originalName: `${file.alias}.txt`,
-              mimeType: 'text/plain',
-              sizeBytes: BigInt(0),
-              uploadedById: userIds[file.owner],
-              status: file.status,
-              createdAt: clock,
-            },
-            update: {},
-          });
-          if (file.linkedTo.type === 'SUBMISSION') {
-            const submissionId = submissionIds[file.linkedTo.alias];
-            const existing = await tx.fileLink.findFirst({
-              where: { fileId: saved.id, submissionId },
-            });
-            if (!existing)
-              await tx.fileLink.create({
-                data: { fileId: saved.id, submissionId, createdAt: clock },
-              });
-          }
         }
 
         const nextByPrefix: Record<string, number> = { CV: 10, NH: 3, CN: 3 };

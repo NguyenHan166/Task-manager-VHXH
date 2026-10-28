@@ -27,7 +27,7 @@ Các tập task trên được tính từ fixture ở script, đối chiếu v�
 |---|---|---|
 | Filter `scope/type/status/priority/projectId/primaryAssigneeId/dueFrom/dueTo/isOverdue`; ngày đảo, page sai | Total đúng trong ACL; input sai `400` | PASS |
 | Sort và phân trang | Hai trang ghép khớp một trang lớn; ID không lặp; hạn `null` cuối ở ASC/DESC | PASS |
-| Task detail có submission/file/approval fixture | `t02` và `t05` có counts, file IDs, không trả `objectKey` | PASS |
+| Task detail có submission/approval fixture | `t02` và `t05` có counts; seed không còn READY file giả | PASS |
 | Tạo DRAFT và tạo đồng thời | Assignee/collaborator/watcher không thấy nháp; mã `CV` không trùng; event/participants lưu cùng task | PASS |
 | Tạo/sửa không hợp lệ | STAFF `403`; TEAM/PERSONAL/project/parent và trường hệ thống bị chặn; DONE/CANCELLED sửa `409` | PASS |
 | Bình luận và sự kiện | Chỉ người có quyền; nội dung rỗng/dài quá `4000` bị chặn; author từ token; COMMENT_ADDED/DETAILS_UPDATED hiện trong lịch sử; comment còn đọc được sau khi đổi trạng thái trực tiếp trên DB scratch | PASS |
@@ -38,4 +38,4 @@ Static checks `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm 
 
 ## Ranh giới phase
 
-TEAM/PERSONAL, project/parent write và lời mời PENDING mở trong Phase 09. Publish, status, deadline/assignee adjustments, submission và approval mở trong Phase 04. Notification recipient matrix/outbox/socket thuộc Phase 06; Phase 03 ghi TaskEvent bền nhưng chưa phát notification. File upload/download R2 thuộc Phase 05. Các module sau phải dùng chung task ACL khi truy vấn quan hệ. Hành trình đổi trạng thái bằng API thực tế được nghiệm thu cùng Phase 04.
+TEAM/PERSONAL, project/parent write và lời mời PENDING mở trong Phase 09. Publish, status, deadline/assignee adjustments, submission và approval mở trong Phase 04. Notification recipient matrix/outbox/socket thuộc Phase 06; Phase 03 ghi TaskEvent bền nhưng chưa phát notification. File upload/download và quyền truy cập R2 được nghiệm thu riêng ở Phase 05; các fixture metadata-only cũ được migration Phase 05 chuyển sang REMOVED. Các module sau phải dùng chung task ACL khi truy vấn quan hệ. Hành trình đổi trạng thái bằng API thực tế được nghiệm thu cùng Phase 04.

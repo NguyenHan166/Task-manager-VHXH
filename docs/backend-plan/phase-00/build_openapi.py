@@ -140,7 +140,7 @@ schemas.update({
     "ApprovalInput": model({"submissionId": UUID, "reason": string()}, ("submissionId",)),
     "ReturnInput": model({"submissionId": UUID, "reason": string(min_length=1)}, ("submissionId", "reason")),
     "CommentInput": model({"body": string(min_length=1, max_length=4000)}, ("body",), description="Nonblank text on an active published OFFICIAL task."),
-    "UploadUrlInput": model({"originalName": string(), "mimeType": string(), "sizeBytes": integer(minimum=1), "entityType": string(enum=["TASK", "COMMENT", "MESSAGE"]), "entityId": UUID}, ("originalName", "mimeType", "sizeBytes", "entityType", "entityId"), description="P0 upload before submission uses entityType TASK. MESSAGE opens in P1."),
+    "UploadUrlInput": model({"originalName": string(), "mimeType": string(), "sizeBytes": integer(minimum=1), "entityType": string(enum=["TASK", "COMMENT"]), "entityId": UUID}, ("originalName", "mimeType", "sizeBytes", "entityType", "entityId"), description="P0 task files are staged on TASK before submission; COMMENT attachments target the comment. Backend validates the declared size, MIME and filename before issuing a short-lived signed PUT URL. MESSAGE opens in P1."),
     "CompleteFileInput": model({"fileId": UUID}, ("fileId",)),
     "SettingsInput": model({"workspaceName": string(), "defaultDueHour": integer(minimum=0, maximum=23), "reminderBeforeHours": integer(minimum=1), "maxFileSizeMb": integer(minimum=1)}),
     "InvitationDecision": model({"decision": string(enum=["ACCEPTED", "DECLINED"])}, ("decision",)),
@@ -271,9 +271,9 @@ add("GET", "/tasks/{id}/comments", "listComments", "Tasks", "PageTaskComment", p
 add("POST", "/tasks/{id}/comments", "addComment", "Tasks", "TaskComment", params=[path_id()], request="CommentInput", created=True, description="Requires read access to an active published OFFICIAL task. DONE and CANCELLED remain readable but cannot receive comments.")
 add("GET", "/tasks/{id}/events", "listTaskEvents", "Tasks", "PageTaskEvent", params=[path_id()] + PAGE)
 
-add("POST", "/files/upload-url", "getUploadUrl", "Files", "UploadTicket", request="UploadUrlInput", created=True, description="P0 only TASK pre-submission; checks write ACL, size/MIME and creates UPLOADING metadata. Never accepts objectKey.")
+add("POST", "/files/upload-url", "getUploadUrl", "Files", "UploadTicket", request="UploadUrlInput", created=True, description="Checks current write ACL, 20 MB default limit, MIME/extension allowlist and creates UPLOADING metadata. Task attachments are staged on TASK and moved to SUBMISSION on submit. Never accepts uploadedById or objectKey.")
 add("POST", "/files/complete", "completeFile", "Files", "FileObject", request="CompleteFileInput", description="HEAD/size/type/checksum verification before READY.")
-add("GET", "/files", "listFiles", "Files", "PageFileObject", params=PAGE + [query("entityType", string(enum=["TASK", "SUBMISSION", "COMMENT", "MESSAGE"])), query("entityId", UUID), query("search")])
+add("GET", "/files", "listFiles", "Files", "PageFileObject", params=PAGE + [query("entityType", string(enum=["TASK", "SUBMISSION", "COMMENT"])), query("entityId", UUID), query("search")], description="ACL is applied to the linked task before filtering, counting and pagination. MESSAGE opens in P1.")
 add("GET", "/files/{id}/download-url", "getDownloadUrl", "Files", "DownloadTicket", params=[path_id()], description="Rechecks entity ACL; REMOVED files return 404.")
 add("DELETE", "/files/{id}", "removeFile", "Files", "Success", params=[path_id()], description="Soft REMOVED; object cleanup after 90 days if no valid links.")
 

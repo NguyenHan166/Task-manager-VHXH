@@ -3930,7 +3930,7 @@
             }
           }
         },
-        "description": "P0 only TASK pre-submission; checks write ACL, size/MIME and creates UPLOADING metadata. Never accepts objectKey.",
+        "description": "Checks current write ACL, 20 MB default limit, MIME/extension allowlist and creates UPLOADING metadata. Task attachments are staged on TASK and moved to SUBMISSION on submit. Never accepts uploadedById or objectKey.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4134,6 +4134,7 @@
             }
           }
         },
+        "description": "ACL is applied to the linked task before filtering, counting and pagination. MESSAGE opens in P1.",
         "parameters": [
           {
             "name": "page",
@@ -4163,8 +4164,7 @@
               "enum": [
                 "TASK",
                 "SUBMISSION",
-                "COMMENT",
-                "MESSAGE"
+                "COMMENT"
               ]
             }
           },
@@ -11680,8 +11680,7 @@
             "type": "string",
             "enum": [
               "TASK",
-              "COMMENT",
-              "MESSAGE"
+              "COMMENT"
             ]
           },
           "entityId": {
@@ -11697,7 +11696,7 @@
           "entityType",
           "entityId"
         ],
-        "description": "P0 upload before submission uses entityType TASK. MESSAGE opens in P1."
+        "description": "P0 task files are staged on TASK before submission; COMMENT attachments target the comment. Backend validates the declared size, MIME and filename before issuing a short-lived signed PUT URL. MESSAGE opens in P1."
       },
       "CompleteFileInput": {
         "type": "object",

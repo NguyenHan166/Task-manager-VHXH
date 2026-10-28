@@ -199,8 +199,8 @@ async function main(): Promise<void> {
     'detail relations',
   );
   assert.equal(detail.participants.length, 1);
-  assert.equal(detail.files.length, 1);
-  assert.equal(detail.latestSubmission.fileIds.length, 1);
+  assert.equal(detail.files.length, 0);
+  assert.equal(detail.latestSubmission.fileIds.length, 0);
   assert.equal(detail.historyCounts.submissions, 1);
   assert.ok(!('archivedAt' in detail.task));
   assert.ok(!('objectKey' in detail.files[0]));
@@ -215,8 +215,8 @@ async function main(): Promise<void> {
   );
   assert.equal(approvedDetail.historyCounts.submissions, 2);
   assert.equal(approvedDetail.historyCounts.approvals, 2);
-  assert.equal(approvedDetail.latestSubmission.fileIds.length, 1);
-  assert.equal(approvedDetail.files.length, 1);
+  assert.equal(approvedDetail.latestSubmission.fileIds.length, 0);
+  assert.equal(approvedDetail.files.length, 0);
 
   const scoped = async (alias: string, query: string): Promise<Page<Task>> =>
     expect<Page<Task>>(

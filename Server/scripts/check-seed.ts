@@ -26,6 +26,8 @@ async function main(): Promise<void> {
       approvals,
       files,
       links,
+      readyDemoFiles,
+      activeDemoLinks,
       settings,
     ] = await Promise.all([
       prisma.user.count(),
@@ -36,6 +38,15 @@ async function main(): Promise<void> {
       prisma.taskApproval.count(),
       prisma.fileObject.count(),
       prisma.fileLink.count(),
+      prisma.fileObject.count({
+        where: { objectKey: { startsWith: 'demo/' }, status: 'READY' },
+      }),
+      prisma.fileLink.count({
+        where: {
+          removedAt: null,
+          file: { is: { objectKey: { startsWith: 'demo/' } } },
+        },
+      }),
       prisma.appSettings.count(),
     ]);
     const counts = {
@@ -47,6 +58,8 @@ async function main(): Promise<void> {
       approvals,
       files,
       links,
+      readyDemoFiles,
+      activeDemoLinks,
       settings,
     };
     const required = {
@@ -56,8 +69,8 @@ async function main(): Promise<void> {
       participants: 6,
       submissions: 4,
       approvals: 3,
-      files: 2,
-      links: 2,
+      readyDemoFiles: 0,
+      activeDemoLinks: 0,
       settings: 1,
     };
     for (const [key, value] of Object.entries(required)) {

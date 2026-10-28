@@ -89,7 +89,7 @@ fixture = {
         {"alias": "a02", "task": "t05", "submission": "s03", "by": "u01", "decision": "APPROVED", "at": at(-96), "dueAtSnapshot": at(-72)},
         {"alias": "a03", "task": "t06", "submission": "s04", "by": "u01", "decision": "APPROVED", "at": at(-48), "dueAtSnapshot": at(-72)},
     ],
-    "files": [{"alias": "f01", "owner": "u02", "status": "READY", "linkedTo": {"type": "SUBMISSION", "alias": "s03"}}, {"alias": "f02", "owner": "u03", "status": "READY", "linkedTo": {"type": "SUBMISSION", "alias": "s01"}}],
+    "files": [],
     "recurrence": {"phase": "P1", "rules": [{"alias": "rr01", "frequency": "MONTHLY", "scope": "CUSTOM", "assignees": ["u02", "u03"], "dueAfterHours": 120}, {"alias": "rr02", "frequency": "WEEKLY", "scope": "ALL", "assignees": ["u02", "u03", "u04", "u05"], "dueAfterHours": 48}], "instance": {"alias": "ri01", "rule": "rr02", "periodKey": "2026-W44", "tasks": ["t14", "t15", "t16", "t17"]}},
     "expected": {
         "initial_t01_t09": {"totalOfficialCount": 9, "totalActivePublished": 7, "todoCount": 2, "inProgressCount": 2, "inReviewCount": 1, "doneCount": 2, "overdueCount": 1, "completedOnTimeCount": 1, "draftCount": 1, "cancelledCount": 1},

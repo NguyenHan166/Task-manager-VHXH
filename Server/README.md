@@ -1,6 +1,6 @@
-# Office Workspace backend — Phase 04
+# Office Workspace backend — Phase 05
 
-NestJS + Prisma + PostgreSQL backend for the single-room Office Workspace application. Phase 01–04 provide the database, demo data, auth/users, task core APIs, and the OFFICIAL task workflow. The contract is in [`docs/backend-plan/phase-00`](../docs/backend-plan/phase-00/); see the [Phase 03 acceptance matrix](../docs/backend-plan/phase-03/ACCEPTANCE.md) and [Phase 04 workflow record](../docs/backend-plan/phase-04/ACCEPTANCE.md).
+NestJS + Prisma + PostgreSQL backend for the single-room Office Workspace application. Phase 01–05 provide the database, demo data, auth/users, task core APIs, OFFICIAL workflow and private R2 file lifecycle. The contract is in [`docs/backend-plan/phase-00`](../docs/backend-plan/phase-00/); see the [Phase 03 task matrix](../docs/backend-plan/phase-03/ACCEPTANCE.md), [Phase 04 workflow record](../docs/backend-plan/phase-04/ACCEPTANCE.md), and [Phase 05 file runbook](../docs/backend-plan/phase-05/RUNBOOK.md).
 
 ## Local setup (Windows PowerShell)
 
@@ -42,10 +42,13 @@ Open **http://localhost:5556**. Prisma Studio shows `users`, `tasks`, submission
 | `npm run auth:check` | Run the localhost-only Phase 02 HTTP security matrix against a seeded disposable DB |
 | `npm run tasks:check` | Run the localhost-only Phase 03 task matrix against a seeded disposable DB |
 | `npm run workflow:check` | Run the Phase 04 OFFICIAL workflow matrix against a seeded disposable DB named `office_workspace_phase04_verify*` (CI uses an isolated service DB) |
+| `npm run files:cleanup` | Mark expired uploads removed and purge due unlinked objects in a bounded batch |
+| `npm run files:check` | Run the Phase 05 HTTP/storage matrix against a seeded disposable DB using local S3 test storage |
+| `npm run files:check -- --r2` | Run the same matrix against the configured private R2 bucket and verify its CORS response |
 | `npm run db:clean -- --confirm` | **Delete all data in the local DB** and reapply migrations; seed again afterward |
 | `npm run typecheck`, `lint`, `format:check`, `build` | Local quality gates |
 
-The seed uses the fixed clock `2026-10-27T09:00:00.000Z` and the `u01`–`u06`, `t01`–`t13` fixture. It excludes `t14`–`t17` and recurrence/chat tables until Phase 09. It writes two **metadata-only** sample file rows; no binary files exist on R2 yet. R2 upload/download is Phase 05.
+The seed uses the fixed clock `2026-10-27T09:00:00.000Z` and the `u01`–`u06`, `t01`–`t13` fixture. It excludes `t14`–`t17` and recurrence/chat tables until Phase 09. It does not seed fake READY file metadata: a file becomes READY only after R2 confirms the object and the server verifies its bytes. See the [Phase 05 runbook](../docs/backend-plan/phase-05/RUNBOOK.md) before configuring a private bucket.
 
 The DB URL in `.env` is local only. For another PostgreSQL server, change `DATABASE_URL` and configure environment variables in `.env.example`; do not commit `.env`. Local/staging demo seed refuses `APP_ENV=production`. `db:clean` refuses non-local databases and requires `--confirm`.
 
@@ -65,7 +68,8 @@ The DB URL in `.env` is local only. For another PostgreSQL server, change `DATAB
 | `src/database` | Prisma lifecycle and atomic business-code allocation |
 | `src/health` | Liveness/readiness and `/api/health` contract |
 | `src/modules/{auth,users,tasks}` | Auth, users, task core APIs, and transactional OFFICIAL workflow commands |
-| `src/modules/{files,notifications,reminders,dashboard,reports,settings,audit}` | Reserved feature boundaries for later phases |
+| `src/modules/files` | Signed R2 uploads/downloads, metadata, ACL, removal and cleanup |
+| `src/modules/{notifications,reminders,dashboard,reports,settings,audit}` | Reserved feature boundaries for later phases |
 | `prisma/schema.prisma`, `prisma/migrations` | Data model and ordered PostgreSQL migration |
 | `prisma/seed.ts`, `scripts/check-seed.ts`, `scripts/check-workflow.ts` | Fixed-clock fake fixture, DB comparison, and OFFICIAL journey acceptance |
 
