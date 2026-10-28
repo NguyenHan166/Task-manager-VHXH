@@ -21,7 +21,8 @@
     "db:clean": "node scripts/reset-local.mjs",
     "db:studio": "prisma studio --hostname 127.0.0.1 --port 5556",
     "db:check": "tsx scripts/check-seed.ts",
-    "auth:check": "tsx scripts/check-auth.ts"
+    "auth:check": "tsx scripts/check-auth.ts",
+    "tasks:check": "tsx scripts/check-tasks.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.2.8",

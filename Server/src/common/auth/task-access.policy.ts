@@ -6,6 +6,7 @@ type TaskRelations = Pick<
   Task,
   'id' | 'type' | 'status' | 'createdById' | 'primaryAssigneeId'
 > & {
+  archivedAt?: Date | null;
   participants?: Array<{
     userId: string;
     invitationStatus: string;
@@ -16,6 +17,7 @@ type TaskRelations = Pick<
 @Injectable()
 export class TaskAccessPolicy {
   canRead(actor: AuthenticatedUser, task: TaskRelations): boolean {
+    if (task.archivedAt) return false;
     if (task.type === TaskType.PERSONAL) return task.createdById === actor.id;
     const isCreator = task.createdById === actor.id;
     const isAssignee = task.primaryAssigneeId === actor.id;
@@ -86,7 +88,7 @@ export class TaskAccessPolicy {
               },
             ],
           };
-    return { OR: [official, team, personal] };
+    return { archivedAt: null, OR: [official, team, personal] };
   }
 
   canOperateOfficial(

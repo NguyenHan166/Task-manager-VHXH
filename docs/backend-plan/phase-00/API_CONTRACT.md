@@ -70,4 +70,4 @@ REST/DB là nguồn sự thật. Socket handshake dùng access token và chỉ j
 | Server → client | `message:new`, `message:updated` | P1    | Sau commit message, chỉ member room chat                                                  |
 | Client → server | `room:join`, `room:leave`        | P0/P1 | Server kiểm tra lại user/task/chat membership trên mỗi join; lỗi không tạo room           |
 
-Event nghiệp vụ bền là `TaskEvent` (`CREATED`, `PUBLISHED`, `STARTED`, `PROGRESS_UPDATED`, `BLOCKED`, `UNBLOCKED`, `SUBMITTED`, `SUBMISSION_WITHDRAWN`, `APPROVED`, `RETURNED`, `DEADLINE_CHANGED`, `ASSIGNEE_CHANGED`, `CANCELLED`, `REOPENED`; P1 thêm request/invitation/recurrence/type). Notification type theo `data-contract.ts`; email/Zalo P2.
+Event nghiệp vụ bền là `TaskEvent` (`CREATED`, `DETAILS_UPDATED`, `COMMENT_ADDED`, `PUBLISHED`, `STARTED`, `PROGRESS_UPDATED`, `BLOCKED`, `UNBLOCKED`, `SUBMITTED`, `SUBMISSION_WITHDRAWN`, `APPROVED`, `RETURNED`, `DEADLINE_CHANGED`, `ASSIGNEE_CHANGED`, `CANCELLED`, `REOPENED`; P1 thêm request/invitation/recurrence/type). Notification type theo `data-contract.ts`; email/Zalo P2.

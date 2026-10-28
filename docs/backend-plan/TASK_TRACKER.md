@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00 đã có [bằng chứng đối chiếu](./phase-00/ACCEPTANCE.md); Phase 01 đã có [bằng chứng local và CI](./phase-01/ACCEPTANCE.md); Phase 02 đã có [bằng chứng triển khai và ma trận runtime](./phase-02/ACCEPTANCE.md). Phase 03–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–03 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-03`; Phase 04–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -30,11 +30,11 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 03 — [Task core](./PHASE_03_TASK_CORE.md)
 
-- [ ] BE-03-01 — Task policy và query scoped.
-- [ ] BE-03-02 — Tạo task, participant, mã nghiệp vụ.
-- [ ] BE-03-03 — List/search/sort/page/detail.
-- [ ] BE-03-04 — Sửa metadata và bình luận.
-- [ ] BE-03-05 — Nghiệm thu ACL task.
+- [x] BE-03-01 — Task policy và query scoped; [runtime acceptance](./phase-03/ACCEPTANCE.md).
+- [x] BE-03-02 — Tạo task, participant, mã nghiệp vụ; [runtime acceptance](./phase-03/ACCEPTANCE.md).
+- [x] BE-03-03 — List/search/sort/page/detail; [runtime acceptance](./phase-03/ACCEPTANCE.md).
+- [x] BE-03-04 — Sửa metadata và bình luận; [runtime acceptance](./phase-03/ACCEPTANCE.md).
+- [x] BE-03-05 — Nghiệm thu ACL task; [runtime acceptance](./phase-03/ACCEPTANCE.md).
 
 ## Phase 04 — [Workflow OFFICIAL](./PHASE_04_OFFICIAL_WORKFLOW.md)
 
