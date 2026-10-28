@@ -1450,7 +1450,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
           },
           {
@@ -1597,7 +1598,7 @@
             }
           }
         },
-        "description": "P0 OFFICIAL only; TEAM/PERSONAL variants open in P1.",
+        "description": "MANAGER/DEPUTY_MANAGER create an OFFICIAL DRAFT. TEAM/PERSONAL variants open in Phase 09.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1810,7 +1811,7 @@
             }
           }
         },
-        "description": "No status, due date or assignee change through PATCH.",
+        "description": "DRAFT creator-leader or leader on an active published OFFICIAL task. No status, due date or assignee change through PATCH.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3695,6 +3696,7 @@
             }
           }
         },
+        "description": "Requires read access to an active published OFFICIAL task. DONE and CANCELLED remain readable but cannot receive comments.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5230,7 +5232,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
           },
           {
@@ -5508,7 +5511,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
           },
           {
@@ -9394,7 +9398,9 @@
             "format": "uuid"
           },
           "body": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
           },
           "createdAt": {
             "type": "string",
@@ -9561,6 +9567,8 @@
             "type": "string",
             "enum": [
               "CREATED",
+              "DETAILS_UPDATED",
+              "COMMENT_ADDED",
               "PUBLISHED",
               "STARTED",
               "PROGRESS_UPDATED",
@@ -11382,13 +11390,17 @@
             ]
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 10000
           },
           "deliverable": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2000
           },
           "priority": {
             "type": "string",
@@ -11409,14 +11421,18 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "maxItems": 100,
+            "uniqueItems": true
           },
           "watcherIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "maxItems": 100,
+            "uniqueItems": true
           },
           "dueAt": {
             "type": "string",
@@ -11445,19 +11461,23 @@
           "type",
           "title"
         ],
-        "description": "P0 accepts OFFICIAL only. dueAt and dueDate are mutually exclusive; DRAFT may omit assignment/due date. projectId/parentTaskId open in P1."
+        "description": "P0 accepts OFFICIAL only and creates DRAFT. dueAt and dueDate are mutually exclusive; DRAFT may omit assignment/due date. Non-null projectId/parentTaskId open in P1."
       },
       "UpdateTaskInput": {
         "type": "object",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 10000
           },
           "deliverable": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2000
           },
           "priority": {
             "type": "string",
@@ -11475,7 +11495,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "No status, dueAt, assignee or server fields. projectId opens in P1."
+        "description": "No status, dueAt, assignee or server fields. Priority may change only while DRAFT; published task priority uses /adjust in Phase 04. projectId opens in P1."
       },
       "ProgressInput": {
         "type": "object",
@@ -11625,13 +11645,16 @@
         "type": "object",
         "properties": {
           "body": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
           }
         },
         "additionalProperties": false,
         "required": [
           "body"
-        ]
+        ],
+        "description": "Nonblank text on an active published OFFICIAL task."
       },
       "UploadUrlInput": {
         "type": "object",

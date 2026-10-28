@@ -34,7 +34,7 @@ Phase 05 có thể phát triển song song với phần cuối Phase 04 sau khi 
 
 ## 3. Quy ước task và Definition of Done
 
-Mỗi task có mã `BE-<phase>-<số>`. Ô `Phụ thuộc` chỉ đến task phải hoàn thành trước. Mỗi task chỉ được đánh dấu xong trong [bảng theo dõi](./TASK_TRACKER.md) khi đầu ra, điều kiện kiểm tra và tài liệu đi kèm đều có. Phase 00 đã hoàn thành với [bằng chứng nghiệm thu](./phase-00/ACCEPTANCE.md); Phase 01 đã hoàn thành với [bằng chứng local và CI](./phase-01/ACCEPTANCE.md). Các phase 02–09 chưa bắt đầu.
+Mỗi task có mã `BE-<phase>-<số>`. Ô `Phụ thuộc` chỉ đến task phải hoàn thành trước. Mỗi task chỉ được đánh dấu xong trong [bảng theo dõi](./TASK_TRACKER.md) khi đầu ra, điều kiện kiểm tra và tài liệu đi kèm đều có. Phase 00–03 đã hoàn thành với [bằng chứng hợp đồng](./phase-00/ACCEPTANCE.md), [nền tảng](./phase-01/ACCEPTANCE.md), [auth/users](./phase-02/ACCEPTANCE.md) và [task core](./phase-03/ACCEPTANCE.md). Phase 04–09 chưa bắt đầu.
 
 Áp dụng cho mọi API hoặc job:
 

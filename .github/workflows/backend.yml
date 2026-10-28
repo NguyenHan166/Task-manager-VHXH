@@ -11,6 +11,8 @@ on:
       - 'docs/backend-plan/TASK_TRACKER.md'
       - 'docs/backend-plan/phase-01/**'
       - 'docs/backend-plan/phase-02/**'
+      - 'docs/backend-plan/PHASE_03_TASK_CORE.md'
+      - 'docs/backend-plan/phase-03/**'
       - 'docs/backend-plan/phase-00/build_openapi.py'
       - 'docs/backend-plan/phase-00/openapi.v1.json'
       - 'docs/backend-plan/phase-00/API_CONTRACT.md'
@@ -25,6 +27,8 @@ on:
       - 'docs/backend-plan/TASK_TRACKER.md'
       - 'docs/backend-plan/phase-01/**'
       - 'docs/backend-plan/phase-02/**'
+      - 'docs/backend-plan/PHASE_03_TASK_CORE.md'
+      - 'docs/backend-plan/phase-03/**'
       - 'docs/backend-plan/phase-00/build_openapi.py'
       - 'docs/backend-plan/phase-00/openapi.v1.json'
       - 'docs/backend-plan/phase-00/API_CONTRACT.md'
@@ -104,6 +108,7 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:3000/api/health/ready | grep -q '"database":"ok"'; then
+              npm run tasks:check
               npm run auth:check
               exit 0
             fi
