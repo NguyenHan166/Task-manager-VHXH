@@ -22,7 +22,8 @@
     "db:studio": "prisma studio --hostname 127.0.0.1 --port 5556",
     "db:check": "tsx scripts/check-seed.ts",
     "auth:check": "tsx scripts/check-auth.ts",
-    "tasks:check": "tsx scripts/check-tasks.ts"
+    "tasks:check": "tsx scripts/check-tasks.ts",
+    "workflow:check": "tsx scripts/check-workflow.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.2.8",

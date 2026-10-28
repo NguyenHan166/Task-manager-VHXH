@@ -1,6 +1,6 @@
-# Office Workspace backend — Phase 03
+# Office Workspace backend — Phase 04
 
-NestJS + Prisma + PostgreSQL backend for the single-room Office Workspace application. Phase 01–03 provide the database, demo data, auth/users, and task core APIs. The contract is in [`docs/backend-plan/phase-00`](../docs/backend-plan/phase-00/); see the [Phase 03 acceptance matrix](../docs/backend-plan/phase-03/ACCEPTANCE.md).
+NestJS + Prisma + PostgreSQL backend for the single-room Office Workspace application. Phase 01–04 provide the database, demo data, auth/users, task core APIs, and the OFFICIAL task workflow. The contract is in [`docs/backend-plan/phase-00`](../docs/backend-plan/phase-00/); see the [Phase 03 acceptance matrix](../docs/backend-plan/phase-03/ACCEPTANCE.md) and [Phase 04 workflow record](../docs/backend-plan/phase-04/ACCEPTANCE.md).
 
 ## Local setup (Windows PowerShell)
 
@@ -41,6 +41,7 @@ Open **http://localhost:5556**. Prisma Studio shows `users`, `tasks`, submission
 | `npm run db:studio` | Browse local DB at `http://localhost:5556` |
 | `npm run auth:check` | Run the localhost-only Phase 02 HTTP security matrix against a seeded disposable DB |
 | `npm run tasks:check` | Run the localhost-only Phase 03 task matrix against a seeded disposable DB |
+| `npm run workflow:check` | Run the Phase 04 OFFICIAL workflow matrix against a seeded disposable DB named `office_workspace_phase04_verify*` (CI uses an isolated service DB) |
 | `npm run db:clean -- --confirm` | **Delete all data in the local DB** and reapply migrations; seed again afterward |
 | `npm run typecheck`, `lint`, `format:check`, `build` | Local quality gates |
 
@@ -52,7 +53,7 @@ The DB URL in `.env` is local only. For another PostgreSQL server, change `DATAB
 
 `GET /api/tasks` supports `scope`, `type`, `status`, `priority`, `projectId`, `primaryAssigneeId`, `search`, `dueFrom`, `dueTo`, `isOverdue`, `sortBy`, `sortDirection`, `page`, and `pageSize` (1–100). Example: `/api/tasks?scope=OWNED&status=IN_PROGRESS&sortBy=DUE_AT&sortDirection=ASC&page=1&pageSize=10`. ACL is applied before filtering and counting. `GET /api/tasks/:id` returns the task, participants, ready files, latest submission, and history counts; comments and events have separate paginated endpoints.
 
-`POST /api/tasks` creates an OFFICIAL DRAFT for MANAGER/DEPUTY_MANAGER. Only its creator can read it until Phase 04 publish. `PATCH /api/tasks/:id` edits permitted metadata; `POST /api/tasks/:id/comments` accepts 1–4000 characters on active published OFFICIAL tasks. TEAM/PERSONAL creation, project/parent links, and their write flows open in Phase 09. Phase 04 owns publish, status changes, deadline/assignee adjustments, submissions, and approvals.
+`POST /api/tasks` creates an OFFICIAL DRAFT for MANAGER/DEPUTY_MANAGER. Only its creator can read it until publish. The workflow supports publish, start, progress/blocked state, submission/withdrawal, approval/return, direct adjustment, cancel, and reopen. Each state change and notification is written in the same transaction; version checks make a replay or concurrent decision return `409` without duplicate history. Published deadline and assignee changes use `/adjust`, never generic `PATCH`. TEAM/PERSONAL creation, project/parent links, and their write flows open in Phase 09.
 
 ## Code layout
 
@@ -63,10 +64,10 @@ The DB URL in `.env` is local only. For another PostgreSQL server, change `DATAB
 | `src/common/http` | Request ID, JSON envelope, error shape and safe structured request logs |
 | `src/database` | Prisma lifecycle and atomic business-code allocation |
 | `src/health` | Liveness/readiness and `/api/health` contract |
-| `src/modules/{auth,users,tasks}` | Auth, users and task core APIs with role and record ACL |
+| `src/modules/{auth,users,tasks}` | Auth, users, task core APIs, and transactional OFFICIAL workflow commands |
 | `src/modules/{files,notifications,reminders,dashboard,reports,settings,audit}` | Reserved feature boundaries for later phases |
 | `prisma/schema.prisma`, `prisma/migrations` | Data model and ordered PostgreSQL migration |
-| `prisma/seed.ts`, `scripts/check-seed.ts` | Fixed-clock fake fixture and DB comparison |
+| `prisma/seed.ts`, `scripts/check-seed.ts`, `scripts/check-workflow.ts` | Fixed-clock fake fixture, DB comparison, and OFFICIAL journey acceptance |
 
 Task list/detail/comment/event reads use the shared task policy in database queries. Later modules must reuse that policy when exposing related records.
 

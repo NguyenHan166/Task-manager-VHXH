@@ -13,6 +13,8 @@ on:
       - 'docs/backend-plan/phase-02/**'
       - 'docs/backend-plan/PHASE_03_TASK_CORE.md'
       - 'docs/backend-plan/phase-03/**'
+      - 'docs/backend-plan/PHASE_04_OFFICIAL_WORKFLOW.md'
+      - 'docs/backend-plan/phase-04/**'
       - 'docs/backend-plan/phase-00/build_openapi.py'
       - 'docs/backend-plan/phase-00/openapi.v1.json'
       - 'docs/backend-plan/phase-00/API_CONTRACT.md'
@@ -29,6 +31,8 @@ on:
       - 'docs/backend-plan/phase-02/**'
       - 'docs/backend-plan/PHASE_03_TASK_CORE.md'
       - 'docs/backend-plan/phase-03/**'
+      - 'docs/backend-plan/PHASE_04_OFFICIAL_WORKFLOW.md'
+      - 'docs/backend-plan/phase-04/**'
       - 'docs/backend-plan/phase-00/build_openapi.py'
       - 'docs/backend-plan/phase-00/openapi.v1.json'
       - 'docs/backend-plan/phase-00/API_CONTRACT.md'
@@ -103,16 +107,30 @@ jobs:
           npm run db:status
       - name: Check HTTP health and database readiness
         run: |
-          node dist/main.js > server.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:3000/api/health/ready | grep -q '"database":"ok"'; then
-              npm run tasks:check
-              npm run auth:check
-              exit 0
-            fi
-            sleep 1
-          done
-          cat server.log
-          exit 1
+          start_server() {
+            node dist/main.js >> server.log 2>&1 &
+            server_pid=$!
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent http://127.0.0.1:3000/api/health/ready | grep -q '"database":"ok"'; then
+                return 0
+              fi
+              sleep 1
+            done
+            cat server.log
+            return 1
+          }
+          stop_server() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+            server_pid=""
+          }
+          trap stop_server EXIT
+          start_server
+          npm run tasks:check
+          stop_server
+          start_server
+          npm run workflow:check
+          stop_server
+          start_server
+          npm run auth:check
+          stop_server

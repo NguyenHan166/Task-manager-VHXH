@@ -2128,7 +2128,7 @@
             }
           }
         },
-        "description": "DRAFT to TODO; task creator must be a leader.",
+        "description": "DRAFT to TODO; creator must be a leader; title, deliverable, active assignee and due date are required.",
         "parameters": [
           {
             "name": "id",
@@ -2560,7 +2560,7 @@
             }
           }
         },
-        "description": "Reason required; no mutation of historical submissions.",
+        "description": "Reason required; an IN_REVIEW task closes its pending submission as WITHDRAWN and retains prior history.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2944,7 +2944,7 @@
             }
           }
         },
-        "description": "Current assignee in IN_PROGRESS only; each submit creates a new immutable submission.",
+        "description": "Current assignee in IN_PROGRESS only; every submit creates a distinct submission record whose decision status is retained in history.",
         "requestBody": {
           "required": true,
           "content": {
@@ -11517,13 +11517,15 @@
         "required": [
           "progressPercent",
           "isBlocked"
-        ]
+        ],
+        "description": "A nonblank blockedReason is required when isBlocked is true; 100 percent does not complete the task."
       },
       "AdjustTaskInput": {
         "type": "object",
         "properties": {
           "reason": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "dueAt": {
             "type": "string",
@@ -11553,25 +11555,28 @@
         "required": [
           "reason"
         ],
-        "description": "At least one mutable field; dueAt and dueDate are mutually exclusive."
+        "description": "At least one mutable field; dueAt and dueDate are mutually exclusive. A nonblank reason is required."
       },
       "ReasonInput": {
         "type": "object",
         "properties": {
           "reason": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         },
         "additionalProperties": false,
         "required": [
           "reason"
-        ]
+        ],
+        "description": "Reason must not be blank."
       },
       "SubmitTaskInput": {
         "type": "object",
         "properties": {
           "summary": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "details": {
             "type": "string",
@@ -11597,7 +11602,8 @@
         "required": [
           "summary",
           "fileIds"
-        ]
+        ],
+        "description": "Every fileId must be a READY file currently linked to this task."
       },
       "WithdrawInput": {
         "type": "object",
@@ -11632,7 +11638,8 @@
             "format": "uuid"
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         },
         "additionalProperties": false,

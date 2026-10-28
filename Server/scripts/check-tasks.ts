@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PrismaClient, TaskStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 type User = { alias: string; email: string; role: string };
 type FixtureTask = {
@@ -517,21 +517,13 @@ async function main(): Promise<void> {
     );
   }
 
-  // Exercise persistence across a status change until the Phase 04 command exists.
+  // The Phase 04 journey now verifies comments across real lifecycle changes.
   const prisma = new PrismaClient();
   try {
-    await prisma.task.update({
-      where: { id: taskId('t01') },
-      data: {
-        status: TaskStatus.DONE,
-        completedAt: new Date(),
-        progressPercent: 100,
-      },
-    });
     const saved = expect<Page<{ id: string }>>(
       await request('GET', `/tasks/${taskId('t01')}/comments`, token('u03')),
       200,
-      'comment survives status change',
+      'comment remains available',
     );
     assert.ok(saved.items.some((item) => item.id === comment.id));
     await prisma.task.update({
@@ -582,9 +574,9 @@ async function main(): Promise<void> {
     'invalid task id',
   );
   expect(
-    await request('POST', `/tasks/${taskId('t01')}/publish`, token('u01'), {}),
-    404,
-    'Phase 04 gate',
+    await request('POST', `/tasks/${taskId('t01')}/publish`, token('u01')),
+    409,
+    'workflow command is enabled and validates current status',
   );
   expect(
     await request('POST', `/tasks/${taskId('t10')}/complete`, token('u02'), {}),

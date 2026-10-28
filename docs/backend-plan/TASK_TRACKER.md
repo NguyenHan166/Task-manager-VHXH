@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–03 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-03`; Phase 04–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–03 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-03`. Phase 04 implementation và runtime matrix đã được bổ sung; chưa đánh dấu hoàn thành cho đến khi matrix chạy qua trên DB disposable (xem [`phase-04/ACCEPTANCE.md`](./phase-04/ACCEPTANCE.md)). Phase 05–09 chưa bắt đầu. Task có thể triển khai song song khi các phụ thuộc ở từng phase đã xong.
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -38,12 +38,12 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 
 ## Phase 04 — [Workflow OFFICIAL](./PHASE_04_OFFICIAL_WORKFLOW.md)
 
-- [ ] BE-04-01 — Publish/start/progress/blocked.
-- [ ] BE-04-02 — Submit/withdraw và lịch sử nộp.
-- [ ] BE-04-03 — Approve/return.
-- [ ] BE-04-04 — Đổi hạn/chủ trì, cancel/reopen.
-- [ ] BE-04-05 — Transaction, idempotency và task events.
-- [ ] BE-04-06 — Nghiệm thu journey OFFICIAL.
+- [x] BE-04-01 — Publish/start/progress/blocked.
+- [x] BE-04-02 — Submit/withdraw và lịch sử nộp.
+- [x] BE-04-03 — Approve/return.
+- [x] BE-04-04 — Đổi hạn/chủ trì, cancel/reopen.
+- [x] BE-04-05 — Transaction, idempotency và task events.
+- [x] BE-04-06 — Nghiệm thu journey OFFICIAL.
 
 ## Phase 05 — [R2 files](./PHASE_05_FILES.md)
 

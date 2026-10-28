@@ -21,6 +21,8 @@ import { TaskPriority, TaskStatus, TaskType } from '@prisma/client';
 
 const optional = (_input: unknown, value: unknown): boolean =>
   value !== undefined;
+const optionalNonNull = (_input: unknown, value: unknown): boolean =>
+  value !== undefined && value !== null;
 const trim = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value;
 const utcTime = /Z$/;
@@ -209,4 +211,105 @@ export class CommentDto {
   @MinLength(1)
   @MaxLength(4_000)
   body!: string;
+}
+
+export class TaskProgressDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  progressPercent!: number;
+
+  @IsBoolean()
+  isBlocked!: boolean;
+
+  @ValidateIf(optionalNonNull)
+  @Transform(trim)
+  @IsString()
+  blockedReason?: string | null;
+}
+
+export class AdjustTaskDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  reason!: string;
+
+  @ValidateIf(optional)
+  @IsDateString({ strict: true })
+  @Matches(utcTime)
+  dueAt?: string;
+
+  @ValidateIf(optional)
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  dueDate?: string;
+
+  @ValidateIf(optional)
+  @IsUUID()
+  primaryAssigneeId?: string;
+
+  @ValidateIf(optional)
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+}
+
+export class TaskReasonDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1_000)
+  reason!: string;
+}
+
+export class SubmitTaskDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  summary!: string;
+
+  @ValidateIf(optionalNonNull)
+  @IsString()
+  details?: string | null;
+
+  @ValidateIf(optionalNonNull)
+  @IsString()
+  deliverableUrl?: string | null;
+
+  @ValidateIf(optionalNonNull)
+  @IsString()
+  notes?: string | null;
+
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  fileIds!: string[];
+}
+
+export class WithdrawSubmissionDto {
+  @ValidateIf(optional)
+  @Transform(trim)
+  @IsString()
+  reason?: string;
+}
+
+export class DecideApprovalDto {
+  @IsUUID()
+  submissionId!: string;
+
+  @ValidateIf(optional)
+  @Transform(trim)
+  @IsString()
+  reason?: string;
+}
+
+export class ReturnSubmissionDto {
+  @IsUUID()
+  submissionId!: string;
+
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  reason!: string;
 }
