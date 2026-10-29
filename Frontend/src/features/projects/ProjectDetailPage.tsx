@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
 import { canSeeTask, isTaskOverdue } from "../../shared/data-contract";
 import { isTaskDueSoon } from "../tasks/task-selectors";
 import type { Project, Task, TaskParticipant, TaskStatus } from "../../shared/data-contract";
@@ -20,7 +20,6 @@ import {
   Select,
   StatusBadge,
   PriorityBadge,
-  TaskTypeBadge,
   OverdueBadge,
   UserAvatar,
   DataTable,
@@ -79,9 +78,9 @@ export function ProjectDetailPage() {
     setIsForbidden(false);
     try {
       const [proj, allTasks, allParts] = await Promise.all([
-        mockRepository.getProjectById(id),
-        mockRepository.getTasks(),
-        mockRepository.getParticipants(),
+        workspaceRepository.getProjectById(id),
+        workspaceRepository.getTasks(),
+        workspaceRepository.getParticipants(),
       ]);
 
       if (!proj) {
@@ -116,7 +115,7 @@ export function ProjectDetailPage() {
 
   useEffect(() => {
     loadData();
-    const unsub = mockRepository.subscribe(loadData);
+    const unsub = workspaceRepository.subscribe(loadData);
     return unsub;
   }, [id, currentUser]);
 
@@ -167,7 +166,7 @@ export function ProjectDetailPage() {
     if (!project || !nameInput.trim()) return;
     setIsSubmitting(true);
     try {
-      const updated = await mockRepository.updateProject(project.id, {
+      const updated = await workspaceRepository.updateProject(project.id, {
         name: nameInput.trim(),
         description: descInput.trim(),
         startAt: startInput ? new Date(startInput).toISOString() : null,
@@ -248,7 +247,6 @@ export function ProjectDetailPage() {
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <TaskTypeBadge type={t.type} />
               <Link
                 to={`/tasks/${t.id}`}
                 className="font-semibold text-text-primary hover:text-brand-700 hover:underline"
@@ -477,7 +475,6 @@ export function ProjectDetailPage() {
                             <span className="font-mono font-bold text-xs bg-slate-100 text-brand-800 px-2 py-0.5 rounded">
                               {t.code}
                             </span>
-                            <TaskTypeBadge type={t.type} />
                             {overdue && <OverdueBadge />}
                             {!overdue && dueSoon && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 flex items-center gap-0.5">

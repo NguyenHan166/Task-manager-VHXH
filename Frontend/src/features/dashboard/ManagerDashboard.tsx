@@ -391,7 +391,7 @@ export function ManagerDashboard() {
                         <span>Chỉ số công việc chính thức (KPI Đơn vị)</span>
                         <span
                             className="text-text-muted cursor-help"
-                            title="Chỉ tính 7 nhiệm vụ OFFICIAL đã phát hành, bỏ DRAFT (1) và CANCELLED (1). Việc TEAM/PERSONAL bị loại trừ hoàn toàn."
+                            title="Chỉ tính công việc OFFICIAL đã phát hành. Bản nháp chưa phát hành và việc TEAM/PERSONAL không được tính."
                         >
                             <HelpCircle className="w-3.5 h-3.5" />
                         </span>

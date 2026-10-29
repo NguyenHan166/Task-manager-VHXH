@@ -60,14 +60,22 @@ export class ApiExceptionFilter implements ExceptionFilter {
           ? detail.message.join('; ')
           : (detail.message ?? 'Request failed');
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const prismaCode =
+        typeof exception === 'object' && exception !== null && 'code' in exception &&
+        typeof exception.code === 'string'
+          ? exception.code
+          : undefined;
       process.stderr.write(
         `${JSON.stringify({
           level: 'error',
           event: 'http_error',
           requestId: request.requestId,
           status,
+          method: request.method,
+          path: request.path,
           errorType:
             exception instanceof Error ? exception.name : 'UnknownError',
+          ...(prismaCode ? { errorCode: prismaCode } : {}),
         })}\n`,
       );
     }

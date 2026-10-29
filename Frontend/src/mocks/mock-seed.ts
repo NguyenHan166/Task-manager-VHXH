@@ -39,7 +39,6 @@ export function createMockSeed(now = new Date()): MockDb {
     task("t05", code("CV", 5), "OFFICIAL", "Báo cáo công tác tháng", "DONE", "u01", "u02", -72, { progressPercent: 100, completedAt: at(-96), approvedById: "u01", approvedAt: at(-96), projectId: "p01" }),
     task("t06", code("CV", 6), "OFFICIAL", "Kiểm kê trang thiết bị", "DONE", "u01", "u03", -72, { progressPercent: 100, completedAt: at(-48), approvedById: "u01", approvedAt: at(-48) }),
     task("t07", code("CV", 7), "OFFICIAL", "Dự thảo kế hoạch tuần tới", "DRAFT", "u01", "u04", 168, { assignedAt: null }),
-    task("t08", code("CV", 8), "OFFICIAL", "Tổng hợp yêu cầu đã hủy", "CANCELLED", "u01", "u05", -48, { progressPercent: 20 }),
     task("t09", code("CV", 9), "OFFICIAL", "Rà soát nội dung họp giao ban", "TODO", "u01", "u02", 8, { priority: "URGENT" }),
     task("t10", code("NH", 1), "TEAM", "Cùng chuẩn bị nội dung truyền thông", "IN_PROGRESS", "u02", "u02", 72, { progressPercent: 40, projectId: "p02" }),
     task("t11", code("NH", 2), "TEAM", "Góp ý mẫu biểu nội bộ", "TODO", "u03", "u03", 144),
@@ -103,7 +102,6 @@ export function createMockSeed(now = new Date()): MockDb {
       { id: "e05", taskId: "t05", actorId: "u01", kind: "RETURNED", note: "Cần bổ sung phụ lục số liệu.", before: { status: "IN_REVIEW" }, after: { status: "IN_PROGRESS" }, createdAt: at(-110) },
       { id: "e06", taskId: "t05", actorId: "u01", kind: "APPROVED", note: "Đã duyệt báo cáo sau khi bổ sung.", before: { status: "IN_REVIEW" }, after: { status: "DONE" }, createdAt: at(-96) },
       { id: "e07", taskId: "t06", actorId: "u01", kind: "APPROVED", note: "Đã duyệt biên bản kiểm kê.", before: { status: "IN_REVIEW" }, after: { status: "DONE" }, createdAt: at(-48) },
-      { id: "e08", taskId: "t08", actorId: "u01", kind: "CANCELLED", note: "Hủy vì yêu cầu không còn hiệu lực.", before: { status: "IN_PROGRESS" }, after: { status: "CANCELLED" }, createdAt: at(-50) },
     ],
     notifications: [
       { id: "n01", recipientId: "u01", type: "SUBMISSION_RECEIVED", title: "Có kết quả chờ duyệt", body: "Lê Minh Châu đã nộp tài liệu tập huấn.", entityType: "TASK", entityId: "t02", createdAt: at(-4), readAt: null },

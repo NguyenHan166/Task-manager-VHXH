@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
+import { joinChatRoom } from "../../shared/realtime";
 import type {
   ChatRoom,
   ChatRoomMember,
@@ -27,6 +28,7 @@ import {
   Search,
   MessagesSquare,
   User as UserIcon,
+  Paperclip,
 } from "lucide-react";
 
 export function ChatPage() {
@@ -42,6 +44,7 @@ export function ChatPage() {
 
   // Message input
   const [inputText, setInputText] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,12 +62,12 @@ export function ChatPage() {
     if (!currentUser) return;
     setIsLoading(true);
     try {
-      const myRooms = await mockRepository.getChatRooms(currentUser.id);
+      const myRooms = await workspaceRepository.getChatRooms(currentUser.id);
       setRooms(myRooms);
 
       // Load all members and messages for user's rooms
-      const membersPromises = myRooms.map((r) => mockRepository.getChatMembers(r.id));
-      const messagesPromises = myRooms.map((r) => mockRepository.getChatMessages(r.id));
+      const membersPromises = myRooms.map((r) => workspaceRepository.getChatMembers(r.id));
+      const messagesPromises = myRooms.map((r) => workspaceRepository.getChatMessages(r.id));
 
       const [membersNested, messagesNested] = await Promise.all([
         Promise.all(membersPromises),
@@ -95,15 +98,20 @@ export function ChatPage() {
 
   useEffect(() => {
     loadChatData();
-    const unsub = mockRepository.subscribe(loadChatData);
+    const unsub = workspaceRepository.subscribe(loadChatData);
     return unsub;
   }, [currentUser]);
 
   // When active room changes, mark as read
   useEffect(() => {
     if (!activeRoomId || !currentUser) return;
-    mockRepository.markChatRoomAsRead(activeRoomId, currentUser.id).catch(() => {});
+    workspaceRepository.markChatRoomAsRead(activeRoomId, currentUser.id).catch(() => {});
   }, [activeRoomId, currentUser]);
+
+  useEffect(() => {
+    if (!activeRoomId) return;
+    return joinChatRoom(activeRoomId);
+  }, [activeRoomId]);
 
   // Auto scroll to bottom of messages
   useEffect(() => {
@@ -168,14 +176,18 @@ export function ChatPage() {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!currentUser || !activeRoomId || !inputText.trim() || isSending) return;
+    if (!currentUser || !activeRoomId || (!inputText.trim() && !attachment) || isSending) return;
 
-    const body = inputText.trim();
+    const body = inputText.trim() || (attachment ? `Đã gửi tệp: ${attachment.name}` : '');
+    const file = attachment;
     setInputText("");
+    setAttachment(null);
     setIsSending(true);
 
     try {
-      await mockRepository.sendChatMessage(activeRoomId, body, currentUser.id);
+      const message = await workspaceRepository.sendChatMessage(activeRoomId, body, currentUser.id);
+      if (file) await workspaceRepository.uploadFile(file, 'MESSAGE', message.id);
+      await loadChatData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Không thể gửi tin nhắn";
       showToast(msg, "error");
@@ -200,7 +212,7 @@ export function ChatPage() {
           showToast("Vui lòng chọn người cần nhắn tin", "error");
           return;
         }
-        const room = await mockRepository.createChatRoom("DIRECT", null, [newDirectUserId], currentUser.id);
+        const room = await workspaceRepository.createChatRoom("DIRECT", null, [newDirectUserId], currentUser.id);
         setIsNewRoomOpen(false);
         setActiveRoomId(room.id);
         setSearchParams({ roomId: room.id });
@@ -214,7 +226,7 @@ export function ChatPage() {
           showToast("Vui lòng chọn ít nhất một thành viên cho nhóm", "error");
           return;
         }
-        const room = await mockRepository.createChatRoom(
+        const room = await workspaceRepository.createChatRoom(
           "GROUP",
           newGroupTitle.trim(),
           newGroupMemberIds,
@@ -438,6 +450,23 @@ export function ChatPage() {
                             >
                               {msg.body}
                             </div>
+                            {((msg as ChatMessage & { fileLinks?: Array<{ file: { id: string; originalName: string } }> }).fileLinks ?? []).map(({ file }) => (
+                              <button
+                                key={file.id}
+                                type="button"
+                                className="block text-[11px] font-medium text-brand-700 hover:underline"
+                                onClick={async () => {
+                                  try {
+                                    const url = await workspaceRepository.getDownloadUrl(file.id);
+                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                  } catch (error) {
+                                    showToast(error instanceof Error ? error.message : 'Không thể tải tệp', 'error');
+                                  }
+                                }}
+                              >
+                                {file.originalName}
+                              </button>
+                            ))}
                           </div>
                         </div>
                       );
@@ -449,6 +478,10 @@ export function ChatPage() {
                 {/* Message Input Box */}
                 <div className="p-3 border-t border-border bg-surface">
                   <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+                    <input type="file" className="hidden" id="chat-attachment" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
+                    <Button variant="outline" size="sm" type="button" className="h-[38px] px-3 shrink-0" onClick={() => document.getElementById('chat-attachment')?.click()} title="Đính kèm tệp">
+                      <Paperclip className="w-3.5 h-3.5" />
+                    </Button>
                     <textarea
                       rows={1}
                       placeholder={`Gửi tin nhắn trong ${getRoomMeta(activeRoom).title}... (Enter để gửi)`}
@@ -462,12 +495,13 @@ export function ChatPage() {
                       variant="primary"
                       size="sm"
                       type="submit"
-                      disabled={!inputText.trim() || isSending}
+                      disabled={(!inputText.trim() && !attachment) || isSending}
                       className="h-[38px] px-3 gap-1 shrink-0 bg-brand-700 hover:bg-brand-800 text-white"
                     >
                       <Send className="w-3.5 h-3.5" /> Gửi
                     </Button>
                   </form>
+                  {attachment && <div className="mt-1 text-[11px] text-text-secondary">Tệp đính kèm: {attachment.name}</div>}
                 </div>
               </>
             ) : (

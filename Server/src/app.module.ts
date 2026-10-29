@@ -24,6 +24,7 @@ import { OperationsModule } from './modules/operations/operations.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
 import { RequestMetricsInterceptor } from './modules/observability/request-metrics.interceptor';
 import { ClockModule } from './common/time/clock.module';
+import { CollaborationModule } from './modules/collaboration/collaboration.module';
 
 @Module({
   imports: [
@@ -32,7 +33,24 @@ import { ClockModule } from './common/time/clock.module';
     ClockModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 60 },
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 60,
+        getTracker: (request) => {
+          const req = request as unknown as Request;
+          return req.authUser?.id ?? req.ip ?? 'unknown';
+        },
+      },
+      {
+        name: 'read',
+        ttl: 60_000,
+        limit: 300,
+        getTracker: (request) => {
+          const req = request as unknown as Request;
+          return req.authUser?.id ?? req.ip ?? 'unknown';
+        },
+      },
       {
         name: 'login',
         ttl: 60_000,
@@ -68,6 +86,7 @@ import { ClockModule } from './common/time/clock.module';
     SettingsModule,
     AuditModule,
     OperationsModule,
+    CollaborationModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor },

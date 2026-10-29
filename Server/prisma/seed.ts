@@ -61,6 +61,21 @@ type FixtureApproval = {
   decision: ApprovalDecision;
   at: string;
 };
+type FixtureRecurrence = {
+  rules: {
+    alias: string;
+    frequency: 'WEEKLY' | 'MONTHLY';
+    scope: 'ALL' | 'CUSTOM';
+    assignees: string[];
+    dueAfterHours: number;
+  }[];
+  instance: {
+    alias: string;
+    rule: string;
+    periodKey: string;
+    tasks: string[];
+  };
+};
 type Fixture = {
   clock: string;
   users: FixtureUser[];
@@ -69,6 +84,7 @@ type Fixture = {
   participants: FixtureParticipant[];
   submissions: FixtureSubmission[];
   approvals: FixtureApproval[];
+  recurrence: FixtureRecurrence;
 };
 
 const fixture = JSON.parse(
@@ -99,6 +115,20 @@ const titles: Record<string, string> = {
   t11: 'Góp ý mẫu biểu nội bộ',
   t12: 'Chuẩn bị ghi chú họp cá nhân',
   t13: 'Sắp xếp tài liệu tham khảo',
+  t14: 'Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44',
+  t15: 'Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44',
+  t16: 'Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44',
+  t17: 'Báo cáo tiến độ công việc hàng tuần - Kỳ 2026-W44',
+};
+const recurrenceTitles: Record<string, string> = {
+  rr01: 'Báo cáo công tác hằng tháng',
+  rr02: 'Báo cáo tiến độ công việc hàng tuần',
+};
+const recurrenceDescriptions: Record<string, string> = {
+  rr01:
+    'Tổng hợp kết quả chuyên môn trong tháng và nộp báo cáo kết quả để Lãnh đạo duyệt.',
+  rr02:
+    'Toàn thể chuyên viên trong phòng nộp tóm tắt các đầu việc đã thực hiện trong tuần, khó khăn vướng mắc và kế hoạch tuần tới.',
 };
 const projectNames: Record<string, string> = {
   p01: 'Công tác tổng hợp',
@@ -142,6 +172,7 @@ async function main(): Promise<void> {
               department,
               role: user.role,
               status: user.status,
+              passwordHash,
             },
           });
           userIds[user.alias] = saved.id;
@@ -174,7 +205,7 @@ async function main(): Promise<void> {
 
         const taskIds: Record<string, string> = {};
         for (const task of fixture.tasks.filter(
-          (item) => Number(item.alias.slice(1)) <= 13,
+          (item) => Number(item.alias.slice(1)) <= 17,
         )) {
           const approval = fixture.approvals.find(
             (item) => item.task === task.alias && item.decision === 'APPROVED',
@@ -279,7 +310,194 @@ async function main(): Promise<void> {
           });
         }
 
-        const nextByPrefix: Record<string, number> = { CV: 10, NH: 3, CN: 3 };
+        const pendingDeadline = await tx.taskDeadlineRequest.findFirst({
+          where: { taskId: taskIds.t01, status: 'PENDING' },
+          select: { id: true },
+        });
+        if (!pendingDeadline) {
+          await tx.taskDeadlineRequest.create({
+            data: {
+              taskId: taskIds.t01,
+              requestedById: userIds.u02,
+              proposedDueAt: new Date(clock.getTime() + 72 * 3_600_000),
+              reason: 'Cần thêm thời gian đối chiếu số liệu.',
+              createdAt: new Date(clock.getTime() - 3 * 3_600_000),
+            },
+          });
+        }
+
+        const recurrenceRuleIds: Record<string, string> = {};
+        for (const rule of fixture.recurrence.rules) {
+          const ownerId = userIds.u01;
+          const title = recurrenceTitles[rule.alias];
+          const nextRunHours = rule.alias === fixture.recurrence.instance.rule ? 168 : 240;
+          const createdHours = rule.alias === 'rr01' ? 240 : 120;
+          const data = {
+            title,
+            description: recurrenceDescriptions[rule.alias],
+            ownerId,
+            scope: rule.scope,
+            priority: rule.alias === 'rr02' ? TaskPriority.HIGH : TaskPriority.NORMAL,
+            frequency: rule.frequency,
+            dueAfterHours: rule.dueAfterHours,
+            nextRunAt: new Date(clock.getTime() + nextRunHours * 3_600_000),
+            active: true,
+          };
+          const existing = await tx.recurrenceRule.findFirst({
+            where: { ownerId, title },
+            select: { id: true },
+          });
+          const saved = existing
+            ? await tx.recurrenceRule.update({ where: { id: existing.id }, data })
+            : await tx.recurrenceRule.create({
+                data: {
+                  ...data,
+                  createdAt: new Date(clock.getTime() - createdHours * 3_600_000),
+                },
+              });
+          recurrenceRuleIds[rule.alias] = saved.id;
+          await tx.recurrenceRuleAssignee.deleteMany({
+            where: { ruleId: saved.id },
+          });
+          if (rule.scope === 'CUSTOM' && rule.assignees.length) {
+            await tx.recurrenceRuleAssignee.createMany({
+              data: rule.assignees.map((alias) => ({
+                ruleId: saved.id,
+                userId: userIds[alias],
+              })),
+              skipDuplicates: true,
+            });
+          }
+        }
+
+        const instanceRuleId = recurrenceRuleIds[fixture.recurrence.instance.rule];
+        const instance = await tx.recurrenceInstance.upsert({
+          where: {
+            ruleId_periodKey: {
+              ruleId: instanceRuleId,
+              periodKey: fixture.recurrence.instance.periodKey,
+            },
+          },
+          create: {
+            ruleId: instanceRuleId,
+            periodKey: fixture.recurrence.instance.periodKey,
+            createdAt: new Date(clock.getTime() - 48 * 3_600_000),
+          },
+          update: {},
+        });
+        for (const alias of fixture.recurrence.instance.tasks) {
+          const task = fixture.tasks.find((item) => item.alias === alias);
+          if (!task?.primaryAssignee) {
+            throw new Error(`Recurrence fixture task ${alias} has no assignee`);
+          }
+          const taskId = taskIds[alias];
+          const userId = userIds[task.primaryAssignee];
+          const submissionId = alias === 't14' ? submissionIds.s05 : undefined;
+          await tx.recurrenceInstanceTask.upsert({
+            where: { instanceId_userId: { instanceId: instance.id, userId } },
+            create: {
+              instanceId: instance.id,
+              userId,
+              taskId,
+              ...(submissionId ? { taskSubmissionId: submissionId } : {}),
+            },
+            update: {
+              taskId,
+              ...(submissionId ? { taskSubmissionId: submissionId } : {}),
+            },
+          });
+          const generatedEvent = await tx.taskEvent.findFirst({
+            where: { taskId, kind: 'RECURRENCE_GENERATED' },
+            select: { id: true },
+          });
+          if (!generatedEvent) {
+            await tx.taskEvent.create({
+              data: {
+                taskId,
+                actorId: userIds.u01,
+                kind: 'RECURRENCE_GENERATED',
+                note: `Sinh từ mẫu định kỳ ${recurrenceTitles[fixture.recurrence.instance.rule]} (${fixture.recurrence.instance.periodKey})`,
+                after: {
+                  ruleId: instanceRuleId,
+                  periodKey: fixture.recurrence.instance.periodKey,
+                },
+                createdAt: new Date(clock.getTime() - 48 * 3_600_000),
+              },
+            });
+          }
+        }
+
+        const directMemberIds = [userIds.u02, userIds.u03].sort();
+        const directRoom = await tx.chatRoom.upsert({
+          where: { directKey: directMemberIds.join(':') },
+          create: {
+            kind: 'DIRECT',
+            directKey: directMemberIds.join(':'),
+            createdAt: new Date(clock.getTime() - 72 * 3_600_000),
+          },
+          update: {},
+        });
+        const existingGroup = await tx.chatRoom.findFirst({
+          where: { kind: 'GROUP', title: 'Nhóm tập huấn nội bộ' },
+          select: { id: true },
+        });
+        const groupRoom = existingGroup ??
+          (await tx.chatRoom.create({
+              data: {
+                kind: 'GROUP',
+                title: 'Nhóm tập huấn nội bộ',
+                createdAt: new Date(clock.getTime() - 48 * 3_600_000),
+              },
+            }));
+        const chatMembers = [
+          { roomId: directRoom.id, user: 'u02', readHours: -3, joinHours: -72 },
+          { roomId: directRoom.id, user: 'u03', readHours: -2, joinHours: -72 },
+          { roomId: groupRoom.id, user: 'u01', readHours: -5, joinHours: -48 },
+          { roomId: groupRoom.id, user: 'u02', readHours: -5, joinHours: -48 },
+          { roomId: groupRoom.id, user: 'u03', readHours: -5, joinHours: -48 },
+          { roomId: groupRoom.id, user: 'u04', readHours: -5, joinHours: -48 },
+          { roomId: groupRoom.id, user: 'u06', readHours: -5, joinHours: -48 },
+        ];
+        for (const member of chatMembers) {
+          await tx.chatRoomMember.upsert({
+            where: {
+              roomId_userId: {
+                roomId: member.roomId,
+                userId: userIds[member.user],
+              },
+            },
+            create: {
+              roomId: member.roomId,
+              userId: userIds[member.user],
+              lastReadAt: new Date(clock.getTime() + member.readHours * 3_600_000),
+              joinedAt: new Date(clock.getTime() + member.joinHours * 3_600_000),
+            },
+            update: {
+              lastReadAt: new Date(clock.getTime() + member.readHours * 3_600_000),
+            },
+          });
+        }
+        const chatMessages = [
+          { roomId: directRoom.id, sender: 'u02', body: 'Châu gửi giúp mình phần tài liệu tập huấn nhé.', hours: -8 },
+          { roomId: directRoom.id, sender: 'u03', body: 'Mình đã cập nhật và gửi trong nhiệm vụ.', hours: -3 },
+          { roomId: groupRoom.id, sender: 'u01', body: 'Nhóm cập nhật tiến độ chuẩn bị trước cuối ngày.', hours: -12 },
+          { roomId: groupRoom.id, sender: 'u04', body: 'Phần hậu cần đã sẵn sàng.', hours: -4 },
+        ];
+        for (const message of chatMessages) {
+          const createdAt = new Date(clock.getTime() + message.hours * 3_600_000);
+          const senderId = userIds[message.sender];
+          const existing = await tx.chatMessage.findFirst({
+            where: { roomId: message.roomId, senderId, body: message.body, createdAt },
+            select: { id: true },
+          });
+          if (!existing) {
+            await tx.chatMessage.create({
+              data: { roomId: message.roomId, senderId, body: message.body, createdAt },
+            });
+          }
+        }
+
+        const nextByPrefix: Record<string, number> = { CV: 14, NH: 3, CN: 3 };
         for (const [prefix, nextValue] of Object.entries(nextByPrefix)) {
           await tx.businessCodeCounter.upsert({
             where: { prefix_year: { prefix, year: 2026 } },
@@ -294,7 +512,7 @@ async function main(): Promise<void> {
       },
       { timeout: 60_000 },
     );
-    console.log('P0 demo fixture seeded at 2026-10-27T09:00:00.000Z.');
+    console.log('P0/P1 demo fixture seeded at 2026-10-27T09:00:00.000Z.');
   } finally {
     await prisma.$disconnect();
   }

@@ -80,6 +80,33 @@ export class R2StorageService {
     }
   }
 
+  async createPreviewUrl(input: {
+    objectKey: string;
+    originalName: string;
+    mimeType: string;
+  }): Promise<string> {
+    const { client, bucket } = this.requireStorage();
+    const previewMimeType = /^(application\/pdf|image\/(gif|jpeg|png|webp))$/i.test(
+      input.mimeType,
+    )
+      ? input.mimeType
+      : 'application/octet-stream';
+    try {
+      return await getSignedUrl(
+        client,
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: input.objectKey,
+          ResponseContentType: previewMimeType,
+          ResponseContentDisposition: this.inlineDisposition(input.originalName),
+        }),
+        { expiresIn: this.signedUrlTtlSeconds() },
+      );
+    } catch {
+      throw this.unavailable();
+    }
+  }
+
   async headObject(objectKey: string): Promise<{ sizeBytes: number } | null> {
     const { client, bucket } = this.requireStorage();
     try {
@@ -198,6 +225,15 @@ export class R2StorageService {
       (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
     );
     return `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
+  }
+
+  private inlineDisposition(originalName: string): string {
+    const asciiName = originalName.replace(/[^\x20-\x7e]|["\\]/g, '_');
+    const encodedName = encodeURIComponent(originalName).replace(
+      /['()*]/g,
+      (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    );
+    return `inline; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
   }
 
   private isMissingObject(error: unknown): boolean {

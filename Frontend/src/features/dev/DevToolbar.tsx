@@ -219,7 +219,7 @@ export function DevToolbar() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="p-2 text-slate-700">Giao việc chính thức (OFFICIAL) & Lưu nháp</td>
+                      <td className="p-2 text-slate-700">Giao việc & Lưu nháp</td>
                       <td className="p-2 text-center border-l border-slate-100 font-semibold text-emerald-700">
                         <Check className="w-3.5 h-3.5 inline text-emerald-600 mr-1" /> Có
                       </td>

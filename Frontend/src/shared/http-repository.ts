@@ -2,6 +2,12 @@ import type {
   AppSettings,
   ApprovalDecision,
   AppError,
+  Project,
+  RecurrenceRule,
+  RecurrenceInstance,
+  ChatRoom,
+  ChatRoomMember,
+  ChatMessage,
   CreateTaskInput,
   FileLink,
   FileObject,
@@ -13,6 +19,8 @@ import type {
   TaskApproval,
   TaskComment,
   TaskDeadlineRequest,
+  TaskAssigneeRequest,
+  TaskInvitationPreview,
   TaskEvent,
   TaskParticipant,
   TaskQuery,
@@ -107,8 +115,8 @@ function asFile(value: JsonRecord): FileObject {
   };
 }
 
-function fileEntityType(entityType: FileLink["entityType"]): "TASK" | "COMMENT" {
-  if (entityType === "TASK" || entityType === "COMMENT") return entityType;
+function fileEntityType(entityType: FileLink["entityType"]): "TASK" | "COMMENT" | "MESSAGE" {
+  if (entityType === "TASK" || entityType === "COMMENT" || entityType === 'MESSAGE') return entityType;
   return unsupported("Đính kèm vào submission/comment/message");
 }
 
@@ -117,9 +125,19 @@ export class HttpRepository {
   private submissionTaskIds = new Map<Id, Id>();
   private submissionFileIds = new Map<Id, Id[]>();
   private latestTaskDetails = new Map<Id, JsonRecord>();
+  private taskDetailsInFlight = new Map<Id, Promise<JsonRecord>>();
   private identity: AuthenticatedUser | null = null;
+  private dataGeneration = 0;
+  private participantsCache: { userId: Id; expiresAt: number; items: TaskParticipant[] } | null = null;
+  private participantsInFlight: { userId: Id; promise: Promise<TaskParticipant[]> } | null = null;
 
   setIdentity(user: AuthenticatedUser | null): void {
+    if (this.identity?.id !== user?.id) {
+      this.participantsCache = null;
+      this.participantsInFlight = null;
+      this.latestTaskDetails.clear();
+      this.taskDetailsInFlight.clear();
+    }
     this.identity = user;
   }
 
@@ -129,6 +147,9 @@ export class HttpRepository {
   }
 
   notifyDataChanged(): void {
+    this.dataGeneration += 1;
+    this.participantsCache = null;
+    this.latestTaskDetails.clear();
     this.listeners.forEach((listener) => listener());
   }
 
@@ -183,11 +204,10 @@ export class HttpRepository {
   }
 
   async getParticipantsForTasks(taskIds: Id[]): Promise<TaskParticipant[]> {
-    const results = await this.withConcurrency(taskIds, 8, async (taskId) => {
-      const detail = await this.getTaskDetail(taskId);
-      return Array.isArray(detail.participants) ? detail.participants as TaskParticipant[] : [];
-    });
-    return results.flat();
+    if (taskIds.length === 0) return [];
+    const taskIdSet = new Set(taskIds);
+    const participants = await this.getParticipants();
+    return participants.filter((participant) => taskIdSet.has(participant.taskId));
   }
 
   async getTasks(): Promise<Task[]> {
@@ -195,9 +215,19 @@ export class HttpRepository {
   }
 
   async getTaskDetail(id: Id): Promise<JsonRecord> {
-    const detail = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(id)}`);
-    this.latestTaskDetails.set(id, detail);
-    return detail;
+    const inFlight = this.taskDetailsInFlight.get(id);
+    if (inFlight) return inFlight;
+    const request = apiClient
+      .request<JsonRecord>(`/tasks/${encodeURIComponent(id)}`)
+      .then((detail) => {
+        this.latestTaskDetails.set(id, detail);
+        return detail;
+      })
+      .finally(() => {
+        this.taskDetailsInFlight.delete(id);
+      });
+    this.taskDetailsInFlight.set(id, request);
+    return request;
   }
 
   async getTaskById(id: Id): Promise<Task | null> {
@@ -220,20 +250,56 @@ export class HttpRepository {
       const detail = await this.getTaskDetail(taskId);
       return Array.isArray(detail.participants) ? detail.participants as TaskParticipant[] : [];
     }
-    const tasks = await this.getAllTasks();
-    const results = await this.withConcurrency(tasks, 8, async (task) => {
-      const detail = await this.getTaskDetail(task.id);
-      return (Array.isArray(detail.participants) ? detail.participants : []) as TaskParticipant[];
+    const userId = this.identity?.id;
+    if (!userId) return [];
+    if (this.participantsCache?.userId === userId && this.participantsCache.expiresAt > Date.now()) {
+      return this.participantsCache.items;
+    }
+    if (this.participantsInFlight?.userId === userId) return this.participantsInFlight.promise;
+
+    const generation = this.dataGeneration;
+    let request: Promise<TaskParticipant[]>;
+    request = apiClient
+      .request<TaskParticipant[]>('/tasks/participants')
+      .then((items) => {
+        const participants = Array.isArray(items) ? items : [];
+        if (this.identity?.id === userId && this.dataGeneration === generation) {
+          this.participantsCache = {
+            userId,
+            expiresAt: Date.now() + 15_000,
+            items: participants,
+          };
+        }
+        return participants;
+      })
+      .finally(() => {
+        if (this.participantsInFlight?.promise === request) this.participantsInFlight = null;
+      });
+    this.participantsInFlight = { userId, promise: request };
+    return request;
+  }
+
+  async getPendingInvitations(): Promise<TaskInvitationPreview[]> {
+    return apiClient.request<TaskInvitationPreview[]>('/tasks/invitations');
+  }
+
+  async getProjects(): Promise<Project[]> {
+    return apiClient.request<Project[]>('/projects');
+  }
+
+  async getProjectById(id: Id): Promise<Project | null> {
+    return apiClient.request<Project>(`/projects/${encodeURIComponent(id)}`).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
     });
-    return results.flat();
   }
 
-  async getProjects(): Promise<[]> {
-    return [];
+  async createProject(input: Omit<Project, 'id' | 'createdAt'>): Promise<Project> {
+    return this.changed(await apiClient.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }));
   }
 
-  async getProjectById(_id: Id): Promise<null> {
-    return null;
+  async updateProject(id: Id, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Promise<Project> {
+    return this.changed(await apiClient.request<Project>(`/projects/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(updates) }));
   }
 
   async getEvents(taskId?: Id): Promise<TaskEvent[]> {
@@ -253,7 +319,11 @@ export class HttpRepository {
   }
 
   async getSubmissions(taskId?: Id): Promise<TaskSubmission[]> {
-    const tasks = taskId ? [{ id: taskId }] : await this.getAllTasks();
+    if (taskId) {
+      const task = await this.getTaskById(taskId);
+      if (!task || task.type !== 'OFFICIAL') return [];
+    }
+    const tasks = taskId ? [{ id: taskId }] : (await this.getAllTasks()).filter((task) => task.type === 'OFFICIAL');
     const batches = await this.withConcurrency(tasks, 8, async (task) => {
       const items = await this.allPages<TaskSubmission>(`/tasks/${encodeURIComponent(task.id)}/submissions`, {}, (submission) => submission as unknown as TaskSubmission);
       for (const item of items) {
@@ -276,7 +346,11 @@ export class HttpRepository {
   }
 
   async getApprovals(taskId?: Id): Promise<TaskApproval[]> {
-    const tasks = taskId ? [{ id: taskId }] : await this.getAllTasks();
+    if (taskId) {
+      const task = await this.getTaskById(taskId);
+      if (!task || task.type !== 'OFFICIAL') return [];
+    }
+    const tasks = taskId ? [{ id: taskId }] : (await this.getAllTasks()).filter((task) => task.type === 'OFFICIAL');
     const batches = await this.withConcurrency(tasks, 8, async (task) =>
       this.allPages<TaskApproval>(`/tasks/${encodeURIComponent(task.id)}/approvals`, {}, (approval) => approval as unknown as TaskApproval),
     );
@@ -307,12 +381,22 @@ export class HttpRepository {
     return this.changed(asTask((result.task ?? result) as JsonRecord));
   }
 
-  async getDeadlineRequests(_taskId?: Id): Promise<TaskDeadlineRequest[]> {
-    return [];
+  async getDeadlineRequests(taskId?: Id): Promise<TaskDeadlineRequest[]> {
+    if (taskId) return apiClient.request<TaskDeadlineRequest[]>(`/tasks/${encodeURIComponent(taskId)}/deadline-requests`);
+    const tasks = await this.getAllTasks();
+    const results = await this.withConcurrency(tasks.filter((task) => task.type === 'OFFICIAL'), 8, (task) =>
+      apiClient.request<TaskDeadlineRequest[]>(`/tasks/${encodeURIComponent(task.id)}/deadline-requests`),
+    );
+    return results.flat();
   }
 
-  async getAssigneeRequests(_taskId?: Id): Promise<[]> {
-    return [];
+  async getAssigneeRequests(taskId?: Id): Promise<TaskAssigneeRequest[]> {
+    if (taskId) return apiClient.request(`/tasks/${encodeURIComponent(taskId)}/assignee-requests`);
+    const tasks = await this.getAllTasks();
+    const results = await this.withConcurrency(tasks.filter((task) => task.type === 'OFFICIAL'), 8, (task) =>
+      apiClient.request<TaskAssigneeRequest[]>(`/tasks/${encodeURIComponent(task.id)}/assignee-requests`),
+    );
+    return results.flat();
   }
 
   async getDashboardStats(scope: "DEPT" | "STAFF"): Promise<JsonRecord> {
@@ -345,7 +429,6 @@ export class HttpRepository {
   }
 
   async createTask(input: CreateTaskInput & { isDraft?: boolean }, _actorId: Id): Promise<Task> {
-    if (input.type !== "OFFICIAL") return unsupported("Tạo TEAM/PERSONAL");
     const result = await apiClient.request<JsonRecord>("/tasks", {
       method: "POST",
       body: JSON.stringify({
@@ -354,19 +437,38 @@ export class HttpRepository {
         description: input.description,
         deliverable: input.deliverable,
         priority: input.priority,
-        primaryAssigneeId: input.primaryAssigneeId,
+        ...(input.type === 'PERSONAL' ? {} : { primaryAssigneeId: input.primaryAssigneeId }),
         collaboratorIds: input.collaboratorIds,
         watcherIds: input.watcherIds,
         ...(input.dueAt ? { dueAt: input.dueAt } : {}),
       }),
     });
     const draft = asTask(result);
+    if (input.type !== 'OFFICIAL') return this.changed(draft);
     if (input.isDraft) return this.changed(draft);
 
     const published = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(draft.id)}/publish`, {
       method: "POST",
     });
     return this.changed(asTask(published));
+  }
+
+  async createAssignment(
+    input: {
+      title: string;
+      description?: string;
+      deliverable?: string;
+      priority: Task['priority'];
+      assigneeIds: Id[];
+      dueAt: string;
+      projectId?: Id | null;
+    },
+  ): Promise<Task> {
+    const result = await apiClient.request<JsonRecord>('/tasks/assign', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    return this.changed(asTask(result));
   }
 
   async updateTask(id: Id, input: UpdateTaskInput, _actorId: Id): Promise<Task> {
@@ -377,8 +479,39 @@ export class HttpRepository {
   }
 
   async publishTask(taskId: Id, _actorId: Id): Promise<Task> {
-    const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/publish`, { method: "POST" });
-    return this.changed(asTask(result));
+    const path = `/tasks/${encodeURIComponent(taskId)}/publish`;
+    try {
+      const result = await apiClient.request<JsonRecord>(path, { method: "POST" });
+      return this.changed(asTask(result));
+    } catch (firstError) {
+      if (!this.mayHaveCommitted(firstError)) throw firstError;
+
+      const persisted = await this.readTaskAfterPublishFailure(taskId);
+      if (persisted?.status && persisted.status !== "DRAFT") return this.changed(persisted);
+
+      try {
+        const result = await apiClient.request<JsonRecord>(path, { method: "POST" });
+        return this.changed(asTask(result));
+      } catch (retryError) {
+        const finalState = await this.readTaskAfterPublishFailure(taskId);
+        if (finalState?.status && finalState.status !== "DRAFT") return this.changed(finalState);
+        throw retryError;
+      }
+    }
+  }
+
+  private mayHaveCommitted(error: unknown): boolean {
+    return error instanceof ApiError &&
+      (error.code === "NETWORK_ERROR" || (error.status ?? 0) >= 500);
+  }
+
+  private async readTaskAfterPublishFailure(taskId: Id): Promise<Task | null> {
+    try {
+      const detail = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}`);
+      return detail.task ? asTask(detail.task as JsonRecord) : null;
+    } catch {
+      return null;
+    }
   }
 
   async startTask(taskId: Id, _actorId: Id): Promise<Task> {
@@ -391,9 +524,22 @@ export class HttpRepository {
     return this.changed(asTask(result));
   }
 
-  async changeTaskStatus(taskId: Id, nextStatus: Task["status"], actorId: Id, note?: string): Promise<Task> {
+  async changeTaskStatus(taskId: Id, nextStatus: Task["status"], actorId: Id, _note?: string): Promise<Task> {
     if (nextStatus === "IN_PROGRESS") return this.startTask(taskId, actorId);
-    if (nextStatus === "CANCELLED") return this.cancelTask(taskId, note || "Hủy theo yêu cầu của người dùng", actorId);
+    if (nextStatus === "CANCELLED") {
+      const task = await this.getTaskById(taskId);
+      if (!task) throw new ApiError("NOT_FOUND", "Không tìm thấy công việc.", undefined, 404);
+      await this.cancelTask(taskId, actorId);
+      // Preserve the legacy method's return type; the task itself is deleted by the API.
+      return { ...task, status: "CANCELLED" };
+    }
+    if (nextStatus === "DONE") {
+      const task = await this.getTaskById(taskId);
+      if (task?.type !== 'OFFICIAL') {
+        const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/complete`, { method: 'POST' });
+        return this.changed(asTask(result));
+      }
+    }
     if (nextStatus === "DONE") return unsupported("Hoàn tất trực tiếp công việc OFFICIAL; cần nộp kết quả để duyệt");
     if (nextStatus === "IN_REVIEW") return unsupported("Chuyển sang chờ duyệt; hãy nộp kết quả");
     const task = await this.getTaskById(taskId);
@@ -408,9 +554,9 @@ export class HttpRepository {
     return this.changed(asTask(result));
   }
 
-  async cancelTask(taskId: Id, reason: string, _actorId: Id): Promise<Task> {
-    const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
-    return this.changed(asTask(result));
+  async cancelTask(taskId: Id, _actorId: Id): Promise<void> {
+    await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/cancel`, { method: "POST", body: JSON.stringify({}) });
+    this.changed(undefined);
   }
 
   async reopenTask(taskId: Id, reason: string, _actorId: Id): Promise<Task> {
@@ -427,8 +573,8 @@ export class HttpRepository {
       type: item.type as Notification["type"],
       title: String(item.title ?? ""),
       body: String(item.body ?? ""),
-      entityType: "TASK",
-      entityId: String(item.taskId ?? (item.task as JsonRecord | undefined)?.id ?? ""),
+      entityType: item.type === 'CHAT_MESSAGE' ? 'CHAT' : 'TASK',
+      entityId: String(item.chatRoomId ?? item.taskId ?? (item.task as JsonRecord | undefined)?.id ?? ""),
       createdAt: String(item.createdAt ?? new Date(0).toISOString()),
       readAt: typeof item.readAt === "string" ? item.readAt : null,
     }));
@@ -496,7 +642,7 @@ export class HttpRepository {
     return links;
   }
 
-  async uploadFile(file: File, entityType: "TASK" | "COMMENT", entityId: Id): Promise<FileObject> {
+  async uploadFile(file: File, entityType: "TASK" | "COMMENT" | "MESSAGE", entityId: Id): Promise<FileObject> {
     const ticket = await apiClient.request<JsonRecord>("/files/upload-url", {
       method: "POST", body: JSON.stringify({ originalName: file.name, mimeType: file.type, sizeBytes: file.size, entityType, entityId }),
     });
@@ -519,13 +665,18 @@ export class HttpRepository {
     return String(ticket.downloadUrl);
   }
 
+  async getPreviewUrl(fileId: Id): Promise<string> {
+    const ticket = await apiClient.request<JsonRecord>(`/files/${encodeURIComponent(fileId)}/preview-url`);
+    return String(ticket.previewUrl);
+  }
+
   async deleteFile(fileId: Id, _actorId: Id): Promise<void> {
     await apiClient.request(`/files/${encodeURIComponent(fileId)}`, { method: "DELETE" });
     this.notifyDataChanged();
   }
 
   async createFileLink(fileId: Id, entityType: FileLink["entityType"], entityId: Id): Promise<FileLink> {
-    if (entityType !== "TASK" && entityType !== "COMMENT") return unsupported("Liên kết tệp này");
+    if (entityType !== "TASK" && entityType !== "COMMENT" && entityType !== 'MESSAGE') return unsupported("Liên kết tệp này");
     // The API creates the entity link with the signed upload ticket.
     return { id: `api:${entityType}:${entityId}:${fileId}`, fileId, entityType, entityId };
   }
@@ -590,13 +741,114 @@ export class HttpRepository {
     return this.changed(result);
   }
 
-  async createDeadlineRequest(): Promise<never> { return unsupported("Yêu cầu gia hạn (P1)"); }
-  async decideDeadlineRequest(): Promise<never> { return unsupported("Duyệt yêu cầu gia hạn (P1)"); }
-  async createAssigneeRequest(): Promise<never> { return unsupported("Yêu cầu đổi chủ trì (P1)"); }
-  async decideAssigneeRequest(): Promise<never> { return unsupported("Duyệt yêu cầu đổi chủ trì (P1)"); }
-  async respondInvitation(): Promise<never> { return unsupported("Lời mời việc nhóm (P1)"); }
-  async convertTeamToOfficial(): Promise<never> { return unsupported("Chuyển việc nhóm sang OFFICIAL (P1)"); }
-  async createSubtask(): Promise<never> { return unsupported("Việc con (P1)"); }
+  async createDeadlineRequest(taskId: Id, input: { proposedDueAt: string; reason: string }, _actorId: Id): Promise<TaskDeadlineRequest> {
+    return this.changed(await apiClient.request<TaskDeadlineRequest>(`/tasks/${encodeURIComponent(taskId)}/deadline-requests`, { method: 'POST', body: JSON.stringify(input) }));
+  }
+
+  async decideDeadlineRequest(requestId: Id, input: { decision: 'APPROVED' | 'REJECTED'; reason?: string | null }, _actorId: Id): Promise<TaskDeadlineRequest> {
+    const request = (await this.getDeadlineRequests()).find((item) => item.id === requestId);
+    if (!request) throw new ApiError('NOT_FOUND', 'Không tìm thấy đề nghị gia hạn.', undefined, 404);
+    return this.changed(await apiClient.request<TaskDeadlineRequest>(`/tasks/${encodeURIComponent(request.taskId)}/deadline-requests/${encodeURIComponent(requestId)}/decision`, { method: 'POST', body: JSON.stringify(input) }));
+  }
+
+  async createAssigneeRequest(taskId: Id, input: { proposedAssigneeId: Id; reason: string }, _actorId: Id): Promise<TaskAssigneeRequest> {
+    return this.changed(await apiClient.request<TaskAssigneeRequest>(`/tasks/${encodeURIComponent(taskId)}/assignee-requests`, { method: 'POST', body: JSON.stringify(input) }));
+  }
+
+  async decideAssigneeRequest(requestId: Id, input: { decision: 'APPROVED' | 'REJECTED'; reason?: string | null }, _actorId: Id): Promise<TaskAssigneeRequest> {
+    const request = (await this.getAssigneeRequests()).find((item) => item.id === requestId);
+    if (!request) throw new ApiError('NOT_FOUND', 'Không tìm thấy đề nghị đổi chủ trì.', undefined, 404);
+    return this.changed(await apiClient.request<TaskAssigneeRequest>(`/tasks/${encodeURIComponent(request.taskId)}/assignee-requests/${encodeURIComponent(requestId)}/decision`, { method: 'POST', body: JSON.stringify(input) }));
+  }
+
+  async respondInvitation(participantId: Id, status: 'ACCEPTED' | 'DECLINED', _actorId: Id) {
+    const result = await apiClient.request<JsonRecord>(`/tasks/invitations/${encodeURIComponent(participantId)}/respond`, { method: 'POST', body: JSON.stringify({ status }) });
+    return this.changed(result);
+  }
+
+  async convertTeamToOfficial(taskId: Id, input: { primaryAssigneeId: Id; dueAt: string; priority?: Task['priority'] }, _actorId: Id): Promise<Task> {
+    const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/convert-official`, { method: 'POST', body: JSON.stringify(input) });
+    return this.changed(asTask(result));
+  }
+
+  async createSubtask(parentId: Id, input: { title: string; primaryAssigneeId: Id; dueAt: string | null; priority?: Task['priority']; deliverable?: string }, _actorId: Id): Promise<Task> {
+    const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(parentId)}/subtasks`, { method: 'POST', body: JSON.stringify(input) });
+    return this.changed(asTask(result));
+  }
+
+  async deletePersonalTask(taskId: Id, _actorId: Id): Promise<void> {
+    await apiClient.request(`/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
+    this.notifyDataChanged();
+  }
+
+  async getRecurrenceRules(): Promise<RecurrenceRule[]> {
+    const rows = await apiClient.request<JsonRecord[]>('/recurrence-rules');
+    return rows.map((row) => ({ ...row, assigneeIds: Array.isArray(row.assigneeIds) ? row.assigneeIds.map(String) : [] }) as unknown as RecurrenceRule);
+  }
+
+  async getRecurrenceInstances(): Promise<RecurrenceInstance[]> {
+    return apiClient.request<RecurrenceInstance[]>('/recurrence-instances');
+  }
+
+  async createRecurrenceRule(input: Omit<RecurrenceRule, 'id' | 'createdAt'>): Promise<RecurrenceRule> {
+    const { ownerId: _ownerId, active: _active, primaryAssigneeId: _primary, assigneeIds = [], ...rest } = input;
+    const result = await apiClient.request<JsonRecord>('/recurrence-rules', { method: 'POST', body: JSON.stringify({ ...rest, ...(input.scope === 'CUSTOM' ? { assigneeIds } : {}) }) });
+    return this.changed({ ...result, assigneeIds: Array.isArray(result.assigneeIds) ? result.assigneeIds : [] } as unknown as RecurrenceRule);
+  }
+
+  async updateRecurrenceRule(id: Id, updates: Partial<Omit<RecurrenceRule, 'id' | 'createdAt'>>): Promise<RecurrenceRule> {
+    const { ownerId: _ownerId, active: _active, primaryAssigneeId: _primary, assigneeIds, ...rest } = updates;
+    const result = await apiClient.request<JsonRecord>(`/recurrence-rules/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ ...rest, ...(updates.scope === 'CUSTOM' && assigneeIds ? { assigneeIds } : {}) }) });
+    return this.changed({ ...result, assigneeIds: Array.isArray(result.assigneeIds) ? result.assigneeIds : [] } as unknown as RecurrenceRule);
+  }
+
+  async deleteRecurrenceRule(id: Id): Promise<boolean> {
+    await apiClient.request(`/recurrence-rules/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    this.notifyDataChanged();
+    return true;
+  }
+
+  async toggleRecurrenceRule(id: Id, active: boolean): Promise<RecurrenceRule> {
+    const result = await apiClient.request<JsonRecord>(`/recurrence-rules/${encodeURIComponent(id)}/toggle`, { method: 'POST', body: JSON.stringify({ active }) });
+    return this.changed({ ...result, assigneeIds: Array.isArray(result.assigneeIds) ? result.assigneeIds : [] } as unknown as RecurrenceRule);
+  }
+
+  async generateRecurrenceNext(id: Id, _actorId: Id): Promise<{ task: Task; tasks: Task[]; instance: RecurrenceInstance }> {
+    const result = await apiClient.request<JsonRecord>(`/recurrence-rules/${encodeURIComponent(id)}/generate`, { method: 'POST' });
+    const tasks = Array.isArray(result.tasks) ? result.tasks.map((task) => asTask(task as JsonRecord)) : [];
+    return this.changed({ task: asTask(result.task as JsonRecord), tasks, instance: result.instance as unknown as RecurrenceInstance });
+  }
+
+  async submitRecurrenceReport(taskId: Id, input: { summary: string; details?: string; deliverableUrl?: string; notes?: string; fileIds?: Id[] }, _actorId: Id): Promise<TaskSubmission> {
+    return this.addSubmission(taskId, input, _actorId);
+  }
+
+  async getChatRooms(_userId?: Id): Promise<ChatRoom[]> {
+    return apiClient.request<ChatRoom[]>('/chat/rooms');
+  }
+
+  async getChatMembers(roomId: Id): Promise<ChatRoomMember[]> {
+    return apiClient.request<ChatRoomMember[]>(`/chat/rooms/${encodeURIComponent(roomId)}/members`);
+  }
+
+  async getChatMessages(roomId: Id): Promise<ChatMessage[]> {
+    return this.allPages<ChatMessage>(`/chat/rooms/${encodeURIComponent(roomId)}/messages`, {}, (message) => message as unknown as ChatMessage);
+  }
+
+  async sendChatMessage(roomId: Id, body: string, _senderId: Id): Promise<ChatMessage> {
+    const message = await apiClient.request<ChatMessage>(`/chat/rooms/${encodeURIComponent(roomId)}/messages`, { method: 'POST', body: JSON.stringify({ body }) });
+    return this.changed(message);
+  }
+
+  async markChatRoomAsRead(roomId: Id, _userId: Id): Promise<void> {
+    await apiClient.request(`/chat/rooms/${encodeURIComponent(roomId)}/read`, { method: 'POST' });
+    this.notifyDataChanged();
+  }
+
+  async createChatRoom(kind: 'DIRECT' | 'GROUP', title: string | null, memberUserIds: Id[], _actorId: Id): Promise<ChatRoom> {
+    const room = await apiClient.request<ChatRoom>('/chat/rooms', { method: 'POST', body: JSON.stringify({ kind, title, memberIds: memberUserIds }) });
+    return this.changed(room);
+  }
   async uploadMockFile(): Promise<never> { return unsupported("Upload cần truyền dữ liệu tệp thật"); }
 
   private async allPages<T>(path: string, params: Record<string, string | number | boolean | null | undefined>, map: (value: JsonRecord) => T): Promise<T[]> {

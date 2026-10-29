@@ -27,15 +27,14 @@ export function getSessionFileUrl(fileId: string): string | null {
 
 export const ALLOWED_EXTENSIONS = [
   "pdf",
-  "doc",
   "docx",
-  "xls",
   "xlsx",
-  "ppt",
   "pptx",
   "jpg",
   "jpeg",
   "png",
+  "webp",
+  "gif",
 ];
 
 export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB default
@@ -52,7 +51,7 @@ export function validateSelectedFile(file: File): { valid: boolean; error?: stri
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
     return {
       valid: false,
-      error: `Định dạng .${ext} không được hỗ trợ. Chỉ chấp nhận: PDF, Word (DOC/DOCX), Excel (XLS/XLSX), PowerPoint (PPT/PPTX), Hình ảnh (JPG/PNG).`,
+      error: `Định dạng .${ext} không được hỗ trợ. Chỉ chấp nhận: PDF, Word (DOCX), Excel (XLSX), PowerPoint (PPTX), Hình ảnh (JPG/PNG/GIF/WEBP).`,
     };
   }
 

@@ -14,7 +14,6 @@ import {
   StatCard,
   StatusBadge,
   PriorityBadge,
-  TaskTypeBadge,
   OverdueBadge,
   BlockedBadge,
   Button,
@@ -252,7 +251,6 @@ export function StaffDashboard() {
                             <span className="font-mono font-bold text-xs text-text-primary">
                               {t.code}
                             </span>
-                            <TaskTypeBadge type={t.type} />
                             <StatusBadge status={t.status} />
                             <PriorityBadge priority={t.priority} />
                             {overdue && <OverdueBadge />}

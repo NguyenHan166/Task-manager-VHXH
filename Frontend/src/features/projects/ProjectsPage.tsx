@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
 import { canSeeTask, isTaskOverdue } from "../../shared/data-contract";
 import type { Project, Task, TaskParticipant } from "../../shared/data-contract";
 import {
@@ -47,9 +47,9 @@ export function ProjectsPage() {
     setIsLoading(true);
     try {
       const [projList, taskList, partList] = await Promise.all([
-        mockRepository.getProjects(),
-        mockRepository.getTasks(),
-        mockRepository.getParticipants(),
+        workspaceRepository.getProjects(),
+        workspaceRepository.getTasks(),
+        workspaceRepository.getParticipants(),
       ]);
       setProjects(projList);
       setTasks(taskList);
@@ -61,7 +61,7 @@ export function ProjectsPage() {
 
   useEffect(() => {
     loadData();
-    const unsub = mockRepository.subscribe(loadData);
+    const unsub = workspaceRepository.subscribe(loadData);
     return unsub;
   }, []);
 
@@ -102,7 +102,7 @@ export function ProjectsPage() {
     }
     setIsSubmitting(true);
     try {
-      const newProj = await mockRepository.createProject({
+      const newProj = await workspaceRepository.createProject({
         name: projectName.trim(),
         description: projectDesc.trim(),
         ownerId: currentUser.id,

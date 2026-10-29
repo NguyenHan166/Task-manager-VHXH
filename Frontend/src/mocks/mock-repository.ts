@@ -982,57 +982,82 @@ export class MockRepository {
 
     public async cancelTask(
         taskId: Id,
-        reason: string,
-        actorId: Id,
-    ): Promise<Task> {
+        _actorId: Id,
+    ): Promise<void> {
         await this.delay();
         this.checkFailure();
-        const trimmedReason = reason.trim();
-        if (!trimmedReason) {
-            throw new DomainError(
-                "VALIDATION",
-                "Bắt buộc nhập lý do hủy nhiệm vụ",
-            );
-        }
-
         const db = this.getDb();
         const taskIdx = db.tasks.findIndex((t) => t.id === taskId);
         if (taskIdx === -1)
             throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
 
         const task = db.tasks[taskIdx];
-        if (task.status === "CANCELLED") {
-            throw new DomainError("CONFLICT", "Nhiệm vụ đã bị hủy trước đó");
+        const actor = db.users.find((user) => user.id === _actorId);
+        if (actor?.role !== "MANAGER" && actor?.role !== "DEPUTY_MANAGER") {
+            throw new DomainError("FORBIDDEN", "Chỉ Trưởng phòng hoặc Phó phòng mới có quyền thu hồi công việc");
+        }
+        if (task.type === "PERSONAL") {
+            throw new DomainError("FORBIDDEN", "Công việc cá nhân chỉ do chủ sở hữu xóa được");
+        }
+        if (!["DRAFT", "TODO", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)) {
+            throw new DomainError("CONFLICT", "Không thể thu hồi công việc ở trạng thái hiện tại");
         }
 
+        const recipientIds = new Set([
+            ...(task.primaryAssigneeId ? [task.primaryAssigneeId] : []),
+            ...db.participants
+                .filter((participant) => participant.taskId === taskId && participant.role === "COLLABORATOR" && participant.invitationStatus === "ACCEPTED")
+                .map((participant) => participant.userId),
+        ]);
+        recipientIds.delete(_actorId);
+        const submissionIds = new Set(db.submissions.filter((item) => item.taskId === taskId).map((item) => item.id));
+        const commentIds = new Set(db.comments.filter((item) => item.taskId === taskId).map((item) => item.id));
+        const fileIds = new Set(db.fileLinks
+            .filter((link) =>
+                (link.entityType === "TASK" && link.entityId === taskId) ||
+                (link.entityType === "SUBMISSION" && submissionIds.has(link.entityId)) ||
+                (link.entityType === "COMMENT" && commentIds.has(link.entityId)),
+            )
+            .map((link) => link.fileId));
+
+        db.tasks = db.tasks.filter((item) => item.id !== taskId).map((item) =>
+            item.parentTaskId === taskId ? { ...item, parentTaskId: null } : item,
+        );
+        db.participants = db.participants.filter((item) => item.taskId !== taskId);
+        db.comments = db.comments.filter((item) => item.taskId !== taskId);
+        db.submissions = db.submissions.filter((item) => item.taskId !== taskId);
+        db.approvals = db.approvals.filter((item) => item.taskId !== taskId);
+        db.deadlineRequests = db.deadlineRequests.filter((item) => item.taskId !== taskId);
+        db.assigneeRequests = db.assigneeRequests.filter((item) => item.taskId !== taskId);
+        db.events = db.events.filter((item) => item.taskId !== taskId);
+        db.notifications = db.notifications.filter((item) => item.entityId !== taskId);
+        db.recurrenceInstances = db.recurrenceInstances
+            .filter((item) => item.taskId !== taskId && !item.taskIds?.includes(taskId))
+            .map((item) => ({ ...item, taskIds: item.taskIds?.filter((id) => id !== taskId) }));
+        db.fileLinks = db.fileLinks.filter((link) =>
+            !(
+                (link.entityType === "TASK" && link.entityId === taskId) ||
+                (link.entityType === "SUBMISSION" && submissionIds.has(link.entityId)) ||
+                (link.entityType === "COMMENT" && commentIds.has(link.entityId))
+            ),
+        );
+        const stillLinkedFileIds = new Set(db.fileLinks.map((link) => link.fileId));
+        db.files = db.files.map((file) =>
+            fileIds.has(file.id) && !stillLinkedFileIds.has(file.id)
+                ? { ...file, status: "REMOVED" }
+                : file,
+        );
+
         const nowIso = toIsoUtc();
-        const updated: Task = {
-            ...task,
-            status: "CANCELLED",
-            updatedAt: nowIso,
-        };
-        db.tasks[taskIdx] = updated;
-
-        db.events.push({
-            id: `e_${Date.now()}_cancel`,
-            taskId,
-            actorId,
-            kind: "CANCELLED",
-            note: `Hủy công việc. Lý do: ${trimmedReason}`,
-            before: { status: task.status },
-            after: { status: "CANCELLED" },
-            createdAt: nowIso,
-        });
-
-        if (task.primaryAssigneeId && task.primaryAssigneeId !== actorId) {
+        for (const recipientId of recipientIds) {
             db.notifications.push({
-                id: `n_${Date.now()}_cancel`,
-                recipientId: task.primaryAssigneeId,
+                id: `n_${Date.now()}_${recipientId}_withdrawn`,
+                recipientId,
                 type: "TASK_UPDATED",
-                title: "Nhiệm vụ đã bị hủy",
-                body: `Công việc [${task.code}] đã bị hủy. Lý do: ${trimmedReason}`,
+                title: "Công việc đã được thu hồi",
+                body: `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
                 entityType: "TASK",
-                entityId: taskId,
+                entityId: "",
                 createdAt: nowIso,
                 readAt: null,
             });
@@ -1040,7 +1065,6 @@ export class MockRepository {
 
         this.persist();
         this.notify();
-        return { ...updated };
     }
 
     public async reopenTask(
@@ -1452,6 +1476,13 @@ export class MockRepository {
         actorId: Id,
         note?: string,
     ): Promise<Task> {
+        if (newStatus === "CANCELLED") {
+            const task = this.getDb().tasks.find((item) => item.id === id);
+            if (!task) throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
+            await this.cancelTask(id, actorId);
+            // Keep the legacy return type; cancellation removes the task from mock storage.
+            return { ...task, status: "CANCELLED" };
+        }
         await this.delay();
         this.checkFailure();
         const db = this.getDb();
@@ -1472,12 +1503,7 @@ export class MockRepository {
 
         db.tasks[idx] = updated;
 
-        const kind =
-            newStatus === "CANCELLED"
-                ? "CANCELLED"
-                : newStatus === "IN_PROGRESS"
-                  ? "STARTED"
-                  : "PROGRESS_UPDATED";
+        const kind = newStatus === "IN_PROGRESS" ? "STARTED" : "PROGRESS_UPDATED";
 
         db.events.push({
             id: `e_${Date.now()}`,

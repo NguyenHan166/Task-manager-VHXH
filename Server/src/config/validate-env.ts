@@ -61,7 +61,7 @@ export function validateEnv(
   }
   const numbers: Array<[string, number, number]> = [
     ['PORT', 1, 65535],
-    ['ACCESS_TOKEN_TTL_SECONDS', 60, 3600],
+    ['ACCESS_TOKEN_TTL_SECONDS', 60, 28_800],
     ['REFRESH_TOKEN_TTL_DAYS', 1, 30],
     ['LOGIN_RATE_LIMIT_PER_MINUTE', 1, 1000],
     ['R2_SIGNED_URL_TTL_SECONDS', 60, 900],
@@ -76,9 +76,6 @@ export function validateEnv(
     if (!Number.isInteger(value) || value < min || value > max) {
       errors.push(`${key} must be an integer between ${min} and ${max}`);
     }
-  }
-  if (env.ACCESS_TOKEN_TTL_SECONDS !== '900') {
-    errors.push('ACCESS_TOKEN_TTL_SECONDS must be 900 (15 minutes)');
   }
   if (env.REFRESH_TOKEN_TTL_DAYS !== '7') {
     errors.push('REFRESH_TOKEN_TTL_DAYS must be 7');

@@ -119,10 +119,17 @@ export class NotificationsService {
         },
       },
     });
+    const chatRoomIds = [...new Set(notifications.flatMap((item) => item.chatRoomId ? [item.chatRoomId] : []))];
+    const joinedChatRoomIds = chatRoomIds.length
+      ? new Set((await this.prisma.chatRoomMember.findMany({ where: { userId: actor.id, roomId: { in: chatRoomIds } }, select: { roomId: true } })).map((row) => row.roomId))
+      : new Set<string>();
     const hasMore = notifications.length > query.limit;
     const items = notifications.slice(0, query.limit).map((item) => {
       const task = item.task;
       const canReadTask = task ? this.access.canRead(actor, task) : false;
+      if (item.chatRoomId && !joinedChatRoomIds.has(item.chatRoomId)) {
+        return { id: item.id, type: item.type, title: 'Tin nhắn mới', body: 'Có tin nhắn trong một cuộc trò chuyện.', taskId: null, chatRoomId: null, task: null, readAt: item.readAt, createdAt: item.createdAt };
+      }
       if (task && !canReadTask) {
         return {
           id: item.id,
@@ -130,6 +137,7 @@ export class NotificationsService {
           title: 'Cập nhật công việc',
           body: 'Có cập nhật liên quan đến một công việc.',
           taskId: null,
+          chatRoomId: null,
           task: null,
           readAt: item.readAt,
           createdAt: item.createdAt,
@@ -141,6 +149,7 @@ export class NotificationsService {
         title: item.title,
         body: item.body,
         taskId: item.taskId,
+        chatRoomId: item.chatRoomId,
         task: task ? { id: task.id, code: task.code, title: task.title } : null,
         readAt: item.readAt,
         createdAt: item.createdAt,

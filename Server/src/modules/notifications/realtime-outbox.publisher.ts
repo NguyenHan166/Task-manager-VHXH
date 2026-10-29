@@ -11,6 +11,8 @@ type ClaimedOutboxRow = {
   taskId: string | null;
   recipientId: string | null;
   notificationId: string | null;
+  messageId: string | null;
+  chatRoomId: string | null;
   createdAt: Date;
   attempts: number;
 };
@@ -52,6 +54,8 @@ export class RealtimeOutboxPublisher {
                     queued.task_id AS "taskId",
                     queued.recipient_id AS "recipientId",
                     queued.notification_id AS "notificationId",
+                    queued.message_id AS "messageId",
+                    queued.chat_room_id AS "chatRoomId",
                     queued.created_at AS "createdAt",
                     queued.attempts
         `,
@@ -77,6 +81,16 @@ export class RealtimeOutboxPublisher {
             await this.gateway.publishTaskUpdated(
               item.taskId,
               item.businessEventId,
+              item.createdAt,
+            );
+          } else if (
+            item.type === RealtimeOutboxType.MESSAGE_NEW &&
+            item.messageId && item.chatRoomId
+          ) {
+            await this.gateway.publishChatMessage(
+              item.chatRoomId,
+              item.messageId,
+              item.id,
               item.createdAt,
             );
           }

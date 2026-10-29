@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
 import { canSeeTask, isTaskOverdue } from "../../shared/data-contract";
 import type { Task, TaskParticipant } from "../../shared/data-contract";
 import {
@@ -10,7 +10,6 @@ import {
   Button,
   StatusBadge,
   PriorityBadge,
-  TaskTypeBadge,
   UserAvatar,
   OverdueBadge,
 } from "../../components/ui";
@@ -46,8 +45,8 @@ export function CalendarPage() {
     setIsLoading(true);
     try {
       const [tList, pList] = await Promise.all([
-        mockRepository.getTasks(),
-        mockRepository.getParticipants(),
+        workspaceRepository.getTasks(),
+        workspaceRepository.getParticipants(),
       ]);
       setTasks(tList);
       setParticipants(pList);
@@ -58,7 +57,7 @@ export function CalendarPage() {
 
   useEffect(() => {
     loadData();
-    const unsub = mockRepository.subscribe(loadData);
+    const unsub = workspaceRepository.subscribe(loadData);
     return unsub;
   }, []);
 
@@ -446,9 +445,7 @@ export function CalendarPage() {
                                   ? "bg-emerald-50 border-emerald-200 text-emerald-800 line-through"
                                   : overdue
                                   ? "bg-red-50 border-red-200 text-danger font-semibold"
-                                  : t.type === "OFFICIAL"
-                                  ? "bg-blue-50 border-blue-200 text-blue-900"
-                                  : "bg-purple-50 border-purple-200 text-purple-900"
+                                  : "bg-blue-50 border-blue-200 text-blue-900"
                               } hover:opacity-90`}
                               title={`[${t.code}] ${t.title} - Hạn: ${t.dueAt?.slice(11, 16)}`}
                             >
@@ -609,7 +606,6 @@ export function CalendarPage() {
                               <span className="font-mono font-bold text-xs bg-white border border-border px-1.5 py-0.5 rounded">
                                 {t.code}
                               </span>
-                              <TaskTypeBadge type={t.type} />
                               {overdue && <OverdueBadge />}
                             </div>
                             <StatusBadge status={t.status} />
@@ -828,7 +824,6 @@ export function CalendarPage() {
                               <span className="font-mono font-bold text-xs bg-white border border-border px-1.5 py-0.5 rounded">
                                 {t.code}
                               </span>
-                              <TaskTypeBadge type={t.type} />
                               {overdue && <OverdueBadge />}
                             </div>
                             <StatusBadge status={t.status} />
@@ -931,7 +926,6 @@ export function CalendarPage() {
                                 <span className="font-mono font-bold text-xs bg-white border border-border px-1.5 py-0.5 rounded">
                                   {t.code}
                                 </span>
-                                <TaskTypeBadge type={t.type} />
                                 {overdue && <OverdueBadge />}
                               </div>
                               <StatusBadge status={t.status} />
@@ -1002,7 +996,6 @@ export function CalendarPage() {
                           <span className="font-mono font-bold text-xs bg-slate-100 px-2 py-0.5 rounded">
                             {t.code}
                           </span>
-                          <TaskTypeBadge type={t.type} />
                           {overdue && <OverdueBadge />}
                           <StatusBadge status={t.status} />
                           <PriorityBadge priority={t.priority} />

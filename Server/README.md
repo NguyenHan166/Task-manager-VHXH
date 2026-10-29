@@ -52,7 +52,7 @@ Open **http://localhost:5556**. Prisma Studio shows `users`, `tasks`, submission
 | `npm run db:clean -- --confirm` | **Delete all data in the local DB** and reapply migrations; seed again afterward |
 | `npm run typecheck`, `lint`, `format:check`, `build` | Local quality gates |
 
-The seed uses the fixed clock `2026-10-27T09:00:00.000Z` and the `u01`–`u06`, `t01`–`t13` fixture. It excludes `t14`–`t17` and recurrence/chat tables until Phase 09. It does not seed fake READY file metadata: a file becomes READY only after R2 confirms the object and the server verifies its bytes. See the [Phase 05 runbook](../docs/backend-plan/phase-05/RUNBOOK.md) before configuring a private bucket.
+The seed uses the fixed clock `2026-10-27T09:00:00.000Z` and loads the `u01`–`u06`, `t01`–`t17` fixture, recurring rules/instance, and sample chat rooms. `db:check` verifies both the original `t01`–`t09` KPI baseline and the extended Phase 09 KPI, confirming TEAM/PERSONAL tasks do not enter OFFICIAL totals. The demo accounts use the password in `DEMO_SEED_PASSWORD`; rerunning the seed synchronizes that password for the fixture accounts. It does not seed fake READY file metadata: a file becomes READY only after R2 confirms the object and the server verifies its bytes. See the [Phase 05 runbook](../docs/backend-plan/phase-05/RUNBOOK.md) before configuring a private bucket.
 
 Phase 07 uses database-side aggregation for dashboard and report KPIs. Managers and deputy managers can export department reports; department report rows are published OFFICIAL tasks only. Settings and audit writes/reads, backup metadata and operations metrics require MANAGER. `SYSTEM_CLOCK_OVERRIDE` is accepted only with `APP_ENV=local`, for fixed-clock acceptance runs.
 

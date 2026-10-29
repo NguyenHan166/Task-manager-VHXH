@@ -101,6 +101,7 @@ enum NotificationType {
 enum RealtimeOutboxType {
   NOTIFICATION_NEW
   TASK_UPDATED
+  MESSAGE_NEW
 }
 
 enum BackupRunStatus {
@@ -110,39 +111,44 @@ enum BackupRunStatus {
 }
 
 model User {
-  id                  String                @id @default(uuid()) @db.Uuid
-  email               String                @unique
-  displayName         String                @map("display_name")
-  role                UserRole
-  status              UserStatus            @default(ACTIVE)
-  passwordHash        String                @map("password_hash")
-  jobTitle            String                @default("") @map("job_title")
-  phoneNumber         String?               @map("phone_number")
-  department          String?
-  avatarUrl           String?               @map("avatar_url")
-  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
-  lastLoginAt         DateTime?             @map("last_login_at") @db.Timestamptz(3)
-  sessions            AuthSession[]
-  ownedProjects       Project[]
-  createdTasks        Task[]                @relation("TaskCreator")
-  assignedTasks       Task[]                @relation("TaskAssignee")
-  approvedTasks       Task[]                @relation("TaskApprover")
-  participations      TaskParticipant[]
-  comments            TaskComment[]
-  submissions         TaskSubmission[]
-  decisions           TaskApproval[]
-  deadlineRequests    TaskDeadlineRequest[] @relation("DeadlineRequester")
-  deadlineDecisions   TaskDeadlineRequest[] @relation("DeadlineDecider")
-  assigneeRequests    TaskAssigneeRequest[] @relation("AssigneeRequester")
-  assigneeDecisions   TaskAssigneeRequest[] @relation("AssigneeDecider")
-  proposedAssignments TaskAssigneeRequest[] @relation("ProposedAssignee")
-  events              TaskEvent[]
-  notifications       Notification[]
-  reminders           ReminderEvent[]
-  realtimeOutbox      RealtimeOutbox[]
-  uploadedFiles       FileObject[]
-  audits              AuditLog[]
+  id                    String                   @id @default(uuid()) @db.Uuid
+  email                 String                   @unique
+  displayName           String                   @map("display_name")
+  role                  UserRole
+  status                UserStatus               @default(ACTIVE)
+  passwordHash          String                   @map("password_hash")
+  jobTitle              String                   @default("") @map("job_title")
+  phoneNumber           String?                  @map("phone_number")
+  department            String?
+  avatarUrl             String?                  @map("avatar_url")
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lastLoginAt           DateTime?                @map("last_login_at") @db.Timestamptz(3)
+  sessions              AuthSession[]
+  ownedProjects         Project[]
+  createdTasks          Task[]                   @relation("TaskCreator")
+  assignedTasks         Task[]                   @relation("TaskAssignee")
+  approvedTasks         Task[]                   @relation("TaskApprover")
+  participations        TaskParticipant[]
+  comments              TaskComment[]
+  submissions           TaskSubmission[]
+  decisions             TaskApproval[]
+  deadlineRequests      TaskDeadlineRequest[]    @relation("DeadlineRequester")
+  deadlineDecisions     TaskDeadlineRequest[]    @relation("DeadlineDecider")
+  assigneeRequests      TaskAssigneeRequest[]    @relation("AssigneeRequester")
+  assigneeDecisions     TaskAssigneeRequest[]    @relation("AssigneeDecider")
+  proposedAssignments   TaskAssigneeRequest[]    @relation("ProposedAssignee")
+  events                TaskEvent[]
+  notifications         Notification[]
+  reminders             ReminderEvent[]
+  realtimeOutbox        RealtimeOutbox[]
+  uploadedFiles         FileObject[]
+  audits                AuditLog[]
+  chatMemberships       ChatRoomMember[]
+  chatMessages          ChatMessage[]
+  recurrenceRules       RecurrenceRule[]
+  recurrenceAssignments RecurrenceRuleAssignee[]
+  recurrenceTasks       RecurrenceInstanceTask[]
 
   @@index([role, status])
   @@map("users")
@@ -201,37 +207,37 @@ model Project {
 }
 
 model Task {
-  id                      String                @id @default(uuid()) @db.Uuid
-  code                    String                @unique
+  id                      String                  @id @default(uuid()) @db.Uuid
+  code                    String                  @unique
   type                    TaskType
   title                   String
-  description             String                @default("")
-  deliverable             String                @default("")
+  description             String                  @default("")
+  deliverable             String                  @default("")
   status                  TaskStatus
-  priority                TaskPriority          @default(NORMAL)
-  progressPercent         Int                   @default(0) @map("progress_percent")
-  createdById             String                @map("created_by_id") @db.Uuid
-  primaryAssigneeId       String?               @map("primary_assignee_id") @db.Uuid
-  projectId               String?               @map("project_id") @db.Uuid
-  parentTaskId            String?               @map("parent_task_id") @db.Uuid
-  assignedAt              DateTime?             @map("assigned_at") @db.Timestamptz(3)
-  dueAt                   DateTime?             @map("due_at") @db.Timestamptz(3)
-  completedAt             DateTime?             @map("completed_at") @db.Timestamptz(3)
-  completionDueAtSnapshot DateTime?             @map("completion_due_at_snapshot") @db.Timestamptz(3)
-  approvedById            String?               @map("approved_by_id") @db.Uuid
-  approvedAt              DateTime?             @map("approved_at") @db.Timestamptz(3)
-  version                 Int                   @default(1)
-  isBlocked               Boolean               @default(false) @map("is_blocked")
-  blockedReason           String?               @map("blocked_reason")
-  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
-  archivedAt              DateTime?             @map("archived_at") @db.Timestamptz(3)
-  creator                 User                  @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  primaryAssignee         User?                 @relation("TaskAssignee", fields: [primaryAssigneeId], references: [id], onDelete: Restrict)
-  approver                User?                 @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: Restrict)
-  project                 Project?              @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  parent                  Task?                 @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Restrict)
-  children                Task[]                @relation("Subtasks")
+  priority                TaskPriority            @default(NORMAL)
+  progressPercent         Int                     @default(0) @map("progress_percent")
+  createdById             String                  @map("created_by_id") @db.Uuid
+  primaryAssigneeId       String?                 @map("primary_assignee_id") @db.Uuid
+  projectId               String?                 @map("project_id") @db.Uuid
+  parentTaskId            String?                 @map("parent_task_id") @db.Uuid
+  assignedAt              DateTime?               @map("assigned_at") @db.Timestamptz(3)
+  dueAt                   DateTime?               @map("due_at") @db.Timestamptz(3)
+  completedAt             DateTime?               @map("completed_at") @db.Timestamptz(3)
+  completionDueAtSnapshot DateTime?               @map("completion_due_at_snapshot") @db.Timestamptz(3)
+  approvedById            String?                 @map("approved_by_id") @db.Uuid
+  approvedAt              DateTime?               @map("approved_at") @db.Timestamptz(3)
+  version                 Int                     @default(1)
+  isBlocked               Boolean                 @default(false) @map("is_blocked")
+  blockedReason           String?                 @map("blocked_reason")
+  createdAt               DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  archivedAt              DateTime?               @map("archived_at") @db.Timestamptz(3)
+  creator                 User                    @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  primaryAssignee         User?                   @relation("TaskAssignee", fields: [primaryAssigneeId], references: [id], onDelete: Restrict)
+  approver                User?                   @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  project                 Project?                @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  parent                  Task?                   @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Restrict)
+  children                Task[]                  @relation("Subtasks")
   participants            TaskParticipant[]
   comments                TaskComment[]
   submissions             TaskSubmission[]
@@ -243,6 +249,7 @@ model Task {
   reminders               ReminderEvent[]
   realtimeOutbox          RealtimeOutbox[]
   fileLinks               FileLink[]
+  recurrenceInstanceTask  RecurrenceInstanceTask?
 
   @@index([type, status, dueAt])
   @@index([primaryAssigneeId, status, dueAt])
@@ -285,21 +292,22 @@ model TaskComment {
 }
 
 model TaskSubmission {
-  id              String           @id @default(uuid()) @db.Uuid
-  taskId          String           @map("task_id") @db.Uuid
-  submittedById   String           @map("submitted_by_id") @db.Uuid
-  summary         String
-  details         String?
-  deliverableUrl  String?          @map("deliverable_url")
-  notes           String?
-  status          SubmissionStatus @default(PENDING)
-  submittedAt     DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(3)
-  withdrawnAt     DateTime?        @map("withdrawn_at") @db.Timestamptz(3)
-  withdrawnReason String?          @map("withdrawn_reason")
-  task            Task             @relation(fields: [taskId], references: [id], onDelete: Restrict)
-  submitter       User             @relation(fields: [submittedById], references: [id], onDelete: Restrict)
-  approval        TaskApproval?
-  fileLinks       FileLink[]
+  id                  String                   @id @default(uuid()) @db.Uuid
+  taskId              String                   @map("task_id") @db.Uuid
+  submittedById       String                   @map("submitted_by_id") @db.Uuid
+  summary             String
+  details             String?
+  deliverableUrl      String?                  @map("deliverable_url")
+  notes               String?
+  status              SubmissionStatus         @default(PENDING)
+  submittedAt         DateTime                 @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  withdrawnAt         DateTime?                @map("withdrawn_at") @db.Timestamptz(3)
+  withdrawnReason     String?                  @map("withdrawn_reason")
+  task                Task                     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  submitter           User                     @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  approval            TaskApproval?
+  fileLinks           FileLink[]
+  recurrenceInstances RecurrenceInstanceTask[]
 
   @@index([taskId, submittedAt, id])
   @@map("task_submissions")
@@ -383,6 +391,7 @@ model Notification {
   id              String           @id @default(uuid()) @db.Uuid
   recipientId     String           @map("recipient_id") @db.Uuid
   taskId          String?          @map("task_id") @db.Uuid
+  chatRoomId      String?          @map("chat_room_id") @db.Uuid
   type            NotificationType
   title           String
   body            String
@@ -406,6 +415,8 @@ model RealtimeOutbox {
   taskId          String?            @map("task_id") @db.Uuid
   recipientId     String?            @map("recipient_id") @db.Uuid
   notificationId  String?            @unique @map("notification_id") @db.Uuid
+  messageId       String?            @map("message_id") @db.Uuid
+  chatRoomId      String?            @map("chat_room_id") @db.Uuid
   attempts        Int                @default(0)
   nextAttemptAt   DateTime           @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
   deliveredAt     DateTime?          @map("delivered_at") @db.Timestamptz(3)
@@ -463,17 +474,124 @@ model FileLink {
   taskId       String?         @map("task_id") @db.Uuid
   submissionId String?         @map("submission_id") @db.Uuid
   commentId    String?         @map("comment_id") @db.Uuid
+  messageId    String?         @map("message_id") @db.Uuid
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   removedAt    DateTime?       @map("removed_at") @db.Timestamptz(3)
   file         FileObject      @relation(fields: [fileId], references: [id], onDelete: Restrict)
   task         Task?           @relation(fields: [taskId], references: [id], onDelete: Restrict)
   submission   TaskSubmission? @relation(fields: [submissionId], references: [id], onDelete: Restrict)
   comment      TaskComment?    @relation(fields: [commentId], references: [id], onDelete: Restrict)
+  message      ChatMessage?    @relation(fields: [messageId], references: [id], onDelete: Restrict)
 
   @@index([taskId])
   @@index([submissionId])
   @@index([commentId])
+  @@index([messageId])
   @@map("file_links")
+}
+
+model RecurrenceRule {
+  id            String                   @id @default(uuid()) @db.Uuid
+  title         String
+  description   String                   @default("")
+  ownerId       String                   @map("owner_id") @db.Uuid
+  scope         String                   @default("ALL") @db.VarChar(10)
+  priority      TaskPriority             @default(NORMAL)
+  frequency     String                   @db.VarChar(10)
+  dueAfterHours Int                      @map("due_after_hours")
+  nextRunAt     DateTime                 @map("next_run_at") @db.Timestamptz(3)
+  active        Boolean                  @default(true)
+  createdAt     DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner         User                     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  assignees     RecurrenceRuleAssignee[]
+  instances     RecurrenceInstance[]
+
+  @@index([active, nextRunAt])
+  @@map("recurrence_rules")
+}
+
+model RecurrenceRuleAssignee {
+  id     String         @id @default(uuid()) @db.Uuid
+  ruleId String         @map("rule_id") @db.Uuid
+  userId String         @map("user_id") @db.Uuid
+  rule   RecurrenceRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([ruleId, userId])
+  @@index([userId])
+  @@map("recurrence_rule_assignees")
+}
+
+model RecurrenceInstance {
+  id        String                   @id @default(uuid()) @db.Uuid
+  ruleId    String                   @map("rule_id") @db.Uuid
+  periodKey String                   @map("period_key") @db.VarChar(20)
+  createdAt DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  rule      RecurrenceRule           @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  tasks     RecurrenceInstanceTask[]
+
+  @@unique([ruleId, periodKey])
+  @@map("recurrence_instances")
+}
+
+model RecurrenceInstanceTask {
+  id               String             @id @default(uuid()) @db.Uuid
+  instanceId       String             @map("instance_id") @db.Uuid
+  userId           String             @map("user_id") @db.Uuid
+  taskId           String             @unique @map("task_id") @db.Uuid
+  instance         RecurrenceInstance @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  task             Task               @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  taskSubmission   TaskSubmission?    @relation(fields: [taskSubmissionId], references: [id])
+  taskSubmissionId String?            @map("task_submission_id") @db.Uuid
+
+  @@unique([instanceId, userId])
+  @@index([userId])
+  @@map("recurrence_instance_tasks")
+}
+
+model ChatRoom {
+  id        String           @id @default(uuid()) @db.Uuid
+  kind      String           @db.VarChar(10)
+  title     String?
+  directKey String?          @unique @map("direct_key")
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  members   ChatRoomMember[]
+  messages  ChatMessage[]
+
+  @@index([createdAt])
+  @@map("chat_rooms")
+}
+
+model ChatRoomMember {
+  id         String    @id @default(uuid()) @db.Uuid
+  roomId     String    @map("room_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  lastReadAt DateTime? @map("last_read_at") @db.Timestamptz(3)
+  joinedAt   DateTime  @default(now()) @map("joined_at") @db.Timestamptz(3)
+  room       ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([roomId, userId])
+  @@index([userId, lastReadAt])
+  @@map("chat_room_members")
+}
+
+model ChatMessage {
+  id        String     @id @default(uuid()) @db.Uuid
+  roomId    String     @map("room_id") @db.Uuid
+  senderId  String     @map("sender_id") @db.Uuid
+  body      String
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  editedAt  DateTime?  @map("edited_at") @db.Timestamptz(3)
+  deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  room      ChatRoom   @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  sender    User       @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  fileLinks FileLink[]
+
+  @@index([roomId, createdAt, id])
+  @@map("chat_messages")
 }
 
 model AuditLog {

@@ -93,7 +93,7 @@ schemas = {
     "RecurrenceInstance": model({"id": UUID, "ruleId": UUID, "periodKey": string(), "taskIds": array(UUID), "createdAt": UTC}, ("id", "ruleId", "periodKey", "taskIds", "createdAt")),
     "ChatRoom": model({"id": UUID, "kind": string(enum=["DIRECT", "GROUP"]), "title": string(nullable=True), "createdAt": UTC}, ("id", "kind", "createdAt")),
     "ChatMessage": model({"id": UUID, "roomId": UUID, "senderId": UUID, "body": string(), "createdAt": UTC, "editedAt": {**UTC, "nullable": True}, "deletedAt": {**UTC, "nullable": True}}, ("id", "roomId", "senderId", "body", "createdAt")),
-    "AuthSession": model({"accessToken": string(), "expiresInSeconds": integer(example=900), "user": ref("User")}, ("accessToken", "expiresInSeconds", "user")),
+    "AuthSession": model({"accessToken": string(), "expiresInSeconds": integer(example=28800), "user": ref("User")}, ("accessToken", "expiresInSeconds", "user")),
     "UserRecord": {"oneOf": [ref("User"), ref("DirectoryUser")]},
     "CreateUserResult": model({"user": ref("User"), "temporaryPassword": string()}, ("user",), description="temporaryPassword appears only when the server generated it and is returned once."),
     "ResetPasswordResult": model({"temporaryPassword": string(), "message": string()}, ("temporaryPassword", "message")),
@@ -228,10 +228,10 @@ def add(method: str, path: str, opid: str, tag: str, result: str, *, phase="P0",
     paths.setdefault(path, {})[method.lower()] = operation
 
 
-add("POST", "/auth/login", "login", "Auth", "AuthSession", request="LoginInput", public=True, errors=(400, 401, 429), request_example={"email": "user@example.invalid", "password": "example-password"}, example={"accessToken": "example-access-token", "expiresInSeconds": 900, "user": {"id": "00000000-0000-4000-8000-000000000001", "username": "user@example.invalid", "email": "user@example.invalid", "displayName": "Người dùng mẫu", "role": "STAFF", "status": "ACTIVE", "jobTitle": "Chuyên viên", "createdAt": "2026-10-27T09:00:00.000Z"}})
+add("POST", "/auth/login", "login", "Auth", "AuthSession", request="LoginInput", public=True, errors=(400, 401, 429), request_example={"email": "user@example.invalid", "password": "example-password"}, example={"accessToken": "example-access-token", "expiresInSeconds": 28800, "user": {"id": "00000000-0000-4000-8000-000000000001", "username": "user@example.invalid", "email": "user@example.invalid", "displayName": "Người dùng mẫu", "role": "STAFF", "status": "ACTIVE", "jobTitle": "Chuyên viên", "createdAt": "2026-10-27T09:00:00.000Z"}})
 paths["/auth/login"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "Rotating refresh cookie; HttpOnly, Secure, SameSite=Lax, Path=/api/auth, Max-Age=604800", "schema": string()}}
 add("GET", "/health", "getHealth", "Operations", "Health", public=True, errors=(), description="Liveness/readiness projection without infrastructure details.")
-add("POST", "/auth/refresh", "refreshSession", "Auth", "AuthSession", cookie=True, errors=(401,), description="Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 15-minute access token. Invalid/expired cookies are cleared.")
+add("POST", "/auth/refresh", "refreshSession", "Auth", "AuthSession", cookie=True, errors=(401,), description="Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 8-hour access token. Invalid/expired cookies are cleared.")
 paths["/auth/refresh"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "New rotating refresh cookie", "schema": string()}}
 add("POST", "/auth/logout", "logout", "Auth", "Success", errors=(401,))
 paths["/auth/logout"]["post"]["responses"]["200"]["headers"] = {"Set-Cookie": {"description": "Clears refresh cookie", "schema": string()}}

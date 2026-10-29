@@ -27,6 +27,7 @@ import { BusinessCodeService } from '../../database/business-code.service';
 import { PrismaService } from '../../database/prisma.service';
 import {
   type CommentDto,
+  type CreateAssignmentDto,
   type CreateTaskDto,
   SortDirection,
   TaskScope,
@@ -127,6 +128,16 @@ export class TasksService {
     };
   }
 
+  async participants(actor: AuthenticatedUser, taskIds?: string[]) {
+    return this.prisma.taskParticipant.findMany({
+      where: {
+        ...(taskIds?.length ? { taskId: { in: taskIds } } : {}),
+        task: { is: { AND: [this.access.readableTaskWhere(actor)] } },
+      },
+      orderBy: [{ invitedAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   async detail(actor: AuthenticatedUser, taskId: string) {
     return this.prisma.$transaction(
       async (tx) => {
@@ -224,6 +235,31 @@ export class TasksService {
     );
   }
 
+  async createAssignment(
+    actor: AuthenticatedUser,
+    input: CreateAssignmentDto,
+  ): Promise<PublicTask> {
+    if (
+      actor.role !== UserRole.MANAGER &&
+      actor.role !== UserRole.DEPUTY_MANAGER
+    ) {
+      throw forbidden('Only leaders can assign work');
+    }
+    const [primaryAssigneeId, ...collaboratorIds] = input.assigneeIds;
+    if (!primaryAssigneeId) throw invalid('At least one assignee is required');
+    return this.create(actor, {
+      type: TaskType.OFFICIAL,
+      title: input.title,
+      description: input.description,
+      deliverable: input.deliverable,
+      priority: input.priority,
+      primaryAssigneeId,
+      collaboratorIds,
+      dueAt: input.dueAt,
+      projectId: input.projectId,
+    });
+  }
+
   async create(
     actor: AuthenticatedUser,
     input: CreateTaskDto,
@@ -237,8 +273,17 @@ export class TasksService {
     if (input.type !== TaskType.OFFICIAL) {
       throw invalid('TEAM and PERSONAL task creation opens in Phase 09');
     }
-    if (input.projectId || input.parentTaskId) {
-      throw invalid('Project and parent links open in Phase 09');
+    if (input.parentTaskId) {
+      throw invalid('Create subtasks through the parent task endpoint');
+    }
+    if (input.projectId) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { status: true },
+      });
+      if (!project || project.status !== 'ACTIVE') {
+        throw invalid('Project must exist and be active');
+      }
     }
     if (input.dueAt !== undefined && input.dueDate !== undefined) {
       throw invalid('Provide either dueAt or dueDate, not both');
@@ -289,6 +334,7 @@ export class TasksService {
           priority: input.priority ?? TaskPriority.NORMAL,
           createdById: actor.id,
           primaryAssigneeId: input.primaryAssigneeId ?? null,
+          projectId: input.projectId ?? null,
           dueAt,
           createdAt: now,
         },
@@ -340,9 +386,6 @@ export class TasksService {
     if (!Object.keys(input).length) {
       throw invalid('At least one task field is required');
     }
-    if (input.projectId !== undefined) {
-      throw invalid('Project links open in Phase 09');
-    }
     return this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: this.visibleTaskWhere(actor, taskId),
@@ -350,6 +393,15 @@ export class TasksService {
       if (!task) throw notFound();
       if (!this.access.canOperateOfficial(actor, task)) {
         throw forbidden('You cannot edit this task');
+      }
+      if (input.projectId) {
+        const project = await tx.project.findUnique({
+          where: { id: input.projectId },
+          select: { status: true },
+        });
+        if (!project || project.status !== 'ACTIVE') {
+          throw invalid('Project must exist and be active');
+        }
       }
       if (
         task.status === TaskStatus.DONE ||
@@ -361,7 +413,7 @@ export class TasksService {
         throw invalid('Change published task priority through /adjust');
       }
 
-      const data: Prisma.TaskUpdateManyMutationInput = {
+      const data: Prisma.TaskUncheckedUpdateManyInput = {
         version: { increment: 1 },
       };
       const before: Record<string, string> = {};
@@ -391,6 +443,11 @@ export class TasksService {
         data.priority = input.priority;
         before.priority = task.priority;
         after.priority = input.priority;
+      }
+      if (input.projectId !== undefined && input.projectId !== task.projectId) {
+        data.projectId = input.projectId;
+        before.projectId = task.projectId ?? '';
+        after.projectId = input.projectId ?? '';
       }
       if (!Object.keys(after).length) return toPublicTask(task);
 
@@ -484,9 +541,6 @@ export class TasksService {
         where: this.visibleTaskWhere(actor, taskId),
       });
       if (!task) throw notFound();
-      if (task.type !== TaskType.OFFICIAL) {
-        throw forbidden('Comments on TEAM and PERSONAL tasks open in Phase 09');
-      }
       if (
         task.status === TaskStatus.DRAFT ||
         task.status === TaskStatus.DONE ||
@@ -639,7 +693,19 @@ export class TasksService {
     const filters: Prisma.TaskWhereInput[] = [];
     if (query.scope === TaskScope.OWNED) {
       filters.push({
-        OR: [{ createdById: actor.id }, { primaryAssigneeId: actor.id }],
+        OR: [
+          { createdById: actor.id },
+          { primaryAssigneeId: actor.id },
+          {
+            participants: {
+              some: {
+                userId: actor.id,
+                role: ParticipantRole.COLLABORATOR,
+                invitationStatus: InvitationStatus.ACCEPTED,
+              },
+            },
+          },
+        ],
       });
     } else if (query.scope === TaskScope.COLLABORATING) {
       filters.push({

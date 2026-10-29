@@ -24,10 +24,12 @@ type SocketIdentity = {
 };
 type AuthenticatedSocket = Socket & { data: { identity?: SocketIdentity } };
 type TaskRoomPayload = { taskId?: unknown };
+type ChatRoomPayload = { roomId?: unknown };
 type SocketNext = (error?: Error) => void;
 
 const userRoom = (userId: string): string => `user_${userId}`;
 const taskRoom = (taskId: string): string => `task_${taskId}`;
+const chatRoom = (roomId: string): string => `chat_${roomId}`;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -147,6 +149,31 @@ export class NotificationsGateway
     return { ok: true };
   }
 
+  @SubscribeMessage('chat:join')
+  async joinChatRoom(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: ChatRoomPayload,
+  ) {
+    const identity = client.data.identity;
+    if (!(await this.validateSession(client)) || !identity) return { ok: false, code: 'UNAUTHORIZED' };
+    if (typeof payload?.roomId !== 'string' || !uuidPattern.test(payload.roomId)) return { ok: false, code: 'VALIDATION' };
+    const member = await this.prisma.chatRoomMember.findUnique({ where: { roomId_userId: { roomId: payload.roomId, userId: identity.actor.id } }, select: { id: true } });
+    if (!member) return { ok: false, code: 'NOT_FOUND' };
+    await client.join(chatRoom(payload.roomId));
+    return { ok: true, room: chatRoom(payload.roomId) };
+  }
+
+  @SubscribeMessage('chat:leave')
+  async leaveChatRoom(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: ChatRoomPayload,
+  ) {
+    if (!(await this.validateSession(client))) return { ok: false, code: 'UNAUTHORIZED' };
+    if (typeof payload?.roomId !== 'string' || !uuidPattern.test(payload.roomId)) return { ok: false, code: 'VALIDATION' };
+    await client.leave(chatRoom(payload.roomId));
+    return { ok: true };
+  }
+
   async publishNotification(
     recipientId: string,
     notificationId: string,
@@ -226,6 +253,33 @@ export class NotificationsGateway
         continue;
       }
       remote.emit('task:updated', payload);
+    }
+  }
+
+  async publishChatMessage(roomId: string, messageId: string, eventId: string, occurredAt: Date): Promise<void> {
+    if (!this.namespace) return;
+    const message = await this.prisma.chatMessage.findFirst({
+      where: { id: messageId, roomId, deletedAt: null },
+      select: { id: true, roomId: true, senderId: true, body: true, createdAt: true },
+    });
+    const members = await this.prisma.chatRoomMember.findMany({ where: { roomId }, select: { userId: true } });
+    const memberIds = new Set(members.map((member) => member.userId));
+    const sockets = await this.namespace.in(chatRoom(roomId)).fetchSockets();
+    for (const socket of sockets) {
+      const remote = socket as typeof socket & { data: { identity?: SocketIdentity } };
+      const identity = remote.data.identity;
+      const actor = identity ? await this.activeActor(identity) : null;
+      if (!message || !identity || !actor) {
+        await remote.leave(chatRoom(roomId));
+        if (identity && !actor) remote.disconnect(true);
+        continue;
+      }
+      identity.actor = actor;
+      if (!memberIds.has(actor.id)) {
+        await remote.leave(chatRoom(roomId));
+        continue;
+      }
+      remote.emit('chat:message', { eventId, occurredAt: occurredAt.toISOString(), entityId: message.id, message });
     }
   }
 

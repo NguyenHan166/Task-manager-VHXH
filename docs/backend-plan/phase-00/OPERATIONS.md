@@ -5,7 +5,7 @@
 | Quyết định | Cấu hình/triển khai bắt buộc | Bằng chứng cần lưu tại phase sau |
 |---|---|---|
 | D-02 | Email công vụ + mật khẩu nội bộ P0; SSO chỉ mở khi đơn vị cung cấp hệ thống/yêu cầu | Kiểm tra login/locked/rate limit Phase 02 |
-| D-03 | Access token 900 giây; refresh cookie 7 ngày, `HttpOnly`, `Secure`, `SameSite=Lax`, xoay vòng; logout một/mọi phiên | Kiểm tra refresh cũ bị từ chối, cookie flag, revoke Phase 02/08 |
+| D-03 | Access token 8 giờ; refresh cookie 7 ngày, `HttpOnly`, `Secure`, `SameSite=Lax`, xoay vòng; logout một/mọi phiên | Kiểm tra refresh cũ bị từ chối, cookie flag, revoke Phase 02/08 |
 | D-04 | Prisma + PostgreSQL; UUID server; counter CV/NH/CN theo năm Việt Nam trong transaction | Migration + tạo đồng thời không trùng mã Phase 01/03 |
 | D-05 | `openapi.v1.json` là nguồn chuẩn; envelope, `Page<T>`, 400/401/403/404/409 | Contract check BE/FE Phase 08 |
 | D-06 | R2 private; soft REMOVED; object không còn link hợp lệ dọn sau ≥90 ngày hoặc theo lưu giữ dài hơn | R2 ACL, lifecycle, cleanup log Phase 05 |

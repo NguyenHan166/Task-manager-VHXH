@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
 import type {
     RecurrenceRule,
     RecurrenceInstance,
@@ -102,10 +102,10 @@ export function RecurrencePage() {
     const loadData = async () => {
         try {
             const [rList, iList, tList, sList] = await Promise.all([
-                mockRepository.getRecurrenceRules(),
-                mockRepository.getRecurrenceInstances(),
-                mockRepository.getTasks(),
-                mockRepository.getSubmissions(),
+                workspaceRepository.getRecurrenceRules(),
+                workspaceRepository.getRecurrenceInstances(),
+                workspaceRepository.getTasks(),
+                workspaceRepository.getSubmissions(),
             ]);
             setRules(rList);
             setInstances(iList);
@@ -120,7 +120,7 @@ export function RecurrencePage() {
 
     useEffect(() => {
         loadData();
-        const unsub = mockRepository.subscribe(loadData);
+        const unsub = workspaceRepository.subscribe(loadData);
         return unsub;
     }, []);
 
@@ -150,7 +150,7 @@ export function RecurrencePage() {
     // Handle Toggle Active
     const handleToggleActive = async (rule: RecurrenceRule) => {
         try {
-            await mockRepository.toggleRecurrenceRule(rule.id, !rule.active);
+            await workspaceRepository.toggleRecurrenceRule(rule.id, !rule.active);
             showToast(
                 rule.active
                     ? `Đã tạm dừng mẫu "${rule.title}"`
@@ -168,7 +168,7 @@ export function RecurrencePage() {
         if (!currentUser) return;
         setIsGenerating(rule.id);
         try {
-            const res = await mockRepository.generateRecurrenceNext(
+            const res = await workspaceRepository.generateRecurrenceNext(
                 rule.id,
                 currentUser.id,
             );
@@ -214,12 +214,12 @@ export function RecurrencePage() {
 
             const assignees =
                 createScope === "ALL"
-                    ? staffUsers.map((u) => u.id)
+                    ? []
                     : createAssigneeIds.length > 0
                     ? createAssigneeIds
                     : [staffUsers[0]?.id || currentUser.id];
 
-            await mockRepository.createRecurrenceRule({
+            await workspaceRepository.createRecurrenceRule({
                 title: createTitle.trim(),
                 description: createDescription.trim(),
                 ownerId: currentUser.id,
@@ -270,12 +270,12 @@ export function RecurrencePage() {
         try {
             const assignees =
                 editScope === "ALL"
-                    ? staffUsers.map((u) => u.id)
+                    ? []
                     : editAssigneeIds.length > 0
                     ? editAssigneeIds
                     : [staffUsers[0]?.id || currentUser.id];
 
-            await mockRepository.updateRecurrenceRule(editingRule.id, {
+            await workspaceRepository.updateRecurrenceRule(editingRule.id, {
                 title: editTitle.trim(),
                 description: editDescription.trim(),
                 scope: editScope,
@@ -302,7 +302,7 @@ export function RecurrencePage() {
         if (!ruleToDelete) return;
         setIsDeleting(true);
         try {
-            await mockRepository.deleteRecurrenceRule(ruleToDelete.id);
+            await workspaceRepository.deleteRecurrenceRule(ruleToDelete.id);
             showToast(`Đã xóa mẫu định kỳ "${ruleToDelete.title}"`, "success");
             setRuleToDelete(null);
             await loadData();
@@ -338,7 +338,7 @@ export function RecurrencePage() {
         setIsSubmittingReport(true);
         setReportError("");
         try {
-            await mockRepository.submitRecurrenceReport(
+            await workspaceRepository.submitRecurrenceReport(
                 reportingTask.id,
                 {
                     summary: reportSummary.trim(),

@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  applyDecorators,
   HttpCode,
   HttpStatus,
   Param,
@@ -10,14 +12,18 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { UserRole } from '@prisma/client';
 import { CurrentUser, Roles } from '../../common/auth/auth.decorators';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
 import {
   CommentDto,
+  ConvertTeamTaskDto,
+  CreateAssignmentDto,
   CreateTaskDto,
+  CreateSubtaskDto,
   TaskListQueryDto,
+  TaskParticipantsQueryDto,
   TaskPageQueryDto,
   AdjustTaskDto,
   DecideApprovalDto,
@@ -25,11 +31,20 @@ import {
   SubmitTaskDto,
   TaskProgressDto,
   TaskReasonDto,
+  TeamInvitationResponseDto,
   UpdateTaskDto,
   WithdrawSubmissionDto,
 } from './tasks.dto';
 import { TasksService } from './tasks.service';
 import { TasksWorkflowService } from './tasks-workflow.service';
+import { TaskCollaborationService } from './task-collaboration.service';
+import { AssigneeRequestInputDto, DeadlineRequestInputDto, RequestDecisionDto } from '../collaboration/collaboration.dto';
+
+const ReadThrottle = () =>
+  applyDecorators(
+    SkipThrottle({ default: true, login: true }),
+    Throttle({ read: { limit: 300, ttl: 60_000 } }),
+  );
 
 @Controller('tasks')
 @SkipThrottle({ login: true })
@@ -37,9 +52,11 @@ export class TasksController {
   constructor(
     private readonly tasks: TasksService,
     private readonly workflow: TasksWorkflowService,
+    private readonly collaboration: TaskCollaborationService,
   ) {}
 
   @Get()
+  @ReadThrottle()
   list(
     @CurrentUser() actor: AuthenticatedUser,
     @Query() query: TaskListQueryDto,
@@ -47,16 +64,50 @@ export class TasksController {
     return this.tasks.list(actor, query);
   }
 
-  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
+  @Get('participants')
+  @ReadThrottle()
+  participants(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: TaskParticipantsQueryDto,
+  ) {
+    return this.tasks.participants(actor, query.taskIds);
+  }
+
   @Post()
   create(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() input: CreateTaskDto,
   ) {
-    return this.tasks.create(actor, input);
+    return input.type === 'OFFICIAL'
+      ? this.tasks.create(actor, input)
+      : this.collaboration.create(actor, input);
   }
 
+  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
+  @Post('assign')
+  assign(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() input: CreateAssignmentDto,
+  ) {
+    return this.tasks.createAssignment(actor, input);
+  }
+
+  @Get('invitations')
+  @ReadThrottle()
+  pendingInvitations(@CurrentUser() actor: AuthenticatedUser) {
+    return this.collaboration.pendingInvitations(actor);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('invitations/:participantId/respond')
+  respondInvitationById(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('participantId', new ParseUUIDPipe()) participantId: string,
+    @Body() input: TeamInvitationResponseDto,
+  ) { return this.collaboration.respondInvitationById(actor, participantId, input.status); }
+
   @Get(':id/comments')
+  @ReadThrottle()
   comments(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
@@ -75,6 +126,7 @@ export class TasksController {
   }
 
   @Get(':id/events')
+  @ReadThrottle()
   events(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
@@ -84,6 +136,7 @@ export class TasksController {
   }
 
   @Get(':id')
+  @ReadThrottle()
   detail(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
@@ -97,7 +150,65 @@ export class TasksController {
     @Param('id', new ParseUUIDPipe()) taskId: string,
     @Body() input: UpdateTaskDto,
   ) {
-    return this.tasks.update(actor, taskId, input);
+    return this.collaboration.update(actor, taskId, input).then((result) => result ?? this.tasks.update(actor, taskId, input));
+  }
+
+  @Delete(':id')
+  delete(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string) {
+    return this.collaboration.deletePersonal(actor, taskId);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/invitations/:participantId/respond')
+  respondInvitation(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) taskId: string,
+    @Param('participantId', new ParseUUIDPipe()) participantId: string,
+    @Body() input: TeamInvitationResponseDto,
+  ) { return this.collaboration.respondInvitation(actor, taskId, participantId, input.status); }
+
+  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/convert-official')
+  convertTeam(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Body() input: ConvertTeamTaskDto) {
+    return this.collaboration.convertTeam(actor, taskId, input);
+  }
+
+  @Post(':id/subtasks')
+  createSubtask(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Body() input: CreateSubtaskDto) {
+    return this.collaboration.createSubtask(actor, taskId, input);
+  }
+
+  @Post(':id/deadline-requests')
+  createDeadlineRequest(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Body() input: DeadlineRequestInputDto) {
+    return this.collaboration.createDeadlineRequest(actor, taskId, input);
+  }
+
+  @Get(':id/deadline-requests')
+  @ReadThrottle()
+  deadlineRequests(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string) { return this.collaboration.deadlineRequests(actor, taskId); }
+
+  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/deadline-requests/:requestId/decision')
+  decideDeadline(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Param('requestId', new ParseUUIDPipe()) requestId: string, @Body() input: RequestDecisionDto) {
+    return this.collaboration.decideDeadline(actor, taskId, requestId, input);
+  }
+
+  @Post(':id/assignee-requests')
+  createAssigneeRequest(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Body() input: AssigneeRequestInputDto) {
+    return this.collaboration.createAssigneeRequest(actor, taskId, input);
+  }
+
+  @Get(':id/assignee-requests')
+  @ReadThrottle()
+  assigneeRequests(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string) { return this.collaboration.assigneeRequests(actor, taskId); }
+
+  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/assignee-requests/:requestId/decision')
+  decideAssignee(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Param('requestId', new ParseUUIDPipe()) requestId: string, @Body() input: RequestDecisionDto) {
+    return this.collaboration.decideAssignee(actor, taskId, requestId, input);
   }
 
   @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
@@ -116,7 +227,7 @@ export class TasksController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
   ) {
-    return this.workflow.start(actor, taskId);
+    return this.collaboration.isP1Task(taskId).then((p1) => p1 ? this.collaboration.start(actor, taskId) : this.workflow.start(actor, taskId));
   }
 
   @HttpCode(HttpStatus.OK)
@@ -126,10 +237,17 @@ export class TasksController {
     @Param('id', new ParseUUIDPipe()) taskId: string,
     @Body() input: TaskProgressDto,
   ) {
-    return this.workflow.progress(actor, taskId, input);
+    return this.collaboration.isP1Task(taskId).then((p1) => p1 ? this.collaboration.progress(actor, taskId, input) : this.workflow.progress(actor, taskId, input));
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/complete')
+  complete(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string) {
+    return this.collaboration.complete(actor, taskId);
   }
 
   @Get(':id/submissions')
+  @ReadThrottle()
   submissions(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
@@ -159,6 +277,7 @@ export class TasksController {
   }
 
   @Get(':id/approvals')
+  @ReadThrottle()
   approvals(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
@@ -167,7 +286,6 @@ export class TasksController {
     return this.workflow.approvals(actor, taskId, query);
   }
 
-  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
   @HttpCode(HttpStatus.OK)
   @Post(':id/approve')
   approve(
@@ -206,12 +324,10 @@ export class TasksController {
   cancel(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) taskId: string,
-    @Body() input: TaskReasonDto,
   ) {
-    return this.workflow.cancel(actor, taskId, input);
+    return this.workflow.cancel(actor, taskId);
   }
 
-  @Roles(UserRole.MANAGER, UserRole.DEPUTY_MANAGER)
   @HttpCode(HttpStatus.OK)
   @Post(':id/reopen')
   reopen(
@@ -219,6 +335,6 @@ export class TasksController {
     @Param('id', new ParseUUIDPipe()) taskId: string,
     @Body() input: TaskReasonDto,
   ) {
-    return this.workflow.reopen(actor, taskId, input);
+    return this.collaboration.isP1Task(taskId).then((p1) => p1 ? this.collaboration.reopen(actor, taskId, input) : this.workflow.reopen(actor, taskId, input));
   }
 }

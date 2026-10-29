@@ -100,8 +100,8 @@ export function NotificationsPage() {
   const handleOpenNotification = async (n: Notification) => {
     await handleMarkRead(n.id);
 
-    if (!isMockMode && !n.entityId) {
-      showToast("Thông báo đã được đọc nhưng không còn công việc có thể mở theo quyền hiện tại.", "warning");
+    if (!n.entityId) {
+      showToast("Thông báo đã được đọc; công việc liên quan không còn tồn tại.", "warning");
       return;
     }
 

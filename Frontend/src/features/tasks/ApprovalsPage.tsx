@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
+import { workspaceRepository, isMockMode } from "../../shared/repository";
 import type {
   Task,
   User,
@@ -35,9 +35,18 @@ import {
   FileCheck,
   XCircle,
   Paperclip,
+  Search,
+  X,
 } from "lucide-react";
 
 type ApprovalTab = "SUBMISSIONS" | "DEADLINES" | "ASSIGNEES" | "HISTORY";
+
+const normalizeSearchText = (value: string): string =>
+  value
+    .toLocaleLowerCase("vi")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d");
 
 export function ApprovalsPage() {
   const { currentUser } = useSession();
@@ -46,6 +55,7 @@ export function ApprovalsPage() {
   const [activeTab, setActiveTab] = useState<ApprovalTab>("SUBMISSIONS");
 
   // Data states
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [reviewTasks, setReviewTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
@@ -54,6 +64,7 @@ export function ApprovalsPage() {
   const [assigneeRequests, setAssigneeRequests] = useState<TaskAssigneeRequest[]>([]);
   const [files, setFiles] = useState<FileObject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Modal states for Submission Review
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -79,42 +90,23 @@ export function ApprovalsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      if (isMockMode) {
-        const [allTasks, allUsers, allSubs, allApps, allDeadlines, allAssignees, allFiles] = await Promise.all([
-          workspaceRepository.getTasks(),
-          workspaceRepository.getUsers(),
-          workspaceRepository.getSubmissions(""),
-          workspaceRepository.getApprovals(),
-          workspaceRepository.getDeadlineRequests(),
-          workspaceRepository.getAssigneeRequests(),
-          workspaceRepository.getFiles(),
-        ]);
-        setReviewTasks(allTasks.filter((task) => task.status === "IN_REVIEW"));
-        setUsers(allUsers);
-        setSubmissions(allSubs);
-        setApprovals(allApps);
-        setDeadlineRequests(allDeadlines);
-        setAssigneeRequests(allAssignees);
-        setFiles(allFiles);
-      } else {
-        const [allTasks, allUsers, allFiles] = await Promise.all([
-          httpRepository.queryAllTasks({ type: "OFFICIAL", sortBy: "UPDATED_AT", sortDirection: "DESC" }),
-          workspaceRepository.getUsers(),
-          workspaceRepository.getFiles(),
-        ]);
-        const review = allTasks.filter((task) => task.status === "IN_REVIEW");
-        const [subBatches, approvalBatches] = await Promise.all([
-          Promise.all(review.map((task) => workspaceRepository.getSubmissions(task.id))),
-          Promise.all(allTasks.map((task) => workspaceRepository.getApprovals(task.id))),
-        ]);
-        setReviewTasks(review);
-        setUsers(allUsers);
-        setSubmissions(subBatches.flat());
-        setApprovals(approvalBatches.flat());
-        setDeadlineRequests([]);
-        setAssigneeRequests([]);
-        setFiles(allFiles);
-      }
+      const [allTasks, allUsers, allSubs, allApps, allDeadlines, allAssignees, allFiles] = await Promise.all([
+        workspaceRepository.getTasks(),
+        workspaceRepository.getUsers(),
+        workspaceRepository.getSubmissions(""),
+        workspaceRepository.getApprovals(),
+        workspaceRepository.getDeadlineRequests(),
+        workspaceRepository.getAssigneeRequests(),
+        workspaceRepository.getFiles(),
+      ]);
+      setAllTasks(allTasks);
+      setReviewTasks(allTasks.filter((task) => task.type === "OFFICIAL" && task.status === "IN_REVIEW"));
+      setUsers(allUsers);
+      setSubmissions(allSubs);
+      setApprovals(allApps);
+      setDeadlineRequests(allDeadlines);
+      setAssigneeRequests(allAssignees);
+      setFiles(allFiles);
     } finally {
       setIsLoading(false);
     }
@@ -263,6 +255,50 @@ export function ApprovalsPage() {
 
   const pendingDeadlines = deadlineRequests.filter((r) => r.status === "PENDING");
   const pendingAssignees = assigneeRequests.filter((r) => r.status === "PENDING");
+  const query = normalizeSearchText(searchQuery.trim());
+  const matchesSearch = (...values: Array<string | number | null | undefined>) =>
+    !query || values.some((value) => normalizeSearchText(String(value ?? "")).includes(query));
+
+  const filteredReviewTasks = reviewTasks.filter((task) => {
+    const taskSubmissions = submissions.filter((submission) => submission.taskId === task.id);
+    const assignee = users.find((user) => user.id === task.primaryAssigneeId);
+    return matchesSearch(
+      task.code,
+      task.title,
+      task.description,
+      task.deliverable,
+      assignee?.displayName,
+      assignee?.jobTitle,
+      ...taskSubmissions.flatMap((submission) => {
+        const submitter = users.find((user) => user.id === submission.submittedById);
+        return [submission.summary, submission.details, submission.notes, submitter?.displayName, submitter?.jobTitle];
+      }),
+    );
+  });
+  const filteredDeadlines = pendingDeadlines.filter((request) => {
+    const task = allTasks.find((item) => item.id === request.taskId);
+    const requester = users.find((user) => user.id === request.requestedById);
+    return matchesSearch(task?.code, task?.title, requester?.displayName, request.reason, request.proposedDueAt);
+  });
+  const filteredAssignees = pendingAssignees.filter((request) => {
+    const task = allTasks.find((item) => item.id === request.taskId);
+    const requester = users.find((user) => user.id === request.requestedById);
+    const proposed = users.find((user) => user.id === request.proposedAssigneeId);
+    return matchesSearch(
+      task?.code,
+      task?.title,
+      requester?.displayName,
+      requester?.jobTitle,
+      proposed?.displayName,
+      proposed?.jobTitle,
+      request.reason,
+    );
+  });
+  const filteredApprovals = approvals.filter((approval) => {
+    const task = allTasks.find((item) => item.id === approval.taskId);
+    const decider = users.find((user) => user.id === approval.decidedById);
+    return matchesSearch(task?.code, task?.title, approval.reason, approval.decision, decider?.displayName, formatDateTimeVN(approval.decidedAt));
+  });
 
   // Columns for Submissions in review
   const submissionColumns = [
@@ -382,7 +418,7 @@ export function ApprovalsPage() {
             )}
           </button>
 
-          {isMockMode && <button
+          <button
             onClick={() => setActiveTab("DEADLINES")}
             className={`px-4 py-2.5 text-xs font-semibold rounded-t-btn border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "DEADLINES"
@@ -397,9 +433,9 @@ export function ApprovalsPage() {
                 {pendingDeadlines.length}
               </span>
             )}
-          </button>}
+          </button>
 
-          {isMockMode && <button
+          <button
             onClick={() => setActiveTab("ASSIGNEES")}
             className={`px-4 py-2.5 text-xs font-semibold rounded-t-btn border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "ASSIGNEES"
@@ -414,7 +450,7 @@ export function ApprovalsPage() {
                 {pendingAssignees.length}
               </span>
             )}
-          </button>}
+          </button>
 
           <button
             onClick={() => setActiveTab("HISTORY")}
@@ -429,6 +465,28 @@ export function ApprovalsPage() {
           </button>
         </div>
 
+        <div className="relative w-full sm:max-w-md">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Tìm mã việc, tên công việc, người gửi hoặc nội dung..."
+            aria-label="Tìm kiếm trong trung tâm phê duyệt"
+            className="w-full h-10 pl-9 pr-9 rounded-btn bg-surface border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-brand-700"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Xóa nội dung tìm kiếm"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
         {/* TAB 1: SUBMISSIONS IN REVIEW */}
         {activeTab === "SUBMISSIONS" && (
           <div>
@@ -438,12 +496,18 @@ export function ApprovalsPage() {
                 title="Không có kết quả nào đang chờ duyệt"
                 description="Toàn bộ các nhiệm vụ đã được thẩm định hoặc chuyên viên đang tiếp tục triển khai."
               />
+            ) : filteredReviewTasks.length === 0 && !isLoading ? (
+              <EmptyState
+                icon={<Search className="w-10 h-10 text-slate-400" />}
+                title="Không tìm thấy hồ sơ phù hợp"
+                description="Thử tìm bằng mã việc, tên công việc, người nộp hoặc nội dung kết quả."
+              />
             ) : (
               <>
                 {/* Desktop View (>= 768px) */}
                 <div className="hidden md:block">
                   <DataTable
-                    data={reviewTasks}
+                    data={filteredReviewTasks}
                     columns={submissionColumns}
                     keyExtractor={(t) => t.id}
                     isLoading={isLoading}
@@ -452,7 +516,7 @@ export function ApprovalsPage() {
 
                 {/* Mobile View (< 768px) */}
                 <div className="block md:hidden space-y-3">
-                  {reviewTasks.map((t) => {
+                {filteredReviewTasks.map((t) => {
                     const sub = submissions.find((s) => s.taskId === t.id);
                     const u = users.find((user) => user.id === t.primaryAssigneeId);
 
@@ -538,7 +602,7 @@ export function ApprovalsPage() {
         )}
 
         {/* TAB 2: DEADLINE REQUESTS */}
-        {isMockMode && activeTab === "DEADLINES" && (
+        {activeTab === "DEADLINES" && (
           <div className="space-y-4">
             {pendingDeadlines.length === 0 ? (
               <EmptyState
@@ -546,10 +610,16 @@ export function ApprovalsPage() {
                 title="Không có yêu cầu gia hạn nào đang chờ xử lý"
                 description="Chuyên viên chưa gửi đề xuất gia hạn thời gian nào cho các nhiệm vụ."
               />
+            ) : filteredDeadlines.length === 0 ? (
+              <EmptyState
+                icon={<Search className="w-10 h-10 text-slate-400" />}
+                title="Không tìm thấy đề nghị phù hợp"
+                description="Thử tìm bằng mã việc, tên công việc, người đề xuất hoặc lý do."
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pendingDeadlines.map((req) => {
-                  const t = reviewTasks.find((task) => task.id === req.taskId) || {
+                {filteredDeadlines.map((req) => {
+                  const t = allTasks.find((task) => task.id === req.taskId) || {
                     id: req.taskId,
                     code: "CV",
                     title: "Nhiệm vụ liên quan",
@@ -627,7 +697,7 @@ export function ApprovalsPage() {
         )}
 
         {/* TAB 3: ASSIGNEE REQUESTS */}
-        {isMockMode && activeTab === "ASSIGNEES" && (
+        {activeTab === "ASSIGNEES" && (
           <div className="space-y-4">
             {pendingAssignees.length === 0 ? (
               <EmptyState
@@ -635,9 +705,15 @@ export function ApprovalsPage() {
                 title="Không có đề nghị đổi chủ trì nào đang chờ xử lý"
                 description="Chưa có yêu cầu chuyển nhượng phân công từ phía các chuyên viên."
               />
+            ) : filteredAssignees.length === 0 ? (
+              <EmptyState
+                icon={<Search className="w-10 h-10 text-slate-400" />}
+                title="Không tìm thấy đề nghị phù hợp"
+                description="Thử tìm bằng tên người gửi, người được đề xuất hoặc lý do."
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pendingAssignees.map((req) => {
+                {filteredAssignees.map((req) => {
                   const requester = users.find((u) => u.id === req.requestedById);
                   const proposed = users.find((u) => u.id === req.proposedAssigneeId);
                   return (
@@ -713,9 +789,15 @@ export function ApprovalsPage() {
                 title="Chưa có lịch sử phê duyệt"
                 description="Các quyết định duyệt hoặc trả lại kết quả sẽ được lưu vết đầy đủ tại đây."
               />
+            ) : filteredApprovals.length === 0 ? (
+              <EmptyState
+                icon={<Search className="w-10 h-10 text-slate-400" />}
+                title="Không tìm thấy lịch sử phù hợp"
+                description="Thử tìm bằng mã việc, tên công việc, người quyết định hoặc nhận xét."
+              />
             ) : (
               <div className="bg-surface rounded-card border border-border divide-y divide-border">
-                {approvals.map((app) => {
+                {filteredApprovals.map((app) => {
                   const decider = users.find((u) => u.id === app.decidedById);
                   return (
                     <div key={app.id} className="p-4 flex items-start justify-between gap-4">

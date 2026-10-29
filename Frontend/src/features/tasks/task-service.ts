@@ -193,14 +193,18 @@ export class TaskService {
 
   /**
    * Create task with business role authorization:
-   * Only MANAGER can create OFFICIAL tasks.
-   * STAFF can only create TEAM or PERSONAL tasks.
+   * Only a manager or deputy manager can assign an official task.
+   * Personal task creation stays available through the personal task flow.
    */
   public async createTask(input: CreateTaskInput, viewer: User): Promise<Task> {
-    if (input.type === "OFFICIAL" && viewer.role !== "MANAGER") {
+    if (
+      input.type === "OFFICIAL" &&
+      viewer.role !== "MANAGER" &&
+      viewer.role !== "DEPUTY_MANAGER"
+    ) {
       throw new DomainError(
         "FORBIDDEN",
-        "Chỉ Trưởng phòng (Manager) mới có quyền tạo và giao việc Chính thức (OFFICIAL). Chuyên viên chỉ có thể tạo việc Nhóm hoặc Cá nhân."
+        "Chỉ Trưởng phòng hoặc Phó phòng mới có quyền giao công việc."
       );
     }
 
@@ -332,15 +336,11 @@ export class TaskService {
   /**
    * Cancel task
    */
-  public async cancelTask(taskId: Id, reason: string, viewer: User): Promise<Task> {
-    const task = await this.getTask(taskId, viewer);
-    if (task.type === "OFFICIAL" && viewer.role !== "MANAGER") {
-      throw new DomainError("FORBIDDEN", "Chỉ Trưởng phòng mới có quyền hủy nhiệm vụ Chính thức");
+  public async cancelTask(taskId: Id, viewer: User): Promise<void> {
+    if (viewer.role !== "MANAGER" && viewer.role !== "DEPUTY_MANAGER") {
+      throw new DomainError("FORBIDDEN", "Chỉ Trưởng phòng hoặc Phó phòng mới có quyền thu hồi công việc");
     }
-    if (task.type !== "OFFICIAL" && task.createdById !== viewer.id && viewer.role !== "MANAGER") {
-      throw new DomainError("FORBIDDEN", "Bạn không có quyền hủy nhiệm vụ này");
-    }
-    return this.repo.cancelTask(taskId, reason, viewer.id);
+    return this.repo.cancelTask(taskId, viewer.id);
   }
 
   /**

@@ -8,7 +8,7 @@ import { getUnreadCount } from "../../features/tasks/task-selectors";
 import { canSeeTask } from "../../shared/data-contract";
 import type { Task, Notification } from "../../shared/data-contract";
 import { formatRelativeVN } from "../../shared/datetime";
-import { StatusBadge, TaskTypeBadge } from "../ui/Badge";
+import { StatusBadge } from "../ui/Badge";
 import { DevToolbar } from "../../features/dev/DevToolbar";
 import {
   LayoutDashboard,
@@ -206,8 +206,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Hồ sơ", path: "/profile", icon: UserIcon },
   ];
 
-  const currentNavItems = (isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems)
-    .filter((item) => isMockMode || !["/personal-tasks", "/projects", "/calendar", "/recurrence", "/chat"].includes(item.path));
+  const currentNavItems = isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems;
   const isP1Route = ["/personal-tasks", "/projects", "/calendar", "/recurrence", "/chat"].some(
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
@@ -373,7 +372,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               {task.code}
                             </span>
                             <div className="flex items-center gap-1">
-                              <TaskTypeBadge type={task.type} />
                               <StatusBadge status={task.status} />
                             </div>
                           </div>
@@ -683,12 +681,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Content Body Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto pb-28">
-          {isP1Route && (
+          {isMockMode && isP1Route && (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
               Dữ liệu mẫu · Tính năng P1 đang chạy trên bản dùng thử và chưa kết nối API thật.
             </div>
           )}
-          {hasP1TaskControls && (
+          {isMockMode && hasP1TaskControls && (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
               Các thao tác việc nhóm/cá nhân, việc con, xin gia hạn và đổi chủ trì thuộc P1; hiện chỉ chạy trên dữ liệu mẫu.
             </div>

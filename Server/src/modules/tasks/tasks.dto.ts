@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -117,6 +118,18 @@ export class TaskListQueryDto extends TaskPageQueryDto {
   sortDirection = SortDirection.DESC;
 }
 
+export class TaskParticipantsQueryDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.split(',').filter(Boolean) : value,
+  )
+  @ValidateIf(optional)
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  taskIds?: string[];
+}
+
 export class CreateTaskDto {
   @IsEnum(TaskType)
   type!: TaskType;
@@ -176,6 +189,43 @@ export class CreateTaskDto {
   @ValidateIf((_input, value: unknown) => value !== undefined && value !== null)
   @IsUUID()
   parentTaskId?: string | null;
+}
+
+export class CreateAssignmentDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @ValidateIf(optional)
+  @IsString()
+  @MaxLength(10_000)
+  description?: string;
+
+  @ValidateIf(optional)
+  @IsString()
+  @MaxLength(2_000)
+  deliverable?: string;
+
+  @ValidateIf(optional)
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  assigneeIds!: string[];
+
+  @IsDateString({ strict: true })
+  @Matches(utcTime)
+  dueAt!: string;
+
+  @ValidateIf(optionalNonNull)
+  @IsUUID()
+  projectId?: string | null;
 }
 
 export class UpdateTaskDto {
@@ -312,4 +362,47 @@ export class ReturnSubmissionDto {
   @IsString()
   @MinLength(1)
   reason!: string;
+}
+
+export class TeamInvitationResponseDto {
+  @IsIn(['ACCEPTED', 'DECLINED'])
+  status!: 'ACCEPTED' | 'DECLINED';
+}
+
+export class ConvertTeamTaskDto {
+  @IsUUID()
+  primaryAssigneeId!: string;
+
+  @IsDateString({ strict: true })
+  @Matches(utcTime)
+  dueAt!: string;
+
+  @ValidateIf(optional)
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+}
+
+export class CreateSubtaskDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @IsUUID()
+  primaryAssigneeId!: string;
+
+  @ValidateIf((_input, value: unknown) => value !== undefined && value !== null)
+  @IsDateString({ strict: true })
+  @Matches(utcTime)
+  dueAt?: string | null;
+
+  @ValidateIf(optional)
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+
+  @ValidateIf(optional)
+  @IsString()
+  @MaxLength(2_000)
+  deliverable?: string;
 }

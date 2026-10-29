@@ -86,7 +86,7 @@
                 "example": {
                   "data": {
                     "accessToken": "example-access-token",
-                    "expiresInSeconds": 900,
+                    "expiresInSeconds": 28800,
                     "user": {
                       "id": "00000000-0000-4000-8000-000000000001",
                       "username": "user@example.invalid",
@@ -258,7 +258,7 @@
             }
           }
         },
-        "description": "Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 15-minute access token. Invalid/expired cookies are cleared.",
+        "description": "Rotates 7-day HttpOnly Secure SameSite=Lax refresh cookie; returns a new 8-hour access token. Invalid/expired cookies are cleared.",
         "security": [
           {
             "refreshCookie": []

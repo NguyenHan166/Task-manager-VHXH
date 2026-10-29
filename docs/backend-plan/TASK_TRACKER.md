@@ -1,6 +1,6 @@
 # Theo dõi triển khai Backend
 
-Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–06 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-06`; workflow Phase 04, file lifecycle Phase 05 và notification Phase 06 đều qua runtime matrix trên DB disposable. Phase 07 BE-01 đến BE-04 đã triển khai và qua nghiệm thu local; phép đo tài nguyên staging BE-05 còn chờ. Phase 08 BE-01 đến BE-03 đã qua nghiệm thu local; staging/production BE-04 và Phase 09 còn chờ.
+Checkbox chỉ đánh dấu sau khi task đạt mục **Hoàn thành khi** trong file phase và có đường dẫn tới PR/bằng chứng nghiệm thu. Phase 00–06 đã có bằng chứng nghiệm thu trong thư mục `phase-00` đến `phase-06`; workflow Phase 04, file lifecycle Phase 05 và notification Phase 06 đều qua runtime matrix trên DB disposable. Phase 07 BE-01 đến BE-04 đã triển khai và qua nghiệm thu local; phép đo tài nguyên staging BE-05 còn chờ. Phase 08 BE-01 đến BE-03 đã qua nghiệm thu local; staging/production BE-04 được hoãn. Phase 09 đã có triển khai API/FE và fixture local; nghiệm thu tổng thể BE-09-06 cùng phép đo Railway còn chờ, xem [biên bản hiện tại](./phase-09/ACCEPTANCE.md).
 
 Các quyết định D-01 đến D-11 đã được người dùng chốt trong [Phase 00](./PHASE_00_CONTRACT.md). Cổng chấp thuận dữ liệu thật D-08 vẫn thuộc BE-08-04.
 
@@ -77,6 +77,8 @@ Các quyết định D-01 đến D-11 đã được người dùng chốt trong 
 - [ ] BE-08-04 — Staging, production và runbook.
 
 ## Phase 09 — [P1 collaboration](./PHASE_09_P1_COLLABORATION.md)
+
+Trạng thái hiện tại và phạm vi nghiệm thu local: [phase-09/ACCEPTANCE.md](./phase-09/ACCEPTANCE.md). Các checkbox dưới đây vẫn chờ đủ tiêu chí **Hoàn thành khi**; staging/production được giữ ngoài phạm vi theo yêu cầu.
 
 - [ ] BE-09-01 — TEAM/PERSONAL/invitation/convert.
 - [ ] BE-09-02 — Projects và calendar.

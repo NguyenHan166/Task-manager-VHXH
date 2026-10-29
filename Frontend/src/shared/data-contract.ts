@@ -79,6 +79,17 @@ export interface TaskParticipant {
   respondedAt: IsoDateTime | null;
 }
 
+export interface TaskInvitationPreview {
+  id: Id;
+  role: ParticipantRole;
+  invitedAt: IsoDateTime;
+  task: {
+    code: string;
+    title: string;
+    creator: { displayName: string };
+  };
+}
+
 export interface TaskComment {
   id: Id;
   taskId: Id;

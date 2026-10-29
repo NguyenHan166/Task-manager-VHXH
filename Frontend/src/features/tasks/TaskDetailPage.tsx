@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
@@ -31,7 +31,6 @@ import {
   CardContent,
   StatusBadge,
   PriorityBadge,
-  TaskTypeBadge,
   OverdueBadge,
   BlockedBadge,
   UserAvatar,
@@ -69,6 +68,7 @@ import {
   AlertTriangle,
   CornerDownRight,
   ExternalLink,
+  Eye,
   X,
   Download,
   Undo2,
@@ -76,9 +76,13 @@ import {
 
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { currentUser, isLeader } = useSession();
   const { showToast } = useToast();
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Data states
   const [task, setTask] = useState<Task | null>(null);
@@ -109,13 +113,6 @@ export function TaskDetailPage() {
   const [subtaskDueTime, setSubtaskDueTime] = useState("17:30");
   const [subtaskPriority, setSubtaskPriority] = useState<TaskPriority>("NORMAL");
   const [subtaskDeliverable, setSubtaskDeliverable] = useState("");
-
-  // Convert TEAM to OFFICIAL modal state
-  const [showConvertModal, setShowConvertModal] = useState(false);
-  const [convertAssigneeId, setConvertAssigneeId] = useState("");
-  const [convertDueDate, setConvertDueDate] = useState("");
-  const [convertDueTime, setConvertDueTime] = useState("17:30");
-  const [convertPriority, setConvertPriority] = useState<TaskPriority>("NORMAL");
 
   // Tab state (5 Tabs: activity, subtasks, comments, submissions, files)
   const [activeTab, setActiveTab] = useState<"activity" | "subtasks" | "comments" | "submissions" | "files">("activity");
@@ -154,7 +151,6 @@ export function TaskDetailPage() {
   const [deadlineReason, setDeadlineReason] = useState("");
 
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
 
   const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -322,6 +318,27 @@ export function TaskDetailPage() {
       showToast(error instanceof Error ? error.message : "Không thể tải tệp", "error");
     } finally {
       setDownloadingFileId(null);
+    }
+  };
+
+  const handlePreviewFile = async (file: FileObject) => {
+    setPreviewFile(file);
+    setPreviewUrl(null);
+    const supportsInlinePreview = file.mimeType === "application/pdf" || file.mimeType.startsWith("image/");
+    if (!supportsInlinePreview) return;
+    setIsLoadingPreview(true);
+    try {
+      const url = isMockMode
+        ? getSessionFileUrl(file.id)
+        : await httpRepository.getPreviewUrl(file.id);
+      setPreviewUrl(url);
+      if (!url && isMockMode) {
+        showToast("Tệp mẫu này không có nội dung xem trước trong phiên hiện tại.", "info");
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Không thể mở bản xem trước.", "error");
+    } finally {
+      setIsLoadingPreview(false);
     }
   };
 
@@ -623,19 +640,15 @@ export function TaskDetailPage() {
     }
   };
 
-  // Action 10: Cancel Task (requires reason)
+  // Action 10: Withdraw and delete a task
   const handleCancelTask = async () => {
     if (!task || !currentUser) return;
-    if (!cancelReason.trim()) {
-      showToast("Bắt buộc nhập lý do hủy nhiệm vụ.", "error");
-      return;
-    }
     setIsSubmittingAction(true);
     try {
-      await workspaceRepository.cancelTask(task.id, cancelReason.trim(), currentUser.id);
+      await workspaceRepository.cancelTask(task.id, currentUser.id);
       setShowCancelModal(false);
-      setCancelReason("");
-      showToast("Đã hủy nhiệm vụ thành công.", "info");
+      showToast("Đã thu hồi và xóa công việc.", "info");
+      navigate("/tasks", { replace: true });
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi hủy công việc", "error");
     } finally {
@@ -841,7 +854,7 @@ export function TaskDetailPage() {
       await workspaceRepository.respondInvitation(invite.id, decision, currentUser.id);
       showToast(
         decision === "ACCEPTED"
-          ? "Đã đồng ý tham gia công việc nhóm thành công"
+          ? "Đã đồng ý cùng thực hiện công việc"
           : "Đã từ chối lời mời tham gia",
         "success"
       );
@@ -863,49 +876,12 @@ export function TaskDetailPage() {
         task.id,
         "DONE",
         currentUser.id,
-        "Người tạo/chủ trì xác nhận hoàn tất công việc nhóm"
+        "Người được giao xác nhận hoàn tất công việc"
       );
-      showToast(`Đã hoàn tất công việc nhóm [${task.code}]`, "success");
+      showToast(`Đã hoàn tất công việc [${task.code}]`, "success");
       await loadAllTaskData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Thao tác thất bại";
-      showToast(msg, "error");
-    } finally {
-      setIsSubmittingAction(false);
-    }
-  };
-
-  // Handle Convert TEAM to OFFICIAL
-  const handleConvertTeamToOfficial = async () => {
-    if (!currentUser || !task) return;
-    if (!convertAssigneeId) {
-      showToast("Vui lòng chọn người chủ trì", "error");
-      return;
-    }
-    let dueAt = task.dueAt || new Date(Date.now() + 72 * 3600000).toISOString();
-    if (convertDueDate) {
-      dueAt = new Date(`${convertDueDate}T${convertDueTime || "17:30"}:00+07:00`).toISOString();
-    }
-
-    try {
-      setIsSubmittingAction(true);
-      const converted = await workspaceRepository.convertTeamToOfficial(
-        task.id,
-        {
-          primaryAssigneeId: convertAssigneeId,
-          dueAt,
-          priority: convertPriority,
-        },
-        currentUser.id
-      );
-      showToast(
-        `Đã chuyển đổi việc nhóm thành nhiệm vụ chính thức [${converted.code}] thành công!`,
-        "success"
-      );
-      setShowConvertModal(false);
-      await loadAllTaskData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Chuyển đổi thất bại";
       showToast(msg, "error");
     } finally {
       setIsSubmittingAction(false);
@@ -955,7 +931,7 @@ export function TaskDetailPage() {
   if (isForbidden) {
     return (
       <ForbiddenPage
-        message="Nhiệm vụ này là việc cá nhân riêng tư của người khác, bản nháp bạn không được giao, hoặc bạn chưa chấp nhận lời mời tham gia."
+        message="Bạn chưa được cấp quyền xem công việc này hoặc chưa chấp nhận lời mời cùng thực hiện."
         resourceName={`Nhiệm vụ ID ${id}`}
         backUrl="/tasks"
       />
@@ -1008,9 +984,16 @@ export function TaskDetailPage() {
   const assignee = users.find((u) => u.id === task.primaryAssigneeId);
 
   // Permission conditions for action buttons
-  const isAssignee = task.primaryAssigneeId === currentUser?.id;
+  const isPrimaryAssignee = task.primaryAssigneeId === currentUser?.id;
+  const isAssignedCollaborator = participants.some(
+    (participant) => participant.userId === currentUser?.id && participant.role === "COLLABORATOR" && participant.invitationStatus === "ACCEPTED",
+  );
+  const isAssignee = isPrimaryAssignee || isAssignedCollaborator;
   const isCreator = task.createdById === currentUser?.id;
   const canActAsAssignee = isAssignee || isLeader;
+  const canWithdrawSubmission = submissions.some(
+    (submission) => submission.status === "PENDING" && submission.submittedById === currentUser?.id,
+  );
   const myInvite = participants.find(
     (p) => p.userId === currentUser?.id && p.invitationStatus === "PENDING"
   );
@@ -1030,7 +1013,7 @@ export function TaskDetailPage() {
         />
 
         {/* Pending Team Invitation Response Banner */}
-        {isMockMode && myInvite && (
+        {myInvite && (
           <div className="bg-amber-50 border-2 border-amber-300 rounded-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-scale-up">
             <div className="flex items-start gap-3.5">
               <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
@@ -1038,7 +1021,7 @@ export function TaskDetailPage() {
               </div>
               <div className="space-y-1">
                 <div className="font-bold text-sm text-text-primary">
-                  Lời mời tham gia công việc nhóm
+                  Lời mời cùng thực hiện công việc
                 </div>
                 <p className="text-xs text-text-secondary leading-relaxed">
                   Bạn nhận được lời mời tham gia phối hợp nhiệm vụ này với vai trò{" "}
@@ -1080,7 +1063,6 @@ export function TaskDetailPage() {
                 <span className="font-mono font-bold text-sm bg-slate-100 px-2.5 py-1 rounded text-text-primary">
                   {task.code}
                 </span>
-                <TaskTypeBadge type={task.type} />
                 <StatusBadge status={task.status} />
                 <PriorityBadge priority={task.priority} />
                 {overdue && <OverdueBadge />}
@@ -1148,7 +1130,7 @@ export function TaskDetailPage() {
                 </Button>
               )}
 
-              {/* IN_PROGRESS: Update progress (Primary Assignee only) */}
+              {/* IN_PROGRESS: Update progress (assigned workers) */}
               {task.status === "IN_PROGRESS" && isAssignee && (
                 <Button
                   variant="outline"
@@ -1160,7 +1142,7 @@ export function TaskDetailPage() {
                 </Button>
               )}
 
-              {/* IN_PROGRESS: Submit deliverable (Primary Assignee only for OFFICIAL) */}
+              {/* IN_PROGRESS: Submit deliverable (assigned workers) */}
               {task.status === "IN_PROGRESS" && isAssignee && task.type === "OFFICIAL" && (
                 <Button
                   variant="primary"
@@ -1173,7 +1155,7 @@ export function TaskDetailPage() {
               )}
 
               {/* TEAM: Confirm Done directly without Manager review */}
-              {isMockMode && task.type === "TEAM" && task.status === "IN_PROGRESS" && (isAssignee || isCreator) && (
+              {task.type !== "OFFICIAL" && task.status === "IN_PROGRESS" && (isAssignee || isCreator) && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1185,25 +1167,8 @@ export function TaskDetailPage() {
                 </Button>
               )}
 
-              {/* TEAM: Convert to OFFICIAL (Manager only) */}
-              {isMockMode && task.type === "TEAM" && task.status !== "CANCELLED" && isLeader && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    setConvertAssigneeId(task.primaryAssigneeId || currentUser?.id || "u02");
-                    setConvertDueDate(task.dueAt ? task.dueAt.slice(0, 10) : "");
-                    setConvertPriority(task.priority);
-                    setShowConvertModal(true);
-                  }}
-                  className="gap-1.5 bg-blue-700 hover:bg-blue-800 text-white"
-                >
-                  <GitFork className="w-3.5 h-3.5" /> Chuyển thành OFFICIAL
-                </Button>
-              )}
-
               {/* IN_PROGRESS: Propose Assignee Change (Primary Assignee only) */}
-              {isMockMode && task.status === "IN_PROGRESS" && isAssignee && task.type === "OFFICIAL" && (
+              {task.status === "IN_PROGRESS" && isAssignee && task.type === "OFFICIAL" && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1243,7 +1208,7 @@ export function TaskDetailPage() {
               )}
 
               {/* IN_REVIEW: Specialist Withdraw Submission */}
-              {task.status === "IN_REVIEW" && isAssignee && (
+              {task.status === "IN_REVIEW" && canWithdrawSubmission && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1258,7 +1223,7 @@ export function TaskDetailPage() {
               )}
 
               {/* Request Deadline Extension (Assignee when active) */}
-              {isMockMode && task.status !== "DONE" && task.status !== "CANCELLED" && task.status !== "DRAFT" && isAssignee && (
+              {task.status !== "DONE" && task.status !== "CANCELLED" && task.status !== "DRAFT" && isPrimaryAssignee && task.type === "OFFICIAL" && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1309,18 +1274,15 @@ export function TaskDetailPage() {
                 </Button>
               )}
 
-              {/* Cancel task (Manager or Creator for non-official) */}
-              {task.status !== "DONE" && task.status !== "CANCELLED" && (isLeader || (isCreator && task.type !== "OFFICIAL")) && (
+              {/* Leaders can withdraw and permanently delete an active assignment */}
+              {task.status !== "DONE" && task.status !== "CANCELLED" && isLeader && task.type !== "PERSONAL" && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setCancelReason("");
-                    setShowCancelModal(true);
-                  }}
+                  onClick={() => setShowCancelModal(true)}
                   className="gap-1.5 text-danger border-red-200 hover:bg-red-50"
                 >
-                  <Ban className="w-3.5 h-3.5" /> Hủy việc
+                  <Ban className="w-3.5 h-3.5" /> Thu hồi công việc
                 </Button>
               )}
             </div>
@@ -1333,7 +1295,7 @@ export function TaskDetailPage() {
             <div className="flex items-center gap-2.5">
               <FileQuestion className="w-5 h-5 text-slate-600 shrink-0" />
               <div className="text-xs text-text-primary">
-                <strong>Bản nháp nhiệm vụ:</strong> Công việc này chưa được chính thức phát hành. Người được gán chưa nhận được thông báo thực hiện.
+                <strong>Bản nháp, chưa giao:</strong> Người nhận chưa được thông báo. Chọn “Giao việc ngay” để phát hành công việc và gửi thông báo cho tất cả người nhận.
               </div>
             </div>
             {isLeader && (
@@ -1350,7 +1312,7 @@ export function TaskDetailPage() {
         )}
 
         {/* Pending Deadline Request Banner */}
-        {isMockMode && pendingDeadline && (
+        {pendingDeadline && (
           <div className="p-4 bg-amber-50 border border-amber-300 rounded-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <Clock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
@@ -1397,7 +1359,7 @@ export function TaskDetailPage() {
         )}
 
         {/* Pending Assignee Request Banner */}
-        {isMockMode && pendingAssignee && (
+        {pendingAssignee && (
           <div className="p-4 bg-blue-50 border border-blue-300 rounded-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <UserCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
@@ -1567,7 +1529,7 @@ export function TaskDetailPage() {
                   Bình luận ({comments.length})
                 </button>
 
-                {isMockMode && <button
+                <button
                   type="button"
                   onClick={() => setActiveTab("subtasks")}
                   className={`py-3 px-3 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
@@ -1578,7 +1540,7 @@ export function TaskDetailPage() {
                 >
                   <GitFork className="w-3.5 h-3.5" />
                   Việc con ({subtasks.length})
-                </button>}
+                </button>
 
                 <button
                   type="button"
@@ -1634,7 +1596,7 @@ export function TaskDetailPage() {
                 )}
 
                 {/* TAB: Việc con (Subtasks) */}
-                {isMockMode && activeTab === "subtasks" && (
+                {activeTab === "subtasks" && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="text-xs text-text-secondary">
@@ -2079,7 +2041,7 @@ export function TaskDetailPage() {
                                   <Clock className="w-3.5 h-3.5 text-purple-700 shrink-0" />
                                   <span>Đang chờ Trưởng phòng xem xét duyệt kết quả.</span>
                                 </div>
-                                {task.status === "IN_REVIEW" && isAssignee && (
+                                {task.status === "IN_REVIEW" && sub.status === "PENDING" && sub.submittedById === currentUser?.id && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -2114,7 +2076,7 @@ export function TaskDetailPage() {
                         onClick={() => setShowFileUploadModal(true)}
                         className="gap-1.5 text-xs"
                       >
-                        <Upload className="w-3.5 h-3.5" /> Đính kèm tệp mẫu
+                        <Upload className="w-3.5 h-3.5" /> Đính kèm tệp
                       </Button>
                     </div>
 
@@ -2128,7 +2090,7 @@ export function TaskDetailPage() {
                           const uploader = users.find((u) => u.id === file.uploadedById);
                           const sizeKb = Math.round(file.sizeBytes / 1024);
                           return (
-                            <div key={file.id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                            <div key={file.id} className="py-3 flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
                                   <FileText className="w-4 h-4" />
@@ -2142,10 +2104,28 @@ export function TaskDetailPage() {
                                   </div>
                                 </div>
                               </div>
-
-                              <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono shrink-0">
-                                MOCK LOCAL
-                              </span>
+                              <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5 px-2.5 text-[11px]"
+                                  onClick={() => void handlePreviewFile(file)}
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> Xem trong ứng dụng
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5 px-2.5 text-[11px]"
+                                  disabled={downloadingFileId === file.id}
+                                  onClick={() => void handleDownloadFile(file)}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  {downloadingFileId === file.id ? "Đang tải…" : "Tải về"}
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
@@ -2166,7 +2146,7 @@ export function TaskDetailPage() {
               <CardContent className="space-y-4 text-xs">
                 {/* Assignee */}
                 <div>
-                  <div className="text-text-muted font-medium mb-1.5">Người chủ trì chính:</div>
+                  <div className="text-text-muted font-medium mb-1.5">Người nhận chính:</div>
                   <div className="p-2.5 rounded-btn bg-slate-50 border border-border flex items-center gap-2.5">
                     <UserAvatar name={assignee?.displayName || "—"} size="sm" />
                     <div>
@@ -2209,7 +2189,7 @@ export function TaskDetailPage() {
                 {/* Participants */}
                 <div>
                   <div className="text-text-muted font-medium mb-1.5">
-                    Người phối hợp & Theo dõi ({participants.length}):
+                    Cùng thực hiện & Theo dõi ({participants.length}):
                   </div>
                   {participants.length === 0 ? (
                     <div className="text-text-muted italic py-1">Không có người phối hợp thêm.</div>
@@ -2561,9 +2541,9 @@ export function TaskDetailPage() {
         {/* --- MODAL 6: PHÁT HÀNH BẢN NHÁP (MANAGER) --- */}
         <ConfirmDialog
           isOpen={showPublishModal}
-          title="Phát hành và chính thức giao nhiệm vụ"
-          description="Chuyển trạng thái từ DRAFT sang TODO, kích hoạt hạn hoàn thành và gửi thông báo giao việc đến người chủ trì."
-          confirmLabel="Phát hành giao việc"
+          title="Phát hành và giao việc"
+          description="Công việc sẽ bắt đầu được thực hiện, hạn hoàn thành có hiệu lực và tất cả người nhận sẽ được thông báo."
+          confirmLabel="Phát hành & giao việc"
           variant="primary"
           isLoading={isSubmittingAction}
           onConfirm={handlePublishTask}
@@ -2693,28 +2673,17 @@ export function TaskDetailPage() {
           </div>
         </ConfirmDialog>
 
-        {/* --- MODAL 10: HỦY NHIỆM VỤ (MANAGER / CREATOR) --- */}
+        {/* --- MODAL 10: THU HỒI VÀ XÓA CÔNG VIỆC --- */}
         <ConfirmDialog
           isOpen={showCancelModal}
-          title="Xác nhận hủy nhiệm vụ này?"
-          description="Công việc sẽ chuyển sang trạng thái ĐÃ HỦY (CANCELLED) và giữ nguyên toàn bộ lịch sử sự kiện."
-          confirmLabel="Xác nhận hủy"
+          title="Thu hồi và xóa công việc này?"
+          description="Công việc và lịch sử xử lý sẽ bị xóa. Tệp đính kèm được gỡ khỏi công việc. Người nhận sẽ được thông báo; thao tác này không thể hoàn tác."
+          confirmLabel="Xác nhận thu hồi"
           variant="danger"
           isLoading={isSubmittingAction}
           onConfirm={handleCancelTask}
           onCancel={() => setShowCancelModal(false)}
-        >
-          <div className="space-y-3 pt-2 text-xs">
-            <Textarea
-              label="Lý do hủy nhiệm vụ *"
-              placeholder="Nêu rõ căn cứ chỉ đạo hủy hoặc thay đổi kế hoạch..."
-              rows={2}
-              required
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-            />
-          </div>
-        </ConfirmDialog>
+        />
 
         {/* --- MODAL 11: DECIDE DEADLINE REQUEST (MANAGER) --- */}
         {activeDecideDeadline && (
@@ -2831,68 +2800,6 @@ export function TaskDetailPage() {
           </div>
         </ConfirmDialog>
 
-        {/* --- MODAL 14: CONVERT TEAM TASK TO OFFICIAL (MANAGER ONLY) --- */}
-        <ConfirmDialog
-          isOpen={showConvertModal}
-          title="Chuyển thành nhiệm vụ chính thức (OFFICIAL)"
-          description="Nhiệm vụ nhóm sẽ được chuyển sang loại OFFICIAL với mã công việc mới (CV-...). Hệ thống sẽ lưu vết mã cũ trong nhật ký và gửi thông báo cho người chủ trì."
-          confirmText="Chuyển sang OFFICIAL"
-          cancelText="Hủy"
-          isLoading={isSubmittingAction}
-          onConfirm={handleConvertTeamToOfficial}
-          onClose={() => setShowConvertModal(false)}
-        >
-          <div className="space-y-4 pt-2 text-xs">
-            <div className="space-y-1.5">
-              <label className="font-bold text-text-secondary">
-                Người chủ trì mới <span className="text-danger-600">*</span>
-              </label>
-              <Select
-                value={convertAssigneeId}
-                onChange={(e) => setConvertAssigneeId(e.target.value)}
-              >
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.displayName} ({u.role === "MANAGER" ? "Trưởng phòng" : "Chuyên viên"})
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="font-bold text-text-secondary">Hạn hoàn thành (Ngày)</label>
-                <Input
-                  type="date"
-                  value={convertDueDate}
-                  onChange={(e) => setConvertDueDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="font-bold text-text-secondary">Giờ (HH:mm)</label>
-                <Input
-                  type="time"
-                  value={convertDueTime}
-                  onChange={(e) => setConvertDueTime(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-text-secondary">Mức độ ưu tiên</label>
-              <Select
-                value={convertPriority}
-                onChange={(e) => setConvertPriority(e.target.value as TaskPriority)}
-              >
-                <option value="LOW">Thấp (LOW)</option>
-                <option value="NORMAL">Bình thường (NORMAL)</option>
-                <option value="HIGH">Cao (HIGH)</option>
-                <option value="URGENT">Khẩn cấp (URGENT)</option>
-              </Select>
-            </div>
-          </div>
-        </ConfirmDialog>
-
         {/* --- MODAL 15: THÊM VIỆC CON (SUBTASK) --- */}
         <ConfirmDialog
           isOpen={showAddSubtaskModal}
@@ -2988,6 +2895,82 @@ export function TaskDetailPage() {
             </div>
           </div>
         </ConfirmDialog>
+
+        {previewFile && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setPreviewFile(null);
+                setPreviewUrl(null);
+              }
+            }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Xem tệp ${previewFile.originalName}`}
+              className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+            >
+              <header className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+                <FileText className="h-5 w-5 shrink-0 text-brand-700" />
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-sm font-semibold text-text-primary">{previewFile.originalName}</h2>
+                  <p className="text-[11px] text-text-muted">Xem tệp đính kèm trong ứng dụng</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={downloadingFileId === previewFile.id}
+                  onClick={() => void handleDownloadFile(previewFile)}
+                >
+                  <Download className="h-3.5 w-3.5" /> Tải về
+                </Button>
+                <button
+                  type="button"
+                  aria-label="Đóng bản xem trước"
+                  onClick={() => {
+                    setPreviewFile(null);
+                    setPreviewUrl(null);
+                  }}
+                  className="rounded p-2 text-text-muted hover:bg-slate-100 hover:text-text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </header>
+              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-slate-100 p-3 sm:p-5">
+                {isLoadingPreview ? (
+                  <p className="text-sm text-text-secondary">Đang mở tệp…</p>
+                ) : previewUrl && previewFile.mimeType.startsWith("image/") ? (
+                  <img
+                    src={previewUrl}
+                    alt={previewFile.originalName}
+                    className="max-h-[78vh] max-w-full rounded object-contain shadow"
+                  />
+                ) : previewUrl && previewFile.mimeType === "application/pdf" ? (
+                  <iframe
+                    src={previewUrl}
+                    title={`Bản xem trước ${previewFile.originalName}`}
+                    className="h-[78vh] w-full rounded border border-border bg-white"
+                  />
+                ) : previewFile.mimeType.startsWith("image/") || previewFile.mimeType === "application/pdf" ? (
+                  <div className="rounded-lg border border-border bg-white p-6 text-center text-sm text-text-secondary">
+                    Không thể tạo bản xem trước. Bạn có thể tải tệp về để mở.
+                  </div>
+                ) : (
+                  <div className="max-w-lg rounded-lg border border-border bg-white p-6 text-center">
+                    <FileText className="mx-auto h-9 w-9 text-brand-700" />
+                    <p className="mt-3 font-semibold text-text-primary">Định dạng này chưa hỗ trợ xem trực tiếp</p>
+                    <p className="mt-1 text-sm text-text-secondary">Tệp vẫn được đính kèm cùng công việc; tải xuống để mở bằng ứng dụng phù hợp.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
       </div>
     </AppShell>
   );

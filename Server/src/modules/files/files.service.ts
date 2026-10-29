@@ -42,8 +42,9 @@ type ResolvedTarget = {
   task: Pick<
     Task,
     'id' | 'type' | 'status' | 'createdById' | 'primaryAssigneeId'
-  >;
-  entityType: FileEntityType.TASK | FileEntityType.COMMENT;
+  > | null;
+  roomId?: string;
+  entityType: FileEntityType.TASK | FileEntityType.COMMENT | FileEntityType.MESSAGE;
   entityId: string;
 };
 
@@ -51,6 +52,7 @@ type FileLinkTaskId = {
   taskId: string | null;
   submissionId: string | null;
   commentId: string | null;
+  messageId: string | null;
 };
 
 @Injectable()
@@ -84,9 +86,11 @@ export class FilesService {
     );
     const result = await this.prisma.$transaction(async (tx) => {
       const target = await this.resolveWriteTarget(tx, actor, input);
-      await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM tasks WHERE id = ${target.task.id}::uuid FOR UPDATE
-      `;
+      if (target.roomId) {
+        await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM chat_rooms WHERE id = ${target.roomId}::uuid FOR UPDATE`;
+      } else if (target.task) {
+        await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM tasks WHERE id = ${target.task.id}::uuid FOR UPDATE`;
+      }
       const lockedTarget = await this.resolveWriteTarget(tx, actor, input);
       const linkWhere = this.linkTargetWhere(lockedTarget);
       const [count, settings] = await Promise.all([
@@ -136,7 +140,9 @@ export class FilesService {
           fileId,
           ...(lockedTarget.entityType === FileEntityType.TASK
             ? { taskId: lockedTarget.entityId }
-            : { commentId: lockedTarget.entityId }),
+            : lockedTarget.entityType === FileEntityType.COMMENT
+              ? { commentId: lockedTarget.entityId }
+              : { messageId: lockedTarget.entityId }),
           createdAt: now,
         },
       });
@@ -280,10 +286,6 @@ export class FilesService {
     if (Boolean(query.entityType) !== Boolean(query.entityId)) {
       throw invalid('entityType and entityId must be provided together');
     }
-    if (query.entityType === FileEntityType.MESSAGE) {
-      throw invalid('MESSAGE file access opens in Phase 09');
-    }
-
     const scopeWhere = await this.listScopeWhere(actor, query);
     const where: Prisma.FileLinkWhereInput = {
       removedAt: null,
@@ -358,6 +360,25 @@ export class FilesService {
     };
   }
 
+  async previewUrl(actor: AuthenticatedUser, fileId: string) {
+    const file = await this.prisma.fileObject.findFirst({
+      where: { id: fileId, status: FileStatus.READY },
+    });
+    if (!file) throw notFound();
+    await this.assertFileTaskAccess(actor, file.id, false);
+    const previewUrl = await this.storage.createPreviewUrl({
+      objectKey: file.objectKey,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+    });
+    return {
+      previewUrl,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      expiresAt: new Date(Date.now() + this.storage.ttlSeconds() * 1000),
+    };
+  }
+
   async remove(actor: AuthenticatedUser, fileId: string) {
     const file = await this.prisma.fileObject.findUnique({
       where: { id: fileId },
@@ -366,7 +387,7 @@ export class FilesService {
     const task = await this.assertFileTaskAccess(actor, file.id, false, true);
     if (
       file.uploadedById !== actor.id &&
-      !this.access.canOperateOfficial(actor, task)
+      (!task || !this.access.canOperateOfficial(actor, task))
     ) {
       throw forbidden(
         'Only the uploader or a task leader can remove this file',
@@ -492,7 +513,16 @@ export class FilesService {
     input: UploadUrlDto,
   ): Promise<ResolvedTarget> {
     if (input.entityType === FileEntityType.MESSAGE) {
-      throw invalid('MESSAGE file access opens in Phase 09');
+      const message = await tx.chatMessage.findFirst({
+        where: {
+          id: input.entityId,
+          deletedAt: null,
+          room: { is: { members: { some: { userId: actor.id } } } },
+        },
+        select: { id: true, roomId: true },
+      });
+      if (!message) throw notFound();
+      return { task: null, roomId: message.roomId, entityType: FileEntityType.MESSAGE, entityId: message.id };
     }
     if (
       input.entityType !== FileEntityType.TASK &&
@@ -541,9 +571,6 @@ export class FilesService {
     if (input.entityType === FileEntityType.COMMENT && !comment)
       throw notFound();
     const targetTask = task ?? comment!.task;
-    if (targetTask.type !== TaskType.OFFICIAL) {
-      throw forbidden('File uploads for TEAM and PERSONAL open in Phase 09');
-    }
     if (input.entityType === FileEntityType.TASK) {
       if (
         targetTask.status !== TaskStatus.DRAFT &&
@@ -552,10 +579,21 @@ export class FilesService {
       ) {
         throw conflict('Task files can only be uploaded before submission');
       }
-      if (
-        !this.access.canOperateOfficial(actor, targetTask) &&
-        targetTask.primaryAssigneeId !== actor.id
-      ) {
+      const assignedCollaborator = targetTask.type === TaskType.OFFICIAL
+        ? await tx.taskParticipant.findFirst({
+            where: {
+              taskId: targetTask.id,
+              userId: actor.id,
+              role: 'COLLABORATOR',
+              invitationStatus: 'ACCEPTED',
+            },
+            select: { id: true },
+          })
+        : null;
+      const canWriteTask = targetTask.type === TaskType.OFFICIAL
+        ? this.access.canOperateOfficial(actor, targetTask) || targetTask.primaryAssigneeId === actor.id || Boolean(assignedCollaborator)
+        : targetTask.createdById === actor.id || targetTask.primaryAssigneeId === actor.id;
+      if (!canWriteTask) {
         throw forbidden(
           'Only the task creator, leader or current assignee can upload files',
         );
@@ -581,7 +619,8 @@ export class FilesService {
       task: targetTask,
       entityType: input.entityType as
         | FileEntityType.TASK
-        | FileEntityType.COMMENT,
+        | FileEntityType.COMMENT
+        | FileEntityType.MESSAGE,
       entityId: input.entityId,
     };
   }
@@ -593,16 +632,25 @@ export class FilesService {
     includeRemovedLinks = false,
   ): Promise<
     Pick<Task, 'id' | 'type' | 'status' | 'createdById' | 'primaryAssigneeId'>
+    | null
   > {
     const links = await this.prisma.fileLink.findMany({
       where: {
         fileId,
         ...(includeRemovedLinks ? {} : { removedAt: null }),
       },
-      select: { taskId: true, submissionId: true, commentId: true },
+      select: { taskId: true, submissionId: true, commentId: true, messageId: true },
       take: 20,
     });
     for (const link of links) {
+      if (link.messageId) {
+        const message = await this.prisma.chatMessage.findFirst({
+          where: { id: link.messageId, deletedAt: null, room: { is: { members: { some: { userId: actor.id } } } } },
+          select: { id: true },
+        });
+        if (message) return null;
+        continue;
+      }
       const taskId = await this.taskIdForLink(this.prisma, link);
       if (!taskId) continue;
       const task = await this.prisma.task.findFirst({
@@ -626,18 +674,25 @@ export class FilesService {
               select: { authorId: true },
             })
           : null;
-        const canWrite =
-          this.access.canOperateOfficial(actor, task) ||
-          task.primaryAssigneeId === actor.id ||
-          commentAuthor?.authorId === actor.id;
+        const assignedCollaborator = task.type === TaskType.OFFICIAL
+          ? await this.prisma.taskParticipant.findFirst({
+              where: {
+                taskId: task.id,
+                userId: actor.id,
+                role: 'COLLABORATOR',
+                invitationStatus: 'ACCEPTED',
+              },
+              select: { id: true },
+            })
+          : null;
+        const canWrite = task.type === TaskType.OFFICIAL
+          ? this.access.canOperateOfficial(actor, task) || task.primaryAssigneeId === actor.id || Boolean(assignedCollaborator) || commentAuthor?.authorId === actor.id
+          : task.createdById === actor.id || task.primaryAssigneeId === actor.id || commentAuthor?.authorId === actor.id;
         if (!canWrite) {
           throw forbidden('File upload permission is no longer active');
         }
-        if (task.type !== TaskType.OFFICIAL) {
-          throw forbidden('File access for this task type is not active');
-        }
         const isCommentAttachment = Boolean(link.commentId);
-        if (
+        if (task.type === TaskType.OFFICIAL && (
           isCommentAttachment
             ? new Set<TaskStatus>([
                 TaskStatus.DRAFT,
@@ -649,9 +704,10 @@ export class FilesService {
                 TaskStatus.TODO,
                 TaskStatus.IN_PROGRESS,
               ]).has(task.status)
-        ) {
+        )) {
           throw conflict('File upload permission is no longer active');
         }
+        if (task.type !== TaskType.OFFICIAL && (task.status === TaskStatus.DONE || task.status === TaskStatus.CANCELLED)) throw conflict('File upload permission is no longer active');
       }
       return task;
     }
@@ -706,7 +762,8 @@ export class FilesService {
       if (query.entityType === FileEntityType.COMMENT) {
         return { commentId: query.entityId };
       }
-      throw invalid('MESSAGE file access opens in Phase 09');
+      if (query.entityType === FileEntityType.MESSAGE) return { messageId: query.entityId };
+      throw invalid('Unsupported file entity');
     }
     const readable = this.access.readableTaskWhere(actor);
     return {
@@ -714,6 +771,7 @@ export class FilesService {
         { task: { is: { AND: [readable] } } },
         { submission: { is: { task: { is: { AND: [readable] } } } } },
         { comment: { is: { task: { is: { AND: [readable] } } } } },
+        { message: { is: { room: { is: { members: { some: { userId: actor.id } } } } } } },
       ],
     };
   }
@@ -725,7 +783,9 @@ export class FilesService {
     entityId: string,
   ): Promise<string> {
     if (entityType === FileEntityType.MESSAGE) {
-      throw invalid('MESSAGE file access opens in Phase 09');
+      const message = await prisma.chatMessage.findFirst({ where: { id: entityId, room: { is: { members: { some: { userId: actor.id } } } } }, select: { roomId: true } });
+      if (!message) throw notFound();
+      return message.roomId;
     }
     let taskId: string | null = null;
     if (entityType === FileEntityType.TASK) {
@@ -759,9 +819,9 @@ export class FilesService {
   private linkTargetWhere(
     target: Pick<ResolvedTarget, 'entityType' | 'entityId'>,
   ): Prisma.FileLinkWhereInput {
-    return target.entityType === FileEntityType.TASK
-      ? { taskId: target.entityId }
-      : { commentId: target.entityId };
+    if (target.entityType === FileEntityType.TASK) return { taskId: target.entityId };
+    if (target.entityType === FileEntityType.COMMENT) return { commentId: target.entityId };
+    return { messageId: target.entityId };
   }
 
   private async writeAudit(

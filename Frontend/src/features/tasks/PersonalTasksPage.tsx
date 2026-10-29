@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
-import { mockRepository } from "../../mocks/mock-repository";
+import { workspaceRepository } from "../../shared/repository";
 import type { Task, TaskPriority, TaskStatus } from "../../shared/data-contract";
 import {
   Breadcrumb,
@@ -73,7 +73,7 @@ export function PersonalTasksPage() {
     if (!currentUser) return;
     setIsLoading(true);
     try {
-      const allTasks = await mockRepository.getTasks();
+      const allTasks = await workspaceRepository.getTasks();
       const myPersonal = allTasks.filter(
         (t) => t.type === "PERSONAL" && t.createdById === currentUser.id
       );
@@ -85,7 +85,7 @@ export function PersonalTasksPage() {
 
   useEffect(() => {
     loadPersonalTasks();
-    const unsub = mockRepository.subscribe(loadPersonalTasks);
+    const unsub = workspaceRepository.subscribe(loadPersonalTasks);
     return unsub;
   }, [currentUser]);
 
@@ -101,7 +101,7 @@ export function PersonalTasksPage() {
   const handleQuickStatus = async (task: Task, newStatus: TaskStatus) => {
     if (!currentUser) return;
     try {
-      await mockRepository.changeTaskStatus(
+      await workspaceRepository.changeTaskStatus(
         task.id,
         newStatus,
         currentUser.id,
@@ -129,7 +129,7 @@ export function PersonalTasksPage() {
         dueAt = new Date(`${newDueDate}T${timePart}:00+07:00`).toISOString();
       }
 
-      const created = await mockRepository.createTask(
+      const created = await workspaceRepository.createTask(
         {
           type: "PERSONAL",
           title: newTitle.trim(),
@@ -177,7 +177,7 @@ export function PersonalTasksPage() {
     }
 
     try {
-      await mockRepository.updateTask(
+      await workspaceRepository.updateTask(
         editingTask.id,
         {
           title: editTitle.trim(),
@@ -199,7 +199,7 @@ export function PersonalTasksPage() {
   const handleDeleteTask = async () => {
     if (!currentUser || !deletingTask) return;
     try {
-      await mockRepository.deletePersonalTask(deletingTask.id, currentUser.id);
+      await workspaceRepository.deletePersonalTask(deletingTask.id, currentUser.id);
       showToast(`Đã xóa việc cá nhân [${deletingTask.code}]`, "success");
       setDeletingTask(null);
     } catch (err: unknown) {

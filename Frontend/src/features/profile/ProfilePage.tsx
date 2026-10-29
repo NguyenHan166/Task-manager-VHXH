@@ -18,7 +18,7 @@ import { CheckCircle2, Edit2, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export function ProfilePage() {
-  const { currentUser, isManager, isDeputy, users, switchUser, refreshSession, logout } = useSession();
+  const { currentUser, isManager, isDeputy, isLeader, users, switchUser, refreshSession, logout } = useSession();
   const { showToast } = useToast();
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -143,11 +143,11 @@ export function ProfilePage() {
                 <CardTitle>Quyền hạn & Phạm vi xử lý</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-xs leading-relaxed">
-                {isManager ? (
+                {isLeader ? (
                   <ul className="space-y-2 text-text-secondary">
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Quản trị & Giao việc:</strong> Có quyền tạo và phát hành công việc Chính thức (OFFICIAL) cho tất cả chuyên viên trong phòng.</span>
+                      <span><strong>Quản trị & Giao việc:</strong> Trưởng phòng và Phó phòng có thể giao công việc cho một hoặc nhiều chuyên viên, đính kèm tài liệu và phát hành.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -174,7 +174,7 @@ export function ProfilePage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                      <span><strong>Tạo việc nhóm & cá nhân:</strong> Tạo việc cộng tác nhóm (TEAM) hoặc việc riêng tư (PERSONAL). Không thể tạo việc Chính thức (OFFICIAL).</span>
+                      <span><strong>Nhận công việc:</strong> Xem tài liệu đính kèm, cùng thực hiện với các đồng nghiệp, cập nhật tiến độ và nộp kết quả.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />

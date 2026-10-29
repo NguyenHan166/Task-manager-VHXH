@@ -3,7 +3,6 @@ import type { Task, User } from "../../shared/data-contract";
 import {
   StatusBadge,
   PriorityBadge,
-  TaskTypeBadge,
   OverdueBadge,
   BlockedBadge,
 } from "./Badge";
@@ -42,7 +41,6 @@ export function TaskCard({ task, assignee, onClick, className }: TaskCardProps) 
           <span className="font-mono text-xs font-semibold text-text-primary">
             {task.code}
           </span>
-          <TaskTypeBadge type={task.type} />
         </div>
         <div className="flex items-center gap-1.5">
           <PriorityBadge priority={task.priority} />

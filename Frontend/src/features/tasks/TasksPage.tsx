@@ -9,7 +9,6 @@ import {
   Button,
   StatusBadge,
   PriorityBadge,
-  TaskTypeBadge,
   OverdueBadge,
   BlockedBadge,
   UserAvatar,
@@ -23,10 +22,10 @@ import type {
   Task,
   TaskPriority,
   TaskStatus,
-  TaskType,
   Project,
   TaskParticipant,
   TaskQuery,
+  TaskInvitationPreview,
 } from "../../shared/data-contract";
 import {
   PlusCircle,
@@ -45,7 +44,7 @@ import {
 } from "lucide-react";
 
 export function TasksPage() {
-  const { currentUser, isManager, isLeader, users } = useSession();
+  const { currentUser, isLeader, users } = useSession();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,7 +52,6 @@ export function TasksPage() {
   // Read URL query parameters
   const viewMode = (searchParams.get("view") as "list" | "kanban") || "list";
   const search = searchParams.get("search") || "";
-  const typeFilter = (searchParams.get("type") as TaskType | "ALL") || "ALL";
   const statusFilter = (searchParams.get("status") as TaskStatus | "ALL") || "ALL";
   const priorityFilter = (searchParams.get("priority") as TaskPriority | "ALL") || "ALL";
   const projectId = searchParams.get("projectId") || "ALL";
@@ -69,6 +67,7 @@ export function TasksPage() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [participants, setParticipants] = useState<TaskParticipant[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<TaskInvitationPreview[]>([]);
   const [serverTotal, setServerTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -102,6 +101,7 @@ export function TasksPage() {
           setAllTasks(tList);
           setProjects(pList);
           setParticipants(partList);
+          setPendingInvitations([]);
           setServerTotal(tList.length);
           return;
         }
@@ -110,7 +110,6 @@ export function TasksPage() {
           page: viewMode === "kanban" ? 1 : Math.max(1, Number(params.get("page") || 1)),
           pageSize: viewMode === "kanban" ? 100 : Math.min(100, Math.max(1, Number(params.get("pageSize") || 10))),
           scope: (params.get("scope") as TaskQuery["scope"]) || (isLeader ? "ALL" : "OWNED"),
-          type: (params.get("type") as TaskQuery["type"]) || "ALL",
           status: (params.get("status") as TaskQuery["status"]) || "ALL",
           priority: (params.get("priority") as TaskQuery["priority"]) || "ALL",
           primaryAssigneeId: params.get("primaryAssigneeId") || "ALL",
@@ -119,17 +118,19 @@ export function TasksPage() {
           sortBy: (params.get("sortBy") as TaskQuery["sortBy"]) || "UPDATED_AT",
           sortDirection: (params.get("sortDirection") as TaskQuery["sortDirection"]) || "DESC",
         };
-        const [pageData, pList] = await Promise.all([
+        const [pageData, pList, invitations] = await Promise.all([
           viewMode === "kanban"
             ? httpRepository.queryAllTasks(query).then((items) => ({ items, total: items.length }))
             : httpRepository.queryTasks(query),
           workspaceRepository.getProjects(),
+          httpRepository.getPendingInvitations(),
         ]);
         const visibleParts = await httpRepository.getParticipantsForTasks(pageData.items.map((task) => task.id));
         if (!live) return;
         setAllTasks(pageData.items);
         setProjects(pList);
         setParticipants(visibleParts);
+        setPendingInvitations(invitations);
         setServerTotal(pageData.total);
       } catch (error) {
         if (live) showToast(error instanceof Error ? error.message : "Không thể tải công việc.", "error");
@@ -153,6 +154,17 @@ export function TasksPage() {
       }
     });
     setSearchParams(next);
+  };
+
+  const respondToInvitation = async (invite: TaskInvitationPreview, status: 'ACCEPTED' | 'DECLINED') => {
+    if (!currentUser) return;
+    try {
+      await workspaceRepository.respondInvitation(invite.id, status, currentUser.id);
+      setPendingInvitations((items) => items.filter((item) => item.id !== invite.id));
+      showToast(status === 'ACCEPTED' ? 'Đã nhận lời mời cùng thực hiện công việc.' : 'Đã từ chối lời mời.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể phản hồi lời mời.', 'error');
+    }
   };
 
   // Filter tasks synchronously based on URL params and user permissions
@@ -180,8 +192,13 @@ export function TasksPage() {
     // 2. Scope filter (Staff doesn't have "Toàn phòng")
     if (scope && scope !== "ALL") {
       if (scope === "OWNED") {
-        list = list.filter(
-          (t) => t.primaryAssigneeId === currentUser.id || t.createdById === currentUser.id
+        const assignedTaskIds = new Set(
+          participants
+            .filter((p) => p.userId === currentUser.id && p.role === "COLLABORATOR" && p.invitationStatus === "ACCEPTED")
+            .map((p) => p.taskId),
+        );
+        list = list.filter((t) =>
+          t.primaryAssigneeId === currentUser.id || t.createdById === currentUser.id || assignedTaskIds.has(t.id),
         );
       } else if (scope === "COLLABORATING") {
         const collabTaskIds = new Set(
@@ -198,12 +215,7 @@ export function TasksPage() {
       }
     }
 
-    // 3. Type filter
-    if (typeFilter !== "ALL") {
-      list = list.filter((t) => t.type === typeFilter);
-    }
-
-    // 4. Status filter
+    // 3. Status filter
     if (statusFilter !== "ALL") {
       list = list.filter((t) => t.status === statusFilter);
     }
@@ -262,10 +274,8 @@ export function TasksPage() {
   }, [
     allTasks,
     currentUser,
-    isManager,
     participants,
     scope,
-    typeFilter,
     statusFilter,
     priorityFilter,
     projectId,
@@ -334,7 +344,6 @@ export function TasksPage() {
   // Active filter count indicator
   const activeFiltersCount =
     (search ? 1 : 0) +
-    (typeFilter !== "ALL" ? 1 : 0) +
     (statusFilter !== "ALL" ? 1 : 0) +
     (priorityFilter !== "ALL" ? 1 : 0) +
     (projectId !== "ALL" ? 1 : 0) +
@@ -395,14 +404,8 @@ export function TasksPage() {
       },
     },
     {
-      key: "type",
-      header: "Phân loại",
-      width: "110px",
-      render: (t: Task) => <TaskTypeBadge type={t.type} />,
-    },
-    {
       key: "assignee",
-      header: "Chủ trì",
+      header: "Người nhận chính",
       width: "150px",
       render: (t: Task) => {
         const u = users.find((user) => user.id === t.primaryAssigneeId);
@@ -466,24 +469,6 @@ export function TasksPage() {
       render: (t: Task) => <PriorityBadge priority={t.priority} />,
     },
     {
-      key: "progress",
-      header: "Tiến độ",
-      width: "90px",
-      render: (t: Task) => (
-        <div className="space-y-1">
-          <div className="text-[11px] font-mono font-semibold text-text-primary">
-            {t.progressPercent}%
-          </div>
-          <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${t.isBlocked ? "bg-amber-500" : "bg-brand-700"}`}
-              style={{ width: `${t.progressPercent}%` }}
-            />
-          </div>
-        </div>
-      ),
-    },
-    {
       key: "status",
       header: "Trạng thái",
       width: "120px",
@@ -520,9 +505,9 @@ export function TasksPage() {
         <PageHeader
           title={isLeader ? "Tất cả công việc phòng" : "Công việc của tôi"}
           subtitle={
-            isManager
-              ? "Xem toàn bộ các nhiệm vụ chính thức, nhiệm vụ nhóm và việc cá nhân do bạn tạo. Quản lý phân công và tiến độ."
-              : "Danh sách công việc bạn được giao chủ trì, tham gia phối hợp hoặc được mời theo dõi."
+            isLeader
+              ? "Xem công việc được giao trong phòng, theo dõi tiến độ và quản lý việc cùng thực hiện."
+              : "Danh sách công việc bạn được giao, cùng thực hiện hoặc đang theo dõi."
           }
           actions={
             <div className="flex items-center gap-2.5">
@@ -550,7 +535,7 @@ export function TasksPage() {
                 </button>
               </div>
 
-              {(isLeader || isMockMode) && (
+              {isLeader && (
                 <Link to="/tasks/create">
                   <Button variant="primary" size="sm" className="gap-1.5 shadow-sm">
                     <PlusCircle className="w-4 h-4" />
@@ -561,6 +546,30 @@ export function TasksPage() {
             </div>
           }
         />
+
+        {!isMockMode && pendingInvitations.length > 0 && (
+          <section className="rounded-card border border-amber-200 bg-amber-50 p-4 space-y-3">
+            <div>
+              <h2 className="text-sm font-bold text-amber-950">Lời mời cùng thực hiện công việc</h2>
+              <p className="mt-1 text-xs text-amber-800">Thông tin chi tiết chỉ hiện sau khi bạn nhận lời mời.</p>
+            </div>
+            <div className="space-y-2">
+              {pendingInvitations.map((invite) => (
+                <div key={invite.id} className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="font-mono text-[11px] text-text-muted">{invite.task.code}</div>
+                    <div className="text-sm font-semibold text-text-primary">{invite.task.title}</div>
+                    <div className="text-xs text-text-secondary">Mời bởi {invite.task.creator.displayName} · {invite.role === 'COLLABORATOR' ? 'Người phối hợp' : 'Người theo dõi'}</div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => void respondToInvitation(invite, 'DECLINED')}>Từ chối</Button>
+                    <Button variant="primary" size="sm" onClick={() => void respondToInvitation(invite, 'ACCEPTED')}>Chấp nhận</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Comprehensive Filter Bar (URL Synced) */}
         <div className="bg-surface p-3.5 rounded-card border border-border shadow-xs space-y-3">
@@ -587,7 +596,7 @@ export function TasksPage() {
 
             {/* Scope tabs */}
             <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 text-xs">
-              {isManager && (
+              {isLeader && (
                 <button
                   onClick={() => updateParams({ scope: "ALL", page: "1" })}
                   className={`px-3 py-1.5 rounded-btn font-medium whitespace-nowrap transition-colors ${
@@ -607,7 +616,7 @@ export function TasksPage() {
                     : "text-text-secondary hover:bg-slate-50 border border-transparent"
                 }`}
               >
-                Tôi chủ trì
+                Công việc của tôi
               </button>
               <button
                 onClick={() => updateParams({ scope: "COLLABORATING", page: "1" })}
@@ -617,7 +626,7 @@ export function TasksPage() {
                     : "text-text-secondary hover:bg-slate-50 border border-transparent"
                 }`}
               >
-                Tôi phối hợp
+                Cùng thực hiện
               </button>
               <button
                 onClick={() => updateParams({ scope: "WATCHING", page: "1" })}
@@ -634,18 +643,6 @@ export function TasksPage() {
 
           {/* Secondary Filter Dropdowns */}
           <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/60 text-xs">
-            {/* Task Type */}
-            <select
-              value={typeFilter}
-              onChange={(e) => updateParams({ type: e.target.value, page: "1" })}
-              className="h-8 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
-            >
-              <option value="ALL">Mọi loại việc</option>
-              <option value="OFFICIAL">Chính thức (OFFICIAL)</option>
-              <option value="TEAM">Cộng tác nhóm (TEAM)</option>
-              <option value="PERSONAL">Cá nhân (PERSONAL)</option>
-            </select>
-
             {/* Status (In List mode) */}
             {viewMode === "list" && (
               <select
@@ -691,7 +688,7 @@ export function TasksPage() {
             </select>
 
             {/* Assignee (if Manager or all) */}
-            {isManager && (
+            {isLeader && (
               <select
                 value={primaryAssigneeId}
                 onChange={(e) => updateParams({ primaryAssigneeId: e.target.value, page: "1" })}
@@ -741,7 +738,7 @@ export function TasksPage() {
                     <Button variant="outline" size="sm" onClick={clearAllFilters}>
                       Xóa bộ lọc
                     </Button>
-                  ) : (isLeader || isMockMode) ? (
+                  ) : isLeader ? (
                     <Link to="/tasks/create">
                       <Button variant="primary" size="sm">
                         <PlusCircle className="w-4 h-4 mr-1.5" /> Giao việc mới
@@ -789,7 +786,6 @@ export function TasksPage() {
                             <span className="font-mono font-bold text-xs bg-slate-100 text-brand-800 px-2 py-0.5 rounded">
                               {t.code}
                             </span>
-                            <TaskTypeBadge type={t.type} />
                             {overdue && <OverdueBadge />}
                             {!overdue && dueSoon && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
@@ -1037,7 +1033,6 @@ export function TasksPage() {
                                   {task.code}
                                 </span>
                                 <div className="flex items-center gap-1">
-                                  <TaskTypeBadge type={task.type} />
                                   <PriorityBadge priority={task.priority} />
                                 </div>
                               </div>

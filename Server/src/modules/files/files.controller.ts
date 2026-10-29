@@ -51,6 +51,14 @@ export class FilesController {
     return this.files.downloadUrl(actor, fileId);
   }
 
+  @Get(':id/preview-url')
+  previewUrl(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) fileId: string,
+  ) {
+    return this.files.previewUrl(actor, fileId);
+  }
+
   @HttpCode(HttpStatus.OK)
   @Delete(':id')
   remove(
