@@ -33,6 +33,7 @@ type DirectoryUser = Pick<
   | 'id'
   | 'email'
   | 'displayName'
+  | 'role'
   | 'jobTitle'
   | 'department'
   | 'phoneNumber'
@@ -67,6 +68,7 @@ const directoryProjection = (user: User): DirectoryUser => ({
   username: user.email,
   email: user.email,
   displayName: user.displayName,
+  role: user.role,
   jobTitle: user.jobTitle,
   department: user.department,
   phoneNumber: user.phoneNumber,

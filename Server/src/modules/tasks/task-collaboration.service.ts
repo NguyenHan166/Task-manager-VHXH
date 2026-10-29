@@ -23,7 +23,7 @@ import { TaskAccessPolicy } from '../../common/auth/task-access.policy';
 import { RequestContextService } from '../../common/http/request-context.service';
 import { BusinessCodeService } from '../../database/business-code.service';
 import { PrismaService } from '../../database/prisma.service';
-import type { CreateTaskDto, TaskProgressDto, TaskReasonDto, UpdateTaskDto } from './tasks.dto';
+import type { CreateTaskDto, TaskProgressDto, TaskReasonDto, TransferTaskDto, UpdateTaskDto } from './tasks.dto';
 import type { AssigneeRequestInputDto, DeadlineRequestInputDto, RequestDecisionDto } from '../collaboration/collaboration.dto';
 
 const bad = (message: string) => new BadRequestException({ code: 'VALIDATION', message });
@@ -279,6 +279,50 @@ export class TaskCollaborationService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), 'An assignee request is already pending for this task');
   }
 
+  async transfer(actor: AuthenticatedUser, taskId: string, input: TransferTaskDto) {
+    if (actor.role !== UserRole.STAFF) throw forbidden('Only specialists can transfer their assigned tasks');
+    return this.mapConcurrentConflict(this.prisma.$transaction(async (tx) => {
+      const task = await tx.task.findFirst({ where: { id: taskId, AND: [this.access.readableTaskWhere(actor)] } });
+      if (!task) throw missing();
+      if ((task.type !== TaskType.OFFICIAL && task.type !== TaskType.TEAM) || task.primaryAssigneeId !== actor.id) {
+        throw forbidden('Only the current primary assignee can transfer this task');
+      }
+      if (task.status !== TaskStatus.TODO && task.status !== TaskStatus.IN_PROGRESS) {
+        throw conflict('Only an active task can be transferred');
+      }
+      if (input.assigneeId === actor.id) throw bad('Choose another specialist');
+      const target = await tx.user.findFirst({
+        where: { id: input.assigneeId, role: UserRole.STAFF, status: UserStatus.ACTIVE },
+        select: { id: true, displayName: true },
+      });
+      if (!target) throw bad('The new assignee must be an active specialist');
+
+      const now = new Date();
+      const changed = await tx.task.updateMany({
+        where: { id: task.id, version: task.version, primaryAssigneeId: actor.id, status: { in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] } },
+        data: { primaryAssigneeId: target.id, assignedAt: now, version: { increment: 1 } },
+      });
+      if (changed.count !== 1) throw conflict('The task changed during transfer');
+      await tx.taskParticipant.deleteMany({ where: { taskId: task.id, userId: target.id } });
+      await tx.taskAssigneeRequest.updateMany({
+        where: { taskId: task.id, status: RequestStatus.PENDING },
+        data: { status: RequestStatus.REJECTED, decidedById: actor.id, decidedAt: now, decisionReason: 'Nhiệm vụ đã được chuyển xử lý trực tiếp.' },
+      });
+      const note = input.note?.trim();
+      const event = await this.recordEvent(tx, task, actor.id, 'ASSIGNEE_CHANGED', note || `Chuyển xử lý cho ${target.displayName}.`,
+        { primaryAssigneeId: actor.id }, { primaryAssigneeId: target.id }, now);
+      await tx.notification.createMany({
+        data: [
+          { recipientId: target.id, taskId: task.id, type: NotificationType.TASK_ASSIGNED, title: 'Bạn được chuyển giao công việc', body: `[${task.code}] ${task.title} đã được chuyển cho bạn xử lý.${note ? ` Lời nhắn: ${note}` : ''}`, businessEventId: event.id, createdAt: now },
+          ...(task.createdById !== actor.id && task.createdById !== target.id ? [{ recipientId: task.createdById, taskId: task.id, type: NotificationType.TASK_UPDATED, title: 'Công việc đã được chuyển xử lý', body: `[${task.code}] ${task.title} đã được chuyển cho ${target.displayName}.`, businessEventId: event.id, createdAt: now }] : []),
+        ],
+        skipDuplicates: true,
+      });
+      const updated = await tx.task.findUniqueOrThrow({ where: { id: task.id } });
+      return publicTask(updated);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), 'Task changed during transfer');
+  }
+
   async deadlineRequests(actor: AuthenticatedUser, taskId: string) {
     await this.readableTask(actor, taskId);
     return this.prisma.taskDeadlineRequest.findMany({ where: { taskId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
@@ -360,7 +404,7 @@ export class TaskCollaborationService {
       if (task.createdById !== actor.id) throw forbidden('Only the PERSONAL task creator can operate it');
       return;
     }
-    if (task.type !== TaskType.TEAM || (task.createdById !== actor.id && task.primaryAssigneeId !== actor.id)) throw forbidden('Only the TEAM creator or primary assignee can operate it');
+    if (task.type !== TaskType.TEAM || (task.primaryAssigneeId ? task.primaryAssigneeId !== actor.id : task.createdById !== actor.id)) throw forbidden('Only the current TEAM assignee can operate it');
   }
 
   private async resolveDueAt(input: CreateTaskDto): Promise<Date | null> {

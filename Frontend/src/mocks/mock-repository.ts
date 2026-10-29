@@ -2317,6 +2317,40 @@ export class MockRepository {
 
     // --- Assignee Requests ---
 
+    public async transferTask(taskId: Id, input: { assigneeId: Id; note?: string }, actorId: Id): Promise<Task> {
+        await this.delay();
+        this.checkFailure();
+        const db = this.getDb();
+        const actor = db.users.find((user) => user.id === actorId);
+        const taskIndex = db.tasks.findIndex((item) => item.id === taskId);
+        const task = db.tasks[taskIndex];
+        if (!task) throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
+        if (actor?.role !== "STAFF" || task.primaryAssigneeId !== actorId || (task.type !== "OFFICIAL" && task.type !== "TEAM")) {
+            throw new DomainError("FORBIDDEN", "Chỉ chuyên viên đang nhận chính mới được chuyển xử lý");
+        }
+        if (task.status !== "TODO" && task.status !== "IN_PROGRESS") throw new DomainError("CONFLICT", "Chỉ có thể chuyển công việc đang thực hiện");
+        if (input.assigneeId === actorId) throw new DomainError("VALIDATION", "Hãy chọn chuyên viên khác");
+        const target = db.users.find((user) => user.id === input.assigneeId && user.role === "STAFF" && user.status === "ACTIVE");
+        if (!target) throw new DomainError("VALIDATION", "Chuyên viên nhận việc phải đang hoạt động");
+
+        const now = toIsoUtc();
+        const note = input.note?.trim();
+        const updated: Task = { ...task, primaryAssigneeId: target.id, assignedAt: now, updatedAt: now, version: (task.version ?? 1) + 1 };
+        db.tasks[taskIndex] = updated;
+        db.participants = db.participants.filter((participant) => participant.taskId !== taskId || participant.userId !== target.id);
+        db.assigneeRequests = db.assigneeRequests.map((request) => request.taskId === taskId && request.status === "PENDING"
+            ? { ...request, status: "REJECTED", decidedById: actorId, decidedAt: now, decisionReason: "Nhiệm vụ đã được chuyển xử lý trực tiếp." }
+            : request);
+        db.events.push({ id: `e_${Date.now()}_transfer`, taskId, actorId, kind: "ASSIGNEE_CHANGED", note: note || `Chuyển xử lý cho ${target.displayName}.`, before: { primaryAssigneeId: actorId }, after: { primaryAssigneeId: target.id }, createdAt: now });
+        db.notifications.push({ id: `n_${Date.now()}_transfer`, recipientId: target.id, type: "TASK_ASSIGNED", title: "Bạn được chuyển giao công việc", body: `[${task.code}] ${task.title} đã được chuyển cho bạn xử lý.${note ? ` Lời nhắn: ${note}` : ""}`, entityType: "TASK", entityId: taskId, createdAt: now, readAt: null });
+        if (task.createdById !== actorId && task.createdById !== target.id) {
+            db.notifications.push({ id: `n_${Date.now()}_transfer_creator`, recipientId: task.createdById, type: "TASK_UPDATED", title: "Công việc đã được chuyển xử lý", body: `[${task.code}] ${task.title} đã được chuyển cho ${target.displayName}.`, entityType: "TASK", entityId: taskId, createdAt: now, readAt: null });
+        }
+        this.persist();
+        this.notify();
+        return { ...updated };
+    }
+
     public async getAssigneeRequests(
         taskId?: Id,
     ): Promise<TaskAssigneeRequest[]> {

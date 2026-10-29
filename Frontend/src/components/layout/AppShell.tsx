@@ -216,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex bg-canvas text-text-primary antialiased">
       {/* Desktop Sidebar (Fixed 248px) */}
-      <aside className="hidden lg:flex flex-col w-[248px] bg-surface border-r border-border shrink-0 z-20">
+      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start flex-col w-[248px] bg-surface border-r border-border shrink-0 z-20">
         {/* Brand Header */}
         <div className="h-16 flex items-center px-5 border-b border-border/80 gap-3">
           <div className="w-8 h-8 rounded-lg bg-brand-700 text-white flex items-center justify-center font-bold text-base shadow-sm">
@@ -233,7 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="min-h-0 flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-3 mb-2">
             {isManager ? "Quản trị & Điều hành" : isDeputy ? "Điều hành & Phê duyệt" : "Không gian Chuyên viên"}
           </div>
@@ -638,7 +638,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-surface border-b border-border p-4 space-y-1 shadow-lg z-20">
+          <div className="lg:hidden sticky top-16 z-20 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-surface border-b border-border p-4 space-y-1 shadow-lg">
             <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-3 mb-2">
               {isManager ? "Quản trị & Điều hành (Manager)" : "Không gian Chuyên viên (Staff)"}
             </div>

@@ -162,9 +162,9 @@ export function TaskDetailPage() {
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
 
-  const [showAssigneeRequestModal, setShowAssigneeRequestModal] = useState(false);
-  const [proposedAssigneeId, setProposedAssigneeId] = useState("");
-  const [assigneeRequestReason, setAssigneeRequestReason] = useState("");
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferAssigneeId, setTransferAssigneeId] = useState("");
+  const [transferNote, setTransferNote] = useState("");
 
   const [activeDecideDeadline, setActiveDecideDeadline] = useState<{
     req: TaskDeadlineRequest;
@@ -656,32 +656,26 @@ export function TaskDetailPage() {
     }
   };
 
-  // Action 12: Propose Assignee Change (Staff)
-  const handleCreateAssigneeRequest = async () => {
+  // Action 12: Transfer directly to another specialist
+  const handleTransferTask = async () => {
     if (!task || !currentUser) return;
-    if (!proposedAssigneeId || proposedAssigneeId === task.primaryAssigneeId) {
-      showToast("Vui lòng chọn người đề xuất khác với người đang chủ trì", "error");
-      return;
-    }
-    if (!assigneeRequestReason.trim()) {
-      showToast("Bắt buộc nhập lý do đề nghị chuyển người chủ trì", "error");
+    if (!transferAssigneeId || transferAssigneeId === task.primaryAssigneeId) {
+      showToast("Vui lòng chọn chuyên viên khác để nhận việc", "error");
       return;
     }
     setIsSubmittingAction(true);
     try {
-      await workspaceRepository.createAssigneeRequest(
+      await workspaceRepository.transferTask(
         task.id,
-        {
-          proposedAssigneeId,
-          reason: assigneeRequestReason.trim(),
-        },
+        { assigneeId: transferAssigneeId, note: transferNote.trim() || undefined },
         currentUser.id
       );
-      setShowAssigneeRequestModal(false);
-      setAssigneeRequestReason("");
-      showToast("Đã gửi đề nghị chuyển chủ trì tới Trưởng phòng.", "success");
+      setShowTransferModal(false);
+      setTransferNote("");
+      showToast("Đã chuyển xử lý công việc. Chuyên viên nhận việc đã có thông báo.", "success");
+      navigate("/tasks", { replace: true });
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Lỗi gửi đề nghị", "error");
+      showToast(err instanceof Error ? err.message : "Không thể chuyển xử lý công việc", "error");
     } finally {
       setIsSubmittingAction(false);
     }
@@ -969,7 +963,9 @@ export function TaskDetailPage() {
   );
   const isAssignee = isPrimaryAssignee || isAssignedCollaborator;
   const isCreator = task.createdById === currentUser?.id;
-  const canActAsAssignee = isAssignee || isLeader;
+  const canActAsAssignee = task.type === "OFFICIAL"
+    ? isAssignee || isLeader
+    : task.primaryAssigneeId ? isPrimaryAssignee : isCreator;
   const canWithdrawSubmission = submissions.some(
     (submission) => submission.status === "PENDING" && submission.submittedById === currentUser?.id,
   );
@@ -1110,7 +1106,7 @@ export function TaskDetailPage() {
               )}
 
               {/* IN_PROGRESS: Update progress (assigned workers) */}
-              {task.status === "IN_PROGRESS" && isAssignee && (
+              {task.status === "IN_PROGRESS" && canActAsAssignee && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1134,7 +1130,7 @@ export function TaskDetailPage() {
               )}
 
               {/* TEAM: Confirm Done directly without Manager review */}
-              {task.type !== "OFFICIAL" && task.status === "IN_PROGRESS" && (isAssignee || isCreator) && (
+              {task.type !== "OFFICIAL" && task.status === "IN_PROGRESS" && (task.primaryAssigneeId ? isPrimaryAssignee : isCreator) && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1146,19 +1142,19 @@ export function TaskDetailPage() {
                 </Button>
               )}
 
-              {/* IN_PROGRESS: Propose Assignee Change (Primary Assignee only) */}
-              {task.status === "IN_PROGRESS" && isAssignee && task.type === "OFFICIAL" && (
+              {/* Primary specialist transfers an active task directly */}
+              {(task.status === "TODO" || task.status === "IN_PROGRESS") && isPrimaryAssignee && currentUser?.role === "STAFF" && (task.type === "OFFICIAL" || task.type === "TEAM") && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setProposedAssigneeId("");
-                    setAssigneeRequestReason("");
-                    setShowAssigneeRequestModal(true);
+                    setTransferAssigneeId("");
+                    setTransferNote("");
+                    setShowTransferModal(true);
                   }}
                   className="gap-1.5 text-blue-800 border-blue-200 hover:bg-blue-50"
                 >
-                  <UserCheck className="w-3.5 h-3.5 text-blue-700" /> Đề nghị đổi chủ trì
+                  <UserCheck className="w-3.5 h-3.5 text-blue-700" /> Chuyển xử lý
                 </Button>
               )}
 
@@ -2077,43 +2073,30 @@ export function TaskDetailPage() {
           {/* Right Column (4 cols): Phụ trách, Hạn, Tiến độ */}
           <div className="order-1 space-y-6 lg:order-2 lg:col-span-4">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle>Thông tin điều hành</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle>Phụ trách &amp; tiến độ</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                {/* Assignee */}
-                <div>
-                  <div className="text-text-muted font-medium mb-1.5">Người nhận chính:</div>
-                  <div className="p-2.5 rounded-btn bg-slate-50 border border-border flex items-center gap-2.5">
+              <CardContent className="space-y-3 text-xs">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="flex min-w-0 items-center gap-2.5 rounded-lg bg-slate-50 px-3 py-2">
                     <UserAvatar name={assignee?.displayName || "—"} size="sm" />
+                    <div className="min-w-0">
+                      <div className="text-[11px] text-text-muted">Người nhận chính</div>
+                      <div className="truncate font-semibold text-text-primary">{assignee?.displayName || "Chưa giao"}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 rounded-lg bg-slate-50 px-3 py-2">
+                    <Calendar className="h-4 w-4 shrink-0 text-brand-700" />
                     <div>
-                      <div className="font-bold text-text-primary">{assignee?.displayName || "Chưa giao"}</div>
-                      <div className="text-[11px] text-text-muted">{assignee?.jobTitle}</div>
+                      <div className="text-[11px] text-text-muted">Hạn hoàn thành</div>
+                      <div className={`font-semibold ${overdue ? "text-danger" : "text-text-primary"}`}>{formatDateTimeVN(task.dueAt)}</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Due Date */}
-                <div>
-                  <div className="text-text-muted font-medium mb-1.5">Hạn hoàn thành:</div>
-                  <div className="p-2.5 rounded-btn bg-slate-50 border border-border flex items-center gap-2.5">
-                    <Calendar className="w-4 h-4 text-brand-700 shrink-0" />
-                    <div>
-                      <div className={`font-semibold ${overdue ? "text-danger" : "text-text-primary"}`}>
-                        {formatDateTimeVN(task.dueAt)}
-                      </div>
-                      <div className="text-[11px] text-text-muted">{formatRelativeVN(task.dueAt)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress */}
-                <div>
-                  <div className="flex items-center justify-between text-text-muted font-medium mb-1.5">
-                    <span>Tiến độ thực hiện:</span>
-                    <span className="font-mono font-bold text-text-primary">{task.progressPercent}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 text-text-muted">Tiến độ</span>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
                         task.isBlocked ? "bg-amber-500" : "bg-brand-700"
@@ -2121,48 +2104,32 @@ export function TaskDetailPage() {
                       style={{ width: `${task.progressPercent}%` }}
                     />
                   </div>
+                  <strong className="w-9 text-right font-mono text-text-primary">{task.progressPercent}%</strong>
                 </div>
 
-                {/* Participants */}
-                <div>
-                  <div className="text-text-muted font-medium mb-1.5">
-                    Cùng thực hiện & Theo dõi ({participants.length}):
-                  </div>
-                  {participants.length === 0 ? (
-                    <div className="text-text-muted italic py-1">Không có người phối hợp thêm.</div>
-                  ) : (
-                    <div className="space-y-2">
+                {participants.length > 0 && (
+                  <div className="border-t border-border pt-3">
+                    <div className="mb-2 font-medium text-text-muted">Phối hợp &amp; theo dõi ({participants.length})</div>
+                    <div className="flex flex-wrap gap-1.5">
                       {participants.map((p) => {
                         const u = users.find((user) => user.id === p.userId);
                         return (
                           <div
                             key={p.id}
-                            className="flex items-center justify-between p-2 rounded bg-slate-50 border border-border/80"
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-slate-50 px-2 py-1.5"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <UserAvatar name={u?.displayName || "—"} size="sm" />
-                              <div className="min-w-0">
-                                <div className="font-semibold text-text-primary truncate">{u?.displayName}</div>
-                                <div className="text-[10px] text-text-muted">
-                                  {p.role === "COLLABORATOR" ? "Phối hợp" : "Theo dõi"}
-                                </div>
-                              </div>
-                            </div>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                                p.invitationStatus === "ACCEPTED"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}
-                            >
-                              {p.invitationStatus === "ACCEPTED" ? "Đã nhận" : "Chờ xác nhận"}
-                            </span>
+                            <UserAvatar name={u?.displayName || "—"} size="sm" />
+                            <span className="min-w-0 truncate font-semibold text-text-primary">{u?.displayName || "Không rõ người dùng"}</span>
+                            <span className="shrink-0 text-text-muted">· {p.role === "COLLABORATOR" ? "Phối hợp" : "Theo dõi"}</span>
+                            {p.invitationStatus !== "ACCEPTED" && (
+                              <span className="shrink-0 text-amber-700">· {p.invitationStatus === "PENDING" ? "Chờ nhận" : "Đã từ chối"}</span>
+                            )}
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -2550,25 +2517,25 @@ export function TaskDetailPage() {
           </div>
         </ConfirmDialog>
 
-        {/* --- MODAL 8: ĐỀ NGHỊ ĐỔI CHỦ TRÌ (STAFF) --- */}
+        {/* --- MODAL 8: CHUYỂN XỬ LÝ TRỰC TIẾP (STAFF) --- */}
         <ConfirmDialog
-          isOpen={showAssigneeRequestModal}
-          title="Đề nghị chuyển giao người chủ trì nhiệm vụ"
-          description="Đề xuất của bạn sẽ được gửi tới Trưởng phòng xem xét chấp thuận."
-          confirmLabel="Gửi đề xuất"
+          isOpen={showTransferModal}
+          title="Chuyển xử lý công việc"
+          description="Chuyên viên được chọn sẽ nhận chính công việc ngay sau khi bạn xác nhận. Nội dung và tiến độ hiện tại được giữ nguyên."
+          confirmLabel="Chuyển xử lý ngay"
           isLoading={isSubmittingAction}
-          onConfirm={handleCreateAssigneeRequest}
-          onCancel={() => setShowAssigneeRequestModal(false)}
+          onConfirm={handleTransferTask}
+          onCancel={() => setShowTransferModal(false)}
         >
           <div className="space-y-3 pt-2 text-xs">
             <Select
-              label="Đề xuất chuyển giao cho chuyên viên *"
-              value={proposedAssigneeId}
-              onChange={(e) => setProposedAssigneeId(e.target.value)}
+              label="Chuyên viên nhận việc *"
+              value={transferAssigneeId}
+              onChange={(e) => setTransferAssigneeId(e.target.value)}
             >
-              <option value="">-- Chọn đồng nghiệp thay thế --</option>
+              <option value="">-- Chọn chuyên viên --</option>
               {users
-                .filter((u) => u.id !== task.primaryAssigneeId)
+                .filter((u) => u.id !== currentUser?.id && u.role === "STAFF" && u.status !== "LOCKED")
                 .map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.displayName} ({u.jobTitle})
@@ -2577,12 +2544,11 @@ export function TaskDetailPage() {
             </Select>
 
             <Textarea
-              label="Lý do đề nghị chuyển người *"
-              placeholder="Nêu lý do khối lượng công việc, chuyên môn hoặc tình trạng sức khỏe..."
+              label="Lời nhắn cho người nhận (không bắt buộc)"
+              placeholder="Thông tin cần bàn giao thêm..."
               rows={2}
-              required
-              value={assigneeRequestReason}
-              onChange={(e) => setAssigneeRequestReason(e.target.value)}
+              value={transferNote}
+              onChange={(e) => setTransferNote(e.target.value)}
             />
           </div>
         </ConfirmDialog>

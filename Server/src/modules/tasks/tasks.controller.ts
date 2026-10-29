@@ -31,6 +31,7 @@ import {
   SubmitTaskDto,
   TaskProgressDto,
   TaskReasonDto,
+  TransferTaskDto,
   TeamInvitationResponseDto,
   UpdateTaskDto,
   WithdrawSubmissionDto,
@@ -198,6 +199,13 @@ export class TasksController {
   @Post(':id/assignee-requests')
   createAssigneeRequest(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Body() input: AssigneeRequestInputDto) {
     return this.collaboration.createAssigneeRequest(actor, taskId, input);
+  }
+
+  @Roles(UserRole.STAFF)
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/transfer')
+  transfer(@CurrentUser() actor: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) taskId: string, @Body() input: TransferTaskDto) {
+    return this.collaboration.transfer(actor, taskId, input);
   }
 
   @Get(':id/assignee-requests')

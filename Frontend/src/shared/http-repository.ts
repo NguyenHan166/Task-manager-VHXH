@@ -755,6 +755,11 @@ export class HttpRepository {
     return this.changed(await apiClient.request<TaskAssigneeRequest>(`/tasks/${encodeURIComponent(taskId)}/assignee-requests`, { method: 'POST', body: JSON.stringify(input) }));
   }
 
+  async transferTask(taskId: Id, input: { assigneeId: Id; note?: string }, _actorId: Id): Promise<Task> {
+    const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/transfer`, { method: 'POST', body: JSON.stringify(input) });
+    return this.changed(asTask(result));
+  }
+
   async decideAssigneeRequest(requestId: Id, input: { decision: 'APPROVED' | 'REJECTED'; reason?: string | null }, _actorId: Id): Promise<TaskAssigneeRequest> {
     const request = (await this.getAssigneeRequests()).find((item) => item.id === requestId);
     if (!request) throw new ApiError('NOT_FOUND', 'Không tìm thấy đề nghị đổi chủ trì.', undefined, 404);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
@@ -7,16 +7,14 @@ import {
   Breadcrumb,
   PageHeader,
   Button,
-  StatusBadge,
   PriorityBadge,
   OverdueBadge,
   BlockedBadge,
   UserAvatar,
-  DataTable,
   EmptyState,
   useToast,
 } from "../../components/ui";
-import { formatDateTimeVN, formatRelativeVN } from "../../shared/datetime";
+import { TaskListItem } from "./TaskListItem";
 import { isTaskOverdue, isTaskDueSoon } from "./task-selectors";
 import type {
   Task,
@@ -29,24 +27,18 @@ import type {
 } from "../../shared/data-contract";
 import {
   PlusCircle,
-  Eye,
   X,
   LayoutList,
   Columns3,
-  AlertTriangle,
-  Clock,
   Search,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp,
-  ArrowUpRight,
 } from "lucide-react";
 
 export function TasksPage() {
   const { currentUser, isLeader, users } = useSession();
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Read URL query parameters
@@ -73,17 +65,6 @@ export function TasksPage() {
 
   // Drag and drop state for Kanban
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-
-  // Mobile expand/collapse state for list view
-  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
-  const toggleExpand = (id: string) => {
-    setExpandedTaskIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const queryKey = searchParams.toString();
   useEffect(() => {
@@ -365,129 +346,6 @@ export function TasksPage() {
     });
   };
 
-  // Table columns definition for List view
-  const columns = [
-    {
-      key: "code",
-      header: "Mã việc",
-      width: "115px",
-      render: (t: Task) => (
-        <span className="font-mono font-semibold text-text-primary text-xs">{t.code}</span>
-      ),
-    },
-    {
-      key: "title",
-      header: "Tên công việc & Kết quả bàn giao",
-      render: (t: Task) => {
-        const overdue = isTaskOverdue(t);
-        const dueSoon = isTaskDueSoon(t);
-        return (
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <Link
-                to={`/tasks/${t.id}`}
-                className="font-semibold text-text-primary hover:text-brand-700 hover:underline line-clamp-1"
-              >
-                {t.title}
-              </Link>
-              {overdue && <OverdueBadge />}
-              {!overdue && dueSoon && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
-                  Sắp đến hạn
-                </span>
-              )}
-              {t.isBlocked && <BlockedBadge reason={t.blockedReason} />}
-            </div>
-            <div className="text-[11px] text-text-muted line-clamp-1">{t.deliverable}</div>
-          </div>
-        );
-      },
-    },
-    {
-      key: "assignee",
-      header: "Người nhận chính",
-      width: "150px",
-      render: (t: Task) => {
-        const u = users.find((user) => user.id === t.primaryAssigneeId);
-        return (
-          <div className="flex items-center gap-2">
-            <UserAvatar user={u} size="sm" />
-            <span className="font-medium text-text-primary truncate">
-              {u?.displayName || "—"}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      key: "collabs",
-      header: "Phối hợp",
-      width: "100px",
-      render: (t: Task) => {
-        const taskParts = participants.filter(
-          (p) => p.taskId === t.id && p.role === "COLLABORATOR" && p.invitationStatus === "ACCEPTED"
-        );
-        if (taskParts.length === 0) return <span className="text-text-muted">—</span>;
-        return (
-          <div className="flex -space-x-1.5 overflow-hidden">
-            {taskParts.slice(0, 3).map((p) => {
-              const u = users.find((user) => user.id === p.userId);
-              return <UserAvatar key={p.id} user={u} size="sm" className="border-2 border-white" />;
-            })}
-            {taskParts.length > 3 && (
-              <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-[10px] flex items-center justify-center font-bold">
-                +{taskParts.length - 3}
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "dueAt",
-      header: "Hạn hoàn thành",
-      width: "140px",
-      render: (t: Task) => {
-        const overdue = isTaskOverdue(t);
-        const dueSoon = isTaskDueSoon(t);
-        return (
-          <div className="text-xs">
-            <div className={overdue ? "text-danger font-semibold flex items-center gap-1" : dueSoon ? "text-amber-700 font-medium" : "text-text-secondary"}>
-              {overdue && <AlertTriangle className="w-3 h-3 text-danger shrink-0" />}
-              {dueSoon && !overdue && <Clock className="w-3 h-3 text-amber-600 shrink-0" />}
-              <span>{formatDateTimeVN(t.dueAt)}</span>
-            </div>
-            <div className="text-[10px] text-text-muted">{formatRelativeVN(t.dueAt)}</div>
-          </div>
-        );
-      },
-    },
-    {
-      key: "priority",
-      header: "Ưu tiên",
-      width: "100px",
-      render: (t: Task) => <PriorityBadge priority={t.priority} />,
-    },
-    {
-      key: "status",
-      header: "Trạng thái",
-      width: "120px",
-      render: (t: Task) => <StatusBadge status={t.status} />,
-    },
-    {
-      key: "actions",
-      header: "",
-      width: "60px",
-      render: (t: Task) => (
-        <Link to={`/tasks/${t.id}`}>
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-text-muted hover:text-brand-700">
-            <Eye className="w-3.5 h-3.5" />
-          </Button>
-        </Link>
-      ),
-    },
-  ];
-
   // Kanban Columns
   const kanbanColumns: Array<{ status: TaskStatus; label: string; color: string; bg: string }> = [
     { status: "TODO", label: "Chưa làm", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
@@ -571,165 +429,96 @@ export function TasksPage() {
           </section>
         )}
 
-        {/* Comprehensive Filter Bar (URL Synced) */}
-        <div className="bg-surface p-3.5 rounded-card border border-border shadow-xs space-y-3">
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-            {/* Search Input */}
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+        <section className="rounded-xl border border-border bg-white p-4 shadow-xs sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative w-full xl:max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <input
-                type="text"
+                type="search"
+                aria-label="Tìm công việc"
                 value={search}
-                onChange={(e) => updateParams({ search: e.target.value, page: "1" })}
-                placeholder="Tìm mã việc (CV-, NH-), tiêu đề..."
-                className="w-full h-9 pl-9 pr-8 rounded-btn bg-slate-50 border border-border text-xs text-text-primary placeholder:text-text-muted focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-700"
+                onChange={(event) => updateParams({ search: event.target.value, page: "1" })}
+                placeholder="Tìm theo tên hoặc mã công việc"
+                className="h-10 w-full rounded-lg border border-border bg-slate-50 pl-10 pr-3 text-sm text-text-primary outline-none focus:border-brand-400 focus:bg-white"
               />
-              {search && (
-                <button
-                  onClick={() => updateParams({ search: undefined, page: "1" })}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
-
-            {/* Scope tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 text-xs">
-              {isLeader && (
-                <button
-                  onClick={() => updateParams({ scope: "ALL", page: "1" })}
-                  className={`px-3 py-1.5 rounded-btn font-medium whitespace-nowrap transition-colors ${
-                    scope === "ALL"
-                      ? "bg-brand-50 text-brand-700 font-bold border border-brand-100"
-                      : "text-text-secondary hover:bg-slate-50 border border-transparent"
-                  }`}
-                >
-                  Toàn phòng
+            <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-50 p-1 text-xs">
+              {(isLeader
+                ? [["ALL", "Toàn phòng"], ["OWNED", "Việc của tôi"], ["COLLABORATING", "Cùng thực hiện"], ["WATCHING", "Theo dõi"]]
+                : [["OWNED", "Việc của tôi"], ["COLLABORATING", "Cùng thực hiện"], ["WATCHING", "Theo dõi"]]
+              ).map(([value, label]) => (
+                <button key={value} type="button" onClick={() => updateParams({ scope: value, page: "1" })}
+                  className={`shrink-0 rounded-md px-3 py-2 font-semibold ${scope === value ? "bg-white text-brand-700 shadow-xs" : "text-text-secondary hover:text-text-primary"}`}>
+                  {label}
                 </button>
-              )}
-              <button
-                onClick={() => updateParams({ scope: "OWNED", page: "1" })}
-                className={`px-3 py-1.5 rounded-btn font-medium whitespace-nowrap transition-colors ${
-                  scope === "OWNED"
-                    ? "bg-brand-50 text-brand-700 font-bold border border-brand-100"
-                    : "text-text-secondary hover:bg-slate-50 border border-transparent"
-                }`}
-              >
-                Công việc của tôi
-              </button>
-              <button
-                onClick={() => updateParams({ scope: "COLLABORATING", page: "1" })}
-                className={`px-3 py-1.5 rounded-btn font-medium whitespace-nowrap transition-colors ${
-                  scope === "COLLABORATING"
-                    ? "bg-brand-50 text-brand-700 font-bold border border-brand-100"
-                    : "text-text-secondary hover:bg-slate-50 border border-transparent"
-                }`}
-              >
-                Cùng thực hiện
-              </button>
-              <button
-                onClick={() => updateParams({ scope: "WATCHING", page: "1" })}
-                className={`px-3 py-1.5 rounded-btn font-medium whitespace-nowrap transition-colors ${
-                  scope === "WATCHING"
-                    ? "bg-brand-50 text-brand-700 font-bold border border-brand-100"
-                    : "text-text-secondary hover:bg-slate-50 border border-transparent"
-                }`}
-              >
-                Theo dõi
-              </button>
-            </div>
-          </div>
-
-          {/* Secondary Filter Dropdowns */}
-          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/60 text-xs">
-            {/* Status (In List mode) */}
-            {viewMode === "list" && (
-              <select
-                value={statusFilter}
-                onChange={(e) => updateParams({ status: e.target.value, page: "1" })}
-                className="h-8 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
-              >
-                <option value="ALL">Mọi trạng thái</option>
-                <option value="TODO">Chưa làm</option>
-                <option value="IN_PROGRESS">Đang làm</option>
-                <option value="IN_REVIEW">Chờ duyệt</option>
-                <option value="DONE">Hoàn thành</option>
-                <option value="DRAFT">Bản nháp</option>
-                <option value="CANCELLED">Đã hủy</option>
-              </select>
-            )}
-
-            {/* Priority */}
-            <select
-              value={priorityFilter}
-              onChange={(e) => updateParams({ priority: e.target.value, page: "1" })}
-              className="h-8 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
-            >
-              <option value="ALL">Mọi mức ưu tiên</option>
-              <option value="URGENT">Khẩn cấp (Urgent)</option>
-              <option value="HIGH">Cao (High)</option>
-              <option value="NORMAL">Bình thường (Normal)</option>
-              <option value="LOW">Thấp (Low)</option>
-            </select>
-
-            {/* Project */}
-            <select
-              value={projectId}
-              onChange={(e) => updateParams({ projectId: e.target.value, page: "1" })}
-              className="h-8 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
-            >
-              <option value="ALL">Mọi dự án</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
               ))}
-            </select>
-
-            {/* Assignee (if Manager or all) */}
-            {isLeader && (
-              <select
-                value={primaryAssigneeId}
-                onChange={(e) => updateParams({ primaryAssigneeId: e.target.value, page: "1" })}
-                className="h-8 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
-              >
-                <option value="ALL">Mọi người chủ trì</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.displayName}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Overdue Checkbox */}
-            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-slate-50 border border-border cursor-pointer select-none text-text-secondary hover:text-text-primary">
-              <input
-                type="checkbox"
-                checked={isOverdueParam}
-                onChange={(e) => updateParams({ isOverdue: e.target.checked ? "true" : undefined, page: "1" })}
-                className="rounded text-brand-700 focus:ring-brand-700"
-              />
-              <span className={isOverdueParam ? "text-danger font-semibold" : ""}>Chỉ việc quá hạn</span>
-            </label>
-
-            {/* Clear Filters */}
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={clearAllFilters}
-                className="text-xs text-brand-700 hover:text-brand-800 font-semibold flex items-center gap-1 hover:underline ml-auto"
-              >
-                <X className="w-3.5 h-3.5" /> Bỏ {activeFiltersCount} bộ lọc
-              </button>
-            )}
+            </div>
           </div>
-        </div>
 
+          {viewMode === "list" && <div className="mt-4 flex gap-1 overflow-x-auto border-t border-border pt-4 text-xs">
+            {([ ["ALL", "Tất cả"], ["TODO", "Chưa làm"], ["IN_PROGRESS", "Đang làm"], ["IN_REVIEW", "Chờ duyệt"], ["DONE", "Hoàn thành"] ] as const).map(([value, label]) => (
+              <button key={value} type="button" onClick={() => updateParams({ status: value, page: "1" })}
+                className={`shrink-0 rounded-lg px-3 py-2 font-semibold ${statusFilter === value ? "bg-brand-700 text-white" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>
+                {label}
+              </button>
+            ))}
+            <button type="button" onClick={() => updateParams({ isOverdue: isOverdueParam ? undefined : "true", page: "1" })}
+              className={`ml-auto shrink-0 rounded-lg px-3 py-2 font-semibold ${isOverdueParam ? "bg-red-50 text-red-700" : "text-text-secondary hover:bg-red-50 hover:text-red-700"}`}>
+              Quá hạn
+            </button>
+          </div>}
+
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-3 border-t border-border pt-3">
+            <details className="group min-w-0 flex-1">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50">
+                <span>Bộ lọc khác</span><ChevronDown className="h-3.5 w-3.5 group-open:rotate-180" />
+              </summary>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <select aria-label="Lọc trạng thái" value={statusFilter} onChange={(event) => updateParams({ status: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                  <option value="ALL">Mọi trạng thái</option>
+                  <option value="TODO">Chưa làm</option>
+                  <option value="IN_PROGRESS">Đang làm</option>
+                  <option value="IN_REVIEW">Chờ duyệt</option>
+                  <option value="DONE">Hoàn thành</option>
+                  <option value="DRAFT">Bản nháp</option>
+                  <option value="CANCELLED">Đã hủy</option>
+                </select>
+                <select aria-label="Lọc mức ưu tiên" value={priorityFilter} onChange={(event) => updateParams({ priority: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                  <option value="ALL">Mọi mức ưu tiên</option>
+                  <option value="URGENT">Khẩn cấp</option>
+                  <option value="HIGH">Cao</option>
+                  <option value="NORMAL">Bình thường</option>
+                  <option value="LOW">Thấp</option>
+                </select>
+                <select aria-label="Lọc dự án" value={projectId} onChange={(event) => updateParams({ projectId: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                  <option value="ALL">Mọi dự án</option>
+                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+                {isLeader && <select aria-label="Lọc người nhận" value={primaryAssigneeId} onChange={(event) => updateParams({ primaryAssigneeId: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                  <option value="ALL">Mọi người nhận</option>
+                  {users.map((user) => <option key={user.id} value={user.id}>{user.displayName}</option>)}
+                </select>}
+                <select aria-label="Sắp xếp công việc" value={`${sortBy}:${sortDirection}`} onChange={(event) => { const [nextSortBy, nextDirection] = event.target.value.split(":"); updateParams({ sortBy: nextSortBy, sortDirection: nextDirection, page: "1" }); }} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                  <option value="UPDATED_AT:DESC">Mới cập nhật</option>
+                  <option value="DUE_AT:ASC">Hạn gần nhất</option>
+                  <option value="PRIORITY:DESC">Ưu tiên cao nhất</option>
+                  <option value="CREATED_AT:DESC">Mới tạo</option>
+                </select>
+              </div>
+            </details>
+            {activeFiltersCount > 0 && <button type="button" onClick={clearAllFilters} className="inline-flex items-center gap-1 py-1.5 text-xs font-semibold text-brand-700 hover:underline"><X className="h-3.5 w-3.5" /> Xóa bộ lọc</button>}
+          </div>
+        </section>
         {/* --- VIEW MODE 1: LIST VIEW --- */}
         {viewMode === "list" && (
           <div className="space-y-4">
-            {paginatedTasks.length === 0 && !isLoading ? (
+            <div className="flex items-center justify-between gap-3 px-1">
+              <h2 className="text-base font-bold text-text-primary">Danh sách công việc</h2>
+              {!isLoading && <span className="text-xs font-medium text-text-secondary">{total} công việc</span>}
+            </div>
+            {isLoading ? (
+              <div className="rounded-xl border border-border bg-white p-8 text-center text-sm text-text-muted" role="status">Đang tải công việc…</div>
+            ) : paginatedTasks.length === 0 ? (
               <EmptyState
                 title="Không tìm thấy nhiệm vụ nào"
                 description="Thử thay đổi bộ lọc hoặc tạo một nhiệm vụ mới."
@@ -749,191 +538,18 @@ export function TasksPage() {
               />
             ) : (
               <>
-                {/* Desktop & Tablet Table View (>= 768px) */}
-                <div className="hidden md:block">
-                  <DataTable
-                    columns={columns}
-                    data={paginatedTasks}
-                    keyExtractor={(t) => t.id}
-                    isLoading={isLoading}
-                    onRowClick={(t) => navigate(`/tasks/${t.id}`)}
-                  />
+                <div className="space-y-3">
+                  {paginatedTasks.map((task) => (
+                    <TaskListItem
+                      key={task.id}
+                      task={task}
+                      assignee={users.find((user) => user.id === task.primaryAssigneeId)}
+                      project={projects.find((project) => project.id === task.projectId)}
+                      currentUserId={currentUser?.id}
+                      isLeader={isLeader}
+                    />
+                  ))}
                 </div>
-
-                {/* Mobile Optimized Cards List (< 768px) */}
-                <div className="block md:hidden space-y-3">
-                  {paginatedTasks.map((t) => {
-                    const isExpanded = expandedTaskIds.has(t.id);
-                    const overdue = isTaskOverdue(t);
-                    const dueSoon = isTaskDueSoon(t);
-                    const assignee = users.find((u) => u.id === t.primaryAssigneeId);
-                    const proj = projects.find((p) => p.id === t.projectId);
-                    const taskCollabs = participants.filter(
-                      (p) =>
-                        p.taskId === t.id &&
-                        p.role === "COLLABORATOR" &&
-                        p.invitationStatus === "ACCEPTED"
-                    );
-
-                    return (
-                      <div
-                        key={t.id}
-                        className="p-3.5 bg-surface rounded-card border border-border shadow-xs space-y-2.5 transition-all"
-                      >
-                        {/* Top: Code, Badges, Status */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                            <span className="font-mono font-bold text-xs bg-slate-100 text-brand-800 px-2 py-0.5 rounded">
-                              {t.code}
-                            </span>
-                            {overdue && <OverdueBadge />}
-                            {!overdue && dueSoon && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
-                                Sắp đến hạn
-                              </span>
-                            )}
-                            {t.isBlocked && <BlockedBadge reason={t.blockedReason} />}
-                          </div>
-                          <div className="shrink-0">
-                            <StatusBadge status={t.status} />
-                          </div>
-                        </div>
-
-                        {/* Task Title */}
-                        <Link
-                          to={`/tasks/${t.id}`}
-                          className="font-bold text-sm text-text-primary hover:text-brand-700 block leading-snug line-clamp-2"
-                        >
-                          {t.title}
-                        </Link>
-
-                        {/* Essential Row: Assignee & Due Date */}
-                        <div className="flex items-center justify-between gap-2 text-xs pt-0.5 text-text-secondary">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <UserAvatar user={assignee} size="sm" />
-                            <span className="font-medium text-text-primary truncate max-w-[130px]">
-                              {assignee?.displayName || "Chưa phân công"}
-                            </span>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <div
-                              className={`font-semibold flex items-center justify-end gap-1 ${
-                                overdue
-                                  ? "text-danger"
-                                  : dueSoon
-                                  ? "text-amber-700"
-                                  : "text-text-primary"
-                              }`}
-                            >
-                              {overdue && <AlertTriangle className="w-3 h-3 text-danger shrink-0" />}
-                              {dueSoon && !overdue && <Clock className="w-3 h-3 text-amber-600 shrink-0" />}
-                              <span>{formatDateTimeVN(t.dueAt)}</span>
-                            </div>
-                            <div className="text-[10px] text-text-muted">{formatRelativeVN(t.dueAt)}</div>
-                          </div>
-                        </div>
-
-                        {/* Toggle Expand Details */}
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(t.id)}
-                          className="w-full pt-2 border-t border-border/70 flex items-center justify-between text-xs text-brand-700 font-medium hover:text-brand-800 transition-colors"
-                        >
-                          <span>
-                            {isExpanded ? "Thu gọn thông tin" : "Xem thêm chi tiết (kết quả, ưu tiên, tiến độ)"}
-                          </span>
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-
-                        {/* Expanded Secondary Details */}
-                        {isExpanded && (
-                          <div className="pt-2 border-t border-dashed border-border/70 space-y-2.5 text-xs">
-                            {t.deliverable && (
-                              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
-                                <span className="font-semibold text-text-secondary block text-[11px] mb-0.5">
-                                  Đầu ra bàn giao:
-                                </span>
-                                <span className="text-text-primary text-xs">{t.deliverable}</span>
-                              </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <span className="text-[11px] text-text-muted block mb-0.5">Ưu tiên:</span>
-                                <PriorityBadge priority={t.priority} />
-                              </div>
-                              {proj && (
-                                <div>
-                                  <span className="text-[11px] text-text-muted block mb-0.5">Dự án:</span>
-                                  <span className="font-medium text-text-primary truncate block">
-                                    {proj.name}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Progress */}
-                            <div>
-                              <div className="flex items-center justify-between text-[11px] text-text-muted mb-1">
-                                <span>Tiến độ thực hiện:</span>
-                                <span className="font-bold text-text-primary font-mono">
-                                  {t.progressPercent}%
-                                </span>
-                              </div>
-                              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all ${
-                                    t.isBlocked ? "bg-amber-500" : "bg-brand-700"
-                                  }`}
-                                  style={{ width: `${t.progressPercent}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Collaborators */}
-                            {taskCollabs.length > 0 && (
-                              <div>
-                                <span className="text-[11px] text-text-muted block mb-1">
-                                  Người phối hợp ({taskCollabs.length}):
-                                </span>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {taskCollabs.map((p) => {
-                                    const cu = users.find((u) => u.id === p.userId);
-                                    return (
-                                      <div
-                                        key={p.id}
-                                        className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full text-[11px]"
-                                      >
-                                        <UserAvatar user={cu} size="sm" />
-                                        <span>{cu?.displayName}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Direct Open Detail Button */}
-                            <div className="pt-1">
-                              <Link to={`/tasks/${t.id}`}>
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  className="w-full gap-1.5 justify-center font-medium"
-                                >
-                                  <span>Xem chi tiết đầy đủ</span>
-                                  <ArrowUpRight className="w-4 h-4" />
-                                </Button>
-                              </Link>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
                 {/* Pagination Controls */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-secondary px-2">
                   <div>

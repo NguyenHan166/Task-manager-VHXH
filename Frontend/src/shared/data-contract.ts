@@ -19,7 +19,7 @@ export interface User {
   username: string; // Tên đăng nhập (Email công vụ)
   email: string; // Email công vụ (bắt buộc, dùng làm tên đăng nhập)
   displayName: string;
-  /** Directory responses intentionally omit role/status for non-managers. */
+  /** Directory responses omit status for non-managers. */
   role?: UserRole;
   status?: UserStatus;
   jobTitle: string;

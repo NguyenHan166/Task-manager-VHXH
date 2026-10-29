@@ -279,6 +279,17 @@ export class TaskProgressDto {
   blockedReason?: string | null;
 }
 
+export class TransferTaskDto {
+  @IsUUID()
+  assigneeId!: string;
+
+  @ValidateIf(optional)
+  @Transform(trim)
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
 export class AdjustTaskDto {
   @Transform(trim)
   @IsString()
