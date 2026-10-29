@@ -22,6 +22,7 @@ import type {
 import { ForbiddenPage } from "../auth/ForbiddenPage";
 import { validateSelectedFile, setSessionFile, getSessionFileUrl } from "../files/file-session-store";
 import { downloadFile } from "../files/file-download";
+import { DocumentPreview } from "../files/DocumentPreview";
 import {
   Breadcrumb,
   Button,
@@ -81,8 +82,6 @@ export function TaskDetailPage() {
   const { showToast } = useToast();
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Data states
   const [task, setTask] = useState<Task | null>(null);
@@ -115,7 +114,7 @@ export function TaskDetailPage() {
   const [subtaskDeliverable, setSubtaskDeliverable] = useState("");
 
   // Tab state (5 Tabs: activity, subtasks, comments, submissions, files)
-  const [activeTab, setActiveTab] = useState<"activity" | "subtasks" | "comments" | "submissions" | "files">("activity");
+  const [activeTab, setActiveTab] = useState<"activity" | "subtasks" | "comments" | "submissions">("activity");
 
   // Comment input state
   const [commentBody, setCommentBody] = useState("");
@@ -321,26 +320,7 @@ export function TaskDetailPage() {
     }
   };
 
-  const handlePreviewFile = async (file: FileObject) => {
-    setPreviewFile(file);
-    setPreviewUrl(null);
-    const supportsInlinePreview = file.mimeType === "application/pdf" || file.mimeType.startsWith("image/");
-    if (!supportsInlinePreview) return;
-    setIsLoadingPreview(true);
-    try {
-      const url = isMockMode
-        ? getSessionFileUrl(file.id)
-        : await httpRepository.getPreviewUrl(file.id);
-      setPreviewUrl(url);
-      if (!url && isMockMode) {
-        showToast("Tệp mẫu này không có nội dung xem trước trong phiên hiện tại.", "info");
-      }
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Không thể mở bản xem trước.", "error");
-    } finally {
-      setIsLoadingPreview(false);
-    }
-  };
+  const handlePreviewFile = (file: FileObject) => setPreviewFile(file);
 
   // Action 1: Send Comment
   const handleSendComment = async (e: React.FormEvent) => {
@@ -776,9 +756,9 @@ export function TaskDetailPage() {
       return;
     }
     const ext = fileName.split(".").pop()?.toLowerCase() || "";
-    const allowedExts = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "jpg", "jpeg", "png"];
+    const allowedExts = ["pdf", "docx", "xlsx", "pptx", "jpg", "jpeg", "png", "webp", "gif"];
     if (!allowedExts.includes(ext)) {
-      showToast("Định dạng tệp không được hỗ trợ. Chỉ chấp nhận: PDF, Word, Excel, PowerPoint, JPG, PNG", "error");
+      showToast("Định dạng tệp không được hỗ trợ. Chỉ chấp nhận: PDF, DOCX, XLSX, PPTX hoặc ảnh.", "error");
       return;
     }
 
@@ -789,15 +769,14 @@ export function TaskDetailPage() {
         : Math.round(parseFloat(uploadFileSizeMb || "1") * 1024 * 1024);
       const mimeMap: Record<string, string> = {
         pdf: "application/pdf",
-        doc: "application/msword",
         docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        xls: "application/vnd.ms-excel",
         xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ppt: "application/vnd.ms-powerpoint",
         pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         png: "image/png",
         jpg: "image/jpeg",
         jpeg: "image/jpeg",
+        webp: "image/webp",
+        gif: "image/gif",
       };
       const mimeType = selectedUploadFile?.type || mimeMap[ext] || "application/octet-stream";
 
@@ -1464,7 +1443,7 @@ export function TaskDetailPage() {
         {/* Main 2-Column Section (8 cols / 4 cols) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column (8 cols): Info, Deliverable & 4 Organized Tabs */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="order-2 space-y-6 lg:order-1 lg:col-span-8">
             {/* Nội dung thực hiện & Sản phẩm yêu cầu */}
             <Card>
               <CardHeader className="pb-3">
@@ -1500,7 +1479,47 @@ export function TaskDetailPage() {
               </CardContent>
             </Card>
 
-            {/* 4 Tabs: Hoạt động, Bình luận, Kết quả nộp & duyệt, Tệp đính kèm */}
+            <Card>
+              <CardHeader className="border-b border-border pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Tài liệu đính kèm ({files.length})</CardTitle>
+                    <p className="mt-1 text-xs text-text-muted">Tệp giao việc và tài liệu liên quan.</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowFileUploadModal(true)} className="gap-1.5 text-xs">
+                    <Upload className="h-3.5 w-3.5" /> Đính kèm tệp
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-5">
+                {files.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-muted">Chưa có tệp đính kèm.</div>
+                ) : (
+                  <div className="grid gap-3">
+                    {files.map((file) => {
+                      const uploader = users.find((user) => user.id === file.uploadedById);
+                      return (
+                        <div key={file.id} className="flex flex-col gap-3 rounded-lg border border-border bg-slate-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText className="h-4 w-4" /></div>
+                            <div className="min-w-0">
+                              <div className="break-words text-sm font-semibold text-text-primary">{file.originalName}</div>
+                              <div className="text-xs text-text-muted">{Math.max(1, Math.round(file.sizeBytes / 1024))} KB · {uploader?.displayName || "Người tải lên"} · {formatRelativeVN(file.createdAt)}</div>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-2 self-end sm:self-auto">
+                            <Button type="button" variant="outline" size="sm" onClick={() => handlePreviewFile(file)} className="h-8 gap-1.5 px-2.5 text-xs"><Eye className="h-3.5 w-3.5" /> Xem</Button>
+                            <Button type="button" variant="outline" size="sm" disabled={downloadingFileId === file.id} onClick={() => void handleDownloadFile(file)} className="h-8 gap-1.5 px-2.5 text-xs"><Download className="h-3.5 w-3.5" /> {downloadingFileId === file.id ? "Đang tải…" : "Tải về"}</Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Hoạt động, bình luận, việc con và kết quả */}
             <Card>
               <div className="border-b border-border flex items-center px-4 overflow-x-auto">
                 <button
@@ -1555,18 +1574,6 @@ export function TaskDetailPage() {
                   Kết quả nộp & duyệt ({submissions.length})
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("files")}
-                  className={`py-3 px-3 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
-                    activeTab === "files"
-                      ? "border-brand-700 text-brand-800"
-                      : "border-transparent text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <Paperclip className="w-3.5 h-3.5" />
-                  Tệp đính kèm ({files.length})
-                </button>
               </div>
 
               <CardContent className="p-4 sm:p-5">
@@ -1738,7 +1745,7 @@ export function TaskDetailPage() {
                         ref={commentFileInputRef}
                         type="file"
                         multiple
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                        accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,.gif"
                         className="hidden"
                         onChange={handleCommentFilesSelected}
                       />
@@ -2063,82 +2070,12 @@ export function TaskDetailPage() {
                   </div>
                 )}
 
-                {/* TAB 4: Tệp đính kèm (Files) */}
-                {activeTab === "files" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-text-muted">
-                        Tài liệu, báo cáo đính kèm theo nhiệm vụ ({files.length} tệp)
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowFileUploadModal(true)}
-                        className="gap-1.5 text-xs"
-                      >
-                        <Upload className="w-3.5 h-3.5" /> Đính kèm tệp
-                      </Button>
-                    </div>
-
-                    {files.length === 0 ? (
-                      <div className="p-8 text-center text-text-muted text-xs border border-dashed border-border rounded-btn">
-                        Chưa có tệp đính kèm nào.
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-border/60">
-                        {files.map((file) => {
-                          const uploader = users.find((u) => u.id === file.uploadedById);
-                          const sizeKb = Math.round(file.sizeBytes / 1024);
-                          return (
-                            <div key={file.id} className="py-3 flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                                  <FileText className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-text-primary truncate">
-                                    {file.originalName}
-                                  </div>
-                                  <div className="text-[11px] text-text-muted">
-                                    {sizeKb} KB • Tải lên bởi {uploader?.displayName} • {formatRelativeVN(file.createdAt)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5 px-2.5 text-[11px]"
-                                  onClick={() => void handlePreviewFile(file)}
-                                >
-                                  <Eye className="h-3.5 w-3.5" /> Xem trong ứng dụng
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5 px-2.5 text-[11px]"
-                                  disabled={downloadingFileId === file.id}
-                                  onClick={() => void handleDownloadFile(file)}
-                                >
-                                  <Download className="h-3.5 w-3.5" />
-                                  {downloadingFileId === file.id ? "Đang tải…" : "Tải về"}
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Right Column (4 cols): Phụ trách, Hạn, Tiến độ */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="order-1 space-y-6 lg:order-2 lg:col-span-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle>Thông tin điều hành</CardTitle>
@@ -2762,7 +2699,7 @@ export function TaskDetailPage() {
               <label className="font-bold text-text-secondary">Chọn tệp từ thiết bị (Tùy chọn)</label>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,.gif"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
@@ -2897,79 +2834,12 @@ export function TaskDetailPage() {
         </ConfirmDialog>
 
         {previewFile && (
-          <div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6"
-            role="presentation"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                setPreviewFile(null);
-                setPreviewUrl(null);
-              }
-            }}
-          >
-            <section
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Xem tệp ${previewFile.originalName}`}
-              className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
-            >
-              <header className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
-                <FileText className="h-5 w-5 shrink-0 text-brand-700" />
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-sm font-semibold text-text-primary">{previewFile.originalName}</h2>
-                  <p className="text-[11px] text-text-muted">Xem tệp đính kèm trong ứng dụng</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={downloadingFileId === previewFile.id}
-                  onClick={() => void handleDownloadFile(previewFile)}
-                >
-                  <Download className="h-3.5 w-3.5" /> Tải về
-                </Button>
-                <button
-                  type="button"
-                  aria-label="Đóng bản xem trước"
-                  onClick={() => {
-                    setPreviewFile(null);
-                    setPreviewUrl(null);
-                  }}
-                  className="rounded p-2 text-text-muted hover:bg-slate-100 hover:text-text-primary"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </header>
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-slate-100 p-3 sm:p-5">
-                {isLoadingPreview ? (
-                  <p className="text-sm text-text-secondary">Đang mở tệp…</p>
-                ) : previewUrl && previewFile.mimeType.startsWith("image/") ? (
-                  <img
-                    src={previewUrl}
-                    alt={previewFile.originalName}
-                    className="max-h-[78vh] max-w-full rounded object-contain shadow"
-                  />
-                ) : previewUrl && previewFile.mimeType === "application/pdf" ? (
-                  <iframe
-                    src={previewUrl}
-                    title={`Bản xem trước ${previewFile.originalName}`}
-                    className="h-[78vh] w-full rounded border border-border bg-white"
-                  />
-                ) : previewFile.mimeType.startsWith("image/") || previewFile.mimeType === "application/pdf" ? (
-                  <div className="rounded-lg border border-border bg-white p-6 text-center text-sm text-text-secondary">
-                    Không thể tạo bản xem trước. Bạn có thể tải tệp về để mở.
-                  </div>
-                ) : (
-                  <div className="max-w-lg rounded-lg border border-border bg-white p-6 text-center">
-                    <FileText className="mx-auto h-9 w-9 text-brand-700" />
-                    <p className="mt-3 font-semibold text-text-primary">Định dạng này chưa hỗ trợ xem trực tiếp</p>
-                    <p className="mt-1 text-sm text-text-secondary">Tệp vẫn được đính kèm cùng công việc; tải xuống để mở bằng ứng dụng phù hợp.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+          <DocumentPreview
+            file={previewFile}
+            onClose={() => setPreviewFile(null)}
+            onDownload={() => void handleDownloadFile(previewFile)}
+            isDownloading={downloadingFileId === previewFile.id}
+          />
         )}
       </div>
     </AppShell>

@@ -13,28 +13,14 @@ import type {
 } from "../../shared/data-contract";
 import {
     Breadcrumb,
-    PageHeader,
     Button,
-    Card,
-    CardContent,
     ConfirmDialog,
-    PriorityBadge,
-    UserAvatar,
-    EmptyState,
     useToast,
 } from "../../components/ui";
 import { formatDateTimeVN } from "../../shared/datetime";
+import { RecurrenceOverview } from "./RecurrenceOverview";
 import {
-    Repeat,
-    PlusCircle,
-    Play,
-    CheckCircle2,
-    Calendar,
     Edit2,
-    Trash2,
-    Users,
-    Building2,
-    Clock,
     Send,
     ExternalLink,
     AlertCircle,
@@ -153,8 +139,8 @@ export function RecurrencePage() {
             await workspaceRepository.toggleRecurrenceRule(rule.id, !rule.active);
             showToast(
                 rule.active
-                    ? `Đã tạm dừng mẫu "${rule.title}"`
-                    : `Đã kích hoạt mẫu "${rule.title}"`,
+                    ? `Đã tạm dừng lịch "${rule.title}"`
+                    : `Đã áp dụng lại lịch "${rule.title}"`,
                 "success",
             );
         } catch (err: unknown) {
@@ -202,15 +188,15 @@ export function RecurrencePage() {
     const handleCreateRule = async () => {
         if (!currentUser) return;
         if (!createTitle.trim()) {
-            showToast("Vui lòng nhập tên mẫu công việc định kỳ", "error");
+            showToast("Vui lòng nhập tên nhiệm vụ định kỳ", "error");
             return;
         }
 
         try {
             const now = new Date();
-            const nextRun = new Date(
-                now.getTime() + (createFrequency === "WEEKLY" ? 7 : 30) * 86400000,
-            );
+            const nextRun = new Date(now);
+            if (createFrequency === "WEEKLY") nextRun.setDate(nextRun.getDate() + 7);
+            else nextRun.setMonth(nextRun.getMonth() + 1);
 
             const assignees =
                 createScope === "ALL"
@@ -233,7 +219,7 @@ export function RecurrencePage() {
                 active: true,
             });
 
-            showToast("Đã tạo mẫu nhiệm vụ định kỳ mới thành công", "success");
+            showToast("Đã tạo lịch giao việc định kỳ", "success");
             setIsCreateModalOpen(false);
             await loadData();
         } catch (err: unknown) {
@@ -262,7 +248,7 @@ export function RecurrencePage() {
     const handleSaveEditRule = async () => {
         if (!editingRule || !currentUser) return;
         if (!editTitle.trim()) {
-            showToast("Vui lòng nhập tên mẫu công việc định kỳ", "error");
+            showToast("Vui lòng nhập tên nhiệm vụ định kỳ", "error");
             return;
         }
 
@@ -286,7 +272,7 @@ export function RecurrencePage() {
                 dueAfterHours: Number(editDueAfterHours) || 48,
             });
 
-            showToast(`Đã cập nhật mẫu "${editTitle.trim()}"`, "success");
+            showToast(`Đã cập nhật lịch "${editTitle.trim()}"`, "success");
             setEditingRule(null);
             await loadData();
         } catch (err: unknown) {
@@ -303,7 +289,7 @@ export function RecurrencePage() {
         setIsDeleting(true);
         try {
             await workspaceRepository.deleteRecurrenceRule(ruleToDelete.id);
-            showToast(`Đã xóa mẫu định kỳ "${ruleToDelete.title}"`, "success");
+            showToast(`Đã xóa lịch "${ruleToDelete.title}"`, "success");
             setRuleToDelete(null);
             await loadData();
         } catch (err: unknown) {
@@ -338,6 +324,10 @@ export function RecurrencePage() {
         setIsSubmittingReport(true);
         setReportError("");
         try {
+            if (reportingTask.status === "TODO") {
+                const started = await workspaceRepository.startTask(reportingTask.id, currentUser.id);
+                setReportingTask(started);
+            }
             await workspaceRepository.submitRecurrenceReport(
                 reportingTask.id,
                 {
@@ -351,7 +341,7 @@ export function RecurrencePage() {
             );
 
             showToast(
-                `Đã nộp báo cáo kỳ định kỳ thành công! Kết quả đang chờ Lãnh đạo phê duyệt.`,
+                `Đã nộp báo cáo. Kết quả đang chờ lãnh đạo phê duyệt.`,
                 "success",
             );
             setReportingTask(null);
@@ -377,39 +367,6 @@ export function RecurrencePage() {
         setViewingSubmission(sub || null);
     };
 
-    // Compute upcoming period key preview for display
-    const computeNextPeriodPreview = (rule: RecurrenceRule) => {
-        const nextDate = new Date(rule.nextRunAt || Date.now());
-        const year = nextDate.getFullYear();
-        const month = String(nextDate.getMonth() + 1).padStart(2, "0");
-        const oneJan = new Date(nextDate.getFullYear(), 0, 1);
-        const numberOfDays = Math.floor(
-            (nextDate.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000),
-        );
-        const weekNumber = Math.ceil((nextDate.getDay() + 1 + numberOfDays) / 7);
-        return rule.frequency === "WEEKLY"
-            ? `${year}-W${String(weekNumber).padStart(2, "0")}`
-            : `${year}-${month}`;
-    };
-
-    // Render helper for assignee scope badge
-    const renderScopeBadge = (rule: RecurrenceRule) => {
-        if (rule.scope === "ALL") {
-            return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    <Building2 className="w-3 h-3 text-emerald-600" /> Cả phòng ({staffUsers.length} chuyên viên)
-                </span>
-            );
-        }
-
-        const count = rule.assigneeIds?.length || (rule.primaryAssigneeId ? 1 : 0);
-        return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-                <Users className="w-3 h-3 text-blue-600" /> {count} chuyên viên cụ thể
-            </span>
-        );
-    };
-
     return (
         <AppShell>
             <div className="space-y-6">
@@ -420,447 +377,40 @@ export function RecurrencePage() {
                     ]}
                 />
 
-                <PageHeader
-                    title="Nhiệm vụ định kỳ (Recurrence Tasks)"
-                    subtitle={
-                        isLeader
-                            ? "Cấu hình tự động phát hành nhiệm vụ định kỳ theo tuần hoặc tháng. Giao việc cho cả phòng hoặc danh sách chuyên viên cụ thể và theo dõi tiến độ nộp báo cáo."
-                            : "Danh sách nhiệm vụ định kỳ của đơn vị. Bạn có thể trực tiếp nộp báo cáo kết quả cho từng kỳ tại đây."
-                    }
-                    badge={
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 border border-brand-200">
-                            {isLeader ? "Quản trị & Điều hành" : "Không gian Chuyên viên"}
-                        </span>
-                    }
-                    actions={
-                        isLeader ? (
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                className="gap-1.5 shadow-sm font-medium"
-                                onClick={handleOpenCreateModal}
-                            >
-                                <PlusCircle className="w-4 h-4" /> Tạo mẫu định kỳ mới
-                            </Button>
-                        ) : undefined
-                    }
+                <RecurrenceOverview
+                    currentUserId={currentUser?.id}
+                    isLeader={isLeader}
+                    isLoading={isLoading}
+                    users={users}
+                    rules={rules}
+                    visibleRules={visibleRules}
+                    instances={instances}
+                    tasks={tasks}
+                    submissions={submissions}
+                    filterTab={filterTab}
+                    onFilterChange={setFilterTab}
+                    onCreate={handleOpenCreateModal}
+                    onEdit={handleOpenEditModal}
+                    onToggle={(rule) => void handleToggleActive(rule)}
+                    onDelete={setRuleToDelete}
+                    onGenerate={(rule) => void handleGenerateNext(rule)}
+                    generatingRuleId={isGenerating}
+                    onReport={handleOpenReportModal}
+                    onViewReport={handleViewSubmission}
                 />
-
-                {/* Filter Tabs for Leader */}
-                <div className="flex items-center justify-between border-b border-border pb-2 text-xs">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setFilterTab("ALL")}
-                            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                                filterTab === "ALL"
-                                    ? "bg-brand-50 text-brand-700 font-bold"
-                                    : "text-text-secondary hover:bg-slate-100"
-                            }`}
-                        >
-                            Tất cả ({rules.length})
-                        </button>
-                        <button
-                            onClick={() => setFilterTab("ACTIVE")}
-                            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                                filterTab === "ACTIVE"
-                                    ? "bg-emerald-50 text-emerald-800 font-bold"
-                                    : "text-text-secondary hover:bg-slate-100"
-                            }`}
-                        >
-                            Đang hiệu lực ({rules.filter((r) => r.active).length})
-                        </button>
-                        <button
-                            onClick={() => setFilterTab("PAUSED")}
-                            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                                filterTab === "PAUSED"
-                                    ? "bg-slate-200 text-slate-800 font-bold"
-                                    : "text-text-secondary hover:bg-slate-100"
-                            }`}
-                        >
-                            Đã tạm dừng ({rules.filter((r) => !r.active).length})
-                        </button>
-                    </div>
-
-                    <div className="text-text-muted text-[11px]">
-                        Hiển thị {visibleRules.length} mẫu nhiệm vụ
-                    </div>
-                </div>
-
-                {visibleRules.length === 0 && !isLoading ? (
-                    <EmptyState
-                        title="Chưa có mẫu nhiệm vụ định kỳ nào"
-                        description={
-                            isLeader
-                                ? "Tạo mẫu công việc lặp lại để phòng ban tự động hóa quy trình nộp báo cáo định kỳ hàng tháng/hàng tuần."
-                                : "Hiện chưa có nhiệm vụ định kỳ nào được phân công cho bạn."
-                        }
-                        icon={<Repeat className="w-8 h-8 text-slate-400" />}
-                        action={
-                            isLeader ? (
-                                <Button
-                                    variant="primary"
-                                    size="sm"
-                                    onClick={handleOpenCreateModal}
-                                >
-                                    <PlusCircle className="w-3.5 h-3.5 mr-1" /> Tạo mẫu đầu tiên
-                                </Button>
-                            ) : undefined
-                        }
-                    />
-                ) : (
-                    <div className="space-y-6">
-                        {visibleRules.map((rule) => {
-                            const ruleInstances = instances.filter(
-                                (inst) => inst.ruleId === rule.id,
-                            );
-                            const nextPeriod = computeNextPeriodPreview(rule);
-
-                            // Find target assignees of this rule
-                            const assignedUserIds =
-                                rule.scope === "ALL"
-                                    ? staffUsers.map((u) => u.id)
-                                    : rule.assigneeIds && rule.assigneeIds.length > 0
-                                    ? rule.assigneeIds
-                                    : rule.primaryAssigneeId
-                                    ? [rule.primaryAssigneeId]
-                                    : [];
-
-                            const assignedMembers = users.filter((u) =>
-                                assignedUserIds.includes(u.id),
-                            );
-
-                            // Find tasks created for this rule's instances
-                            const ruleTaskIds = new Set<string>();
-                            ruleInstances.forEach((inst) => {
-                                if (inst.taskId) ruleTaskIds.add(inst.taskId);
-                                if (inst.taskIds) inst.taskIds.forEach((tid) => ruleTaskIds.add(tid));
-                            });
-
-                            const ruleTasks = tasks.filter((t) => ruleTaskIds.has(t.id));
-
-                            // If staff, find current user's task in this rule
-                            const myTasksInRule = isStaff && currentUser
-                                ? ruleTasks.filter((t) => t.primaryAssigneeId === currentUser.id)
-                                : [];
-
-                            const latestMyTask = myTasksInRule[myTasksInRule.length - 1] || null;
-
-                            return (
-                                <Card
-                                    key={rule.id}
-                                    className="overflow-hidden border-border/80 shadow-xs"
-                                >
-                                    {/* Card Header */}
-                                    <div className="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border/60 bg-surface">
-                                        <div className="space-y-1.5 min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="font-mono text-xs font-bold text-text-muted bg-slate-100 px-2 py-0.5 rounded">
-                                                    {rule.id}
-                                                </span>
-                                                <h2 className="text-base font-bold text-text-primary">
-                                                    {rule.title}
-                                                </h2>
-                                                <span
-                                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                                                        rule.frequency === "WEEKLY"
-                                                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                                                            : "bg-blue-50 text-blue-700 border-blue-200"
-                                                    }`}
-                                                >
-                                                    {rule.frequency === "WEEKLY" ? "Lặp hàng tuần" : "Lặp hàng tháng"}
-                                                </span>
-                                                <PriorityBadge priority={rule.priority} />
-                                                {renderScopeBadge(rule)}
-                                                <span
-                                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-                                                        rule.active
-                                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                                            : "bg-slate-100 text-slate-500 border border-slate-200"
-                                                    }`}
-                                                >
-                                                    {rule.active ? "Đang hiệu lực" : "Tạm dừng"}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-text-secondary leading-relaxed max-w-3xl">
-                                                {rule.description || "Không có ghi chú mô tả"}
-                                            </p>
-                                        </div>
-
-                                        {/* Action buttons (CRUD for Leader, or Report for Staff) */}
-                                        <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                            {isLeader && (
-                                                <>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleOpenEditModal(rule)}
-                                                        className="h-8 px-2.5 text-xs gap-1 text-slate-700 hover:bg-slate-100"
-                                                        title="Chỉnh sửa mẫu định kỳ"
-                                                    >
-                                                        <Edit2 className="w-3.5 h-3.5 text-brand-700" /> Sửa
-                                                    </Button>
-
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleToggleActive(rule)}
-                                                        className="h-8 px-2.5 text-xs text-slate-700"
-                                                    >
-                                                        {rule.active ? "Tạm dừng" : "Kích hoạt"}
-                                                    </Button>
-
-                                                    <Button
-                                                        variant="primary"
-                                                        size="sm"
-                                                        className="h-8 px-3 text-xs gap-1.5 shadow-sm"
-                                                        disabled={!rule.active || isGenerating === rule.id}
-                                                        onClick={() => handleGenerateNext(rule)}
-                                                        title="Phát hành ngay kỳ tiếp theo cho tất cả chuyên viên"
-                                                    >
-                                                        <Play className="w-3 h-3" />
-                                                        {isGenerating === rule.id ? "Đang sinh..." : "Phát hành kỳ tới"}
-                                                    </Button>
-
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => setRuleToDelete(rule)}
-                                                        className="h-8 px-2 text-xs text-danger hover:bg-red-50 hover:border-danger"
-                                                        title="Xóa mẫu định kỳ"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </Button>
-                                                </>
-                                            )}
-
-                                            {/* Staff quick report button if they have a task needing report */}
-                                            {isStaff && latestMyTask && (
-                                                <>
-                                                    {latestMyTask.status === "TODO" ||
-                                                    latestMyTask.status === "IN_PROGRESS" ? (
-                                                        <Button
-                                                            variant="primary"
-                                                            size="sm"
-                                                            onClick={() => handleOpenReportModal(latestMyTask, rule)}
-                                                            className="gap-1.5 text-xs shadow-sm bg-brand-700 hover:bg-brand-800"
-                                                        >
-                                                            <Send className="w-3.5 h-3.5" /> Báo cáo kỳ này
-                                                        </Button>
-                                                    ) : latestMyTask.status === "IN_REVIEW" ? (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleViewSubmission(latestMyTask)}
-                                                            className="gap-1.5 text-xs text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
-                                                        >
-                                                            <Clock className="w-3.5 h-3.5" /> Đã nộp (Chờ duyệt)
-                                                        </Button>
-                                                    ) : latestMyTask.status === "DONE" ? (
-                                                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                                            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Đã hoàn thành
-                                                        </span>
-                                                    ) : null}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Card Content */}
-                                    <CardContent className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 text-xs">
-                                        {/* Block 1: Phân công & Đối tượng */}
-                                        <div className="space-y-3">
-                                            <div className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
-                                                <Users className="w-3.5 h-3.5 text-brand-700" />
-                                                Đối tượng thực hiện
-                                            </div>
-                                            <div className="bg-surface p-3.5 rounded-lg border border-border/80 space-y-2.5">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-text-secondary">Phạm vi giao:</span>
-                                                    <span className="font-semibold text-text-primary">
-                                                        {rule.scope === "ALL" ? "Cả phòng" : "Chuyên viên cụ thể"}
-                                                    </span>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <span className="text-text-muted text-[11px] block">
-                                                        Danh sách thành viên ({assignedMembers.length}):
-                                                    </span>
-                                                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-0.5">
-                                                        {assignedMembers.map((m) => (
-                                                            <div
-                                                                key={m.id}
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[11px]"
-                                                            >
-                                                                <UserAvatar user={m} size="sm" />
-                                                                <span className="font-medium">{m.displayName}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between pt-1 border-t border-border/60">
-                                                    <span className="text-text-secondary">Hạn nộp sau:</span>
-                                                    <span className="font-semibold text-text-primary">
-                                                        {rule.dueAfterHours} giờ (~{Math.round(rule.dueAfterHours / 24)} ngày)
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Block 2: Dự kiến phát hành kỳ tới */}
-                                        <div className="space-y-3">
-                                            <div className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
-                                                <Calendar className="w-3.5 h-3.5 text-brand-700" />
-                                                Kỳ phát hành tiếp theo
-                                            </div>
-                                            <div className="bg-surface p-3.5 rounded-lg border border-border/80 space-y-2.5">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-text-secondary">Mã kỳ (Period):</span>
-                                                    <span className="font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
-                                                        {nextPeriod}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-text-secondary">Thời điểm chạy:</span>
-                                                    <span className="font-medium text-text-primary">
-                                                        {formatDateTimeVN(rule.nextRunAt)}
-                                                    </span>
-                                                </div>
-                                                <div className="text-[11px] text-text-muted">
-                                                    Tên nhiệm vụ tự sinh:
-                                                    <div className="font-semibold text-text-primary truncate mt-0.5">
-                                                        {rule.title} - Kỳ {nextPeriod}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Block 3: Lịch sử các kỳ & Tiến độ nộp báo cáo */}
-                                        <div className="space-y-3">
-                                            <div className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center justify-between">
-                                                <span className="flex items-center gap-1.5">
-                                                    <Clock className="w-3.5 h-3.5 text-brand-700" />
-                                                    Lịch sử đã sinh ({ruleInstances.length} kỳ)
-                                                </span>
-                                            </div>
-
-                                            <div className="bg-surface p-3 rounded-lg border border-border/80 max-h-48 overflow-y-auto space-y-2">
-                                                {ruleInstances.length === 0 ? (
-                                                    <div className="text-xs text-text-muted italic py-4 text-center">
-                                                        Chưa có kỳ nào được phát hành từ mẫu này.
-                                                    </div>
-                                                ) : (
-                                                    ruleInstances.map((inst) => {
-                                                        // Tasks of this instance
-                                                        const instTaskIds = inst.taskIds || (inst.taskId ? [inst.taskId] : []);
-                                                        const instTasks = tasks.filter((t) => instTaskIds.includes(t.id));
-
-                                                        // Submissions count
-                                                        const submittedCount = instTasks.filter(
-                                                            (t) => t.status === "IN_REVIEW" || t.status === "DONE",
-                                                        ).length;
-
-                                                        return (
-                                                            <div
-                                                                key={inst.id}
-                                                                className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1.5"
-                                                            >
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                                                        <span className="font-mono font-bold text-brand-700 text-xs">
-                                                                            Kỳ {inst.periodKey}
-                                                                        </span>
-                                                                    </div>
-                                                                    <span className="text-[11px] font-semibold text-text-secondary">
-                                                                        Đã nộp: {submittedCount}/{instTasks.length}
-                                                                    </span>
-                                                                </div>
-
-                                                                {/* Task rows of each staff */}
-                                                                <div className="space-y-1 pt-1 border-t border-slate-200">
-                                                                    {instTasks.map((t) => {
-                                                                        const assignee = users.find(
-                                                                            (u) => u.id === t.primaryAssigneeId,
-                                                                        );
-                                                                        const isMyTask = t.primaryAssigneeId === currentUser?.id;
-
-                                                                        return (
-                                                                            <div
-                                                                                key={t.id}
-                                                                                className={`flex items-center justify-between text-[11px] px-1.5 py-1 rounded transition-colors ${
-                                                                                    isMyTask ? "bg-brand-50/70 border border-brand-200" : "hover:bg-white"
-                                                                                }`}
-                                                                            >
-                                                                                <div className="flex items-center gap-1.5 truncate">
-                                                                                    <span className="font-medium text-text-primary">
-                                                                                        {assignee?.displayName || t.primaryAssigneeId}
-                                                                                    </span>
-                                                                                    {isMyTask && (
-                                                                                        <span className="text-[9px] px-1 py-0.2 rounded bg-brand-700 text-white font-bold">
-                                                                                            Bạn
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-
-                                                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                                                    {t.status === "DONE" ? (
-                                                                                        <span className="text-emerald-700 font-semibold">Đã duyệt</span>
-                                                                                    ) : t.status === "IN_REVIEW" ? (
-                                                                                        <span className="text-amber-700 font-semibold">Chờ duyệt</span>
-                                                                                    ) : (
-                                                                                        <span className="text-slate-500">Chưa nộp</span>
-                                                                                    )}
-
-                                                                                    {/* Quick action for current user */}
-                                                                                    {isMyTask &&
-                                                                                        (t.status === "TODO" || t.status === "IN_PROGRESS") && (
-                                                                                            <button
-                                                                                                onClick={() => handleOpenReportModal(t, rule)}
-                                                                                                className="text-brand-700 font-bold hover:underline ml-1"
-                                                                                            >
-                                                                                                Nộp
-                                                                                            </button>
-                                                                                        )}
-
-                                                                                    <Link
-                                                                                        to={`/tasks/${t.id}`}
-                                                                                        className="text-text-muted hover:text-brand-700 ml-0.5"
-                                                                                        title="Mở chi tiết công việc"
-                                                                                    >
-                                                                                        <ExternalLink className="w-3 h-3" />
-                                                                                    </Link>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                )}
-
                 {/* MODAL 1: TẠO MẪU ĐỊNH KỲ MỚI (LEADER ONLY) */}
                 <ConfirmDialog
                     isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
                     onConfirm={handleCreateRule}
-                    title="Tạo mẫu nhiệm vụ định kỳ mới"
-                    confirmText="Lưu và kích hoạt"
+                    title="Tạo lịch giao việc định kỳ"
+                    confirmText="Tạo lịch"
                     cancelText="Hủy"
                 >
                     <div className="space-y-4 pt-1 text-xs">
                         <div className="space-y-1">
                             <label className="font-bold text-text-secondary">
-                                Tên mẫu công việc định kỳ <span className="text-danger">*</span>
+                                Tên nhiệm vụ định kỳ <span className="text-danger">*</span>
                             </label>
                             <input
                                 type="text"
@@ -873,14 +423,14 @@ export function RecurrencePage() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
-                                <label className="font-bold text-text-secondary">Tần suất phát hành</label>
+                                <label className="font-bold text-text-secondary">Lặp lại</label>
                                 <select
                                     value={createFrequency}
                                     onChange={(e) => setCreateFrequency(e.target.value as "WEEKLY" | "MONTHLY")}
                                     className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
                                 >
-                                    <option value="WEEKLY">Hàng tuần (Weekly)</option>
-                                    <option value="MONTHLY">Hàng tháng (Monthly)</option>
+                                    <option value="WEEKLY">Hằng tuần</option>
+                                    <option value="MONTHLY">Hằng tháng</option>
                                 </select>
                             </div>
 
@@ -891,13 +441,17 @@ export function RecurrencePage() {
                                     onChange={(e) => setCreatePriority(e.target.value as TaskPriority)}
                                     className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
                                 >
-                                    <option value="LOW">Thấp (LOW)</option>
-                                    <option value="NORMAL">Bình thường (NORMAL)</option>
-                                    <option value="HIGH">Cao (HIGH)</option>
-                                    <option value="URGENT">Khẩn cấp (URGENT)</option>
+                                    <option value="LOW">Thấp</option>
+                                    <option value="NORMAL">Bình thường</option>
+                                    <option value="HIGH">Cao</option>
+                                    <option value="URGENT">Khẩn cấp</option>
                                 </select>
                             </div>
                         </div>
+
+                        <p className="rounded-lg bg-slate-50 px-3 py-2 text-text-secondary">
+                            Hệ thống sẽ giao kỳ đầu sau {createFrequency === "WEEKLY" ? "một tuần" : "một tháng"} và tự giao các kỳ tiếp theo. Nếu cần giao ngay, hãy tạo lịch rồi bấm “Giao kỳ tiếp theo ngay”.
+                        </p>
 
                         {/* Phân công: Cả phòng hoặc Danh sách chuyên viên cụ thể */}
                         <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
@@ -964,7 +518,7 @@ export function RecurrencePage() {
 
                         <div className="space-y-1">
                             <label className="font-bold text-text-secondary">
-                                Hạn nộp báo cáo (số giờ sau khi phát hành)
+                                Hạn nộp sau khi giao (giờ)
                             </label>
                             <input
                                 type="number"
@@ -976,7 +530,7 @@ export function RecurrencePage() {
                                 className="w-full h-9 px-3 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
                             />
                             <p className="text-[11px] text-text-muted">
-                                Ví dụ: 48 giờ tương đương 2 ngày làm việc.
+                                Ví dụ: 48 giờ tương đương 2 ngày.
                             </p>
                         </div>
 
@@ -1007,7 +561,7 @@ export function RecurrencePage() {
                                 <div className="flex items-center gap-2">
                                     <Edit2 className="w-5 h-5 text-brand-700" />
                                     <h3 className="font-bold text-base text-text-primary">
-                                        Chỉnh sửa mẫu định kỳ: {editingRule.title}
+                                        Sửa lịch giao việc: {editingRule.title}
                                     </h3>
                                 </div>
                                 <button
@@ -1021,7 +575,7 @@ export function RecurrencePage() {
                             <div className="space-y-4 text-xs">
                                 <div className="space-y-1">
                                     <label className="font-bold text-text-secondary">
-                                        Tên mẫu công việc định kỳ <span className="text-danger">*</span>
+                                        Tên nhiệm vụ định kỳ <span className="text-danger">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -1039,8 +593,8 @@ export function RecurrencePage() {
                                             onChange={(e) => setEditFrequency(e.target.value as "WEEKLY" | "MONTHLY")}
                                             className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
                                         >
-                                            <option value="WEEKLY">Hàng tuần (Weekly)</option>
-                                            <option value="MONTHLY">Hàng tháng (Monthly)</option>
+                                            <option value="WEEKLY">Hằng tuần</option>
+                                            <option value="MONTHLY">Hằng tháng</option>
                                         </select>
                                     </div>
 
@@ -1051,10 +605,10 @@ export function RecurrencePage() {
                                             onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
                                             className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
                                         >
-                                            <option value="LOW">Thấp (LOW)</option>
-                                            <option value="NORMAL">Bình thường (NORMAL)</option>
-                                            <option value="HIGH">Cao (HIGH)</option>
-                                            <option value="URGENT">Khẩn cấp (URGENT)</option>
+                                            <option value="LOW">Thấp</option>
+                                            <option value="NORMAL">Bình thường</option>
+                                            <option value="HIGH">Cao</option>
+                                            <option value="URGENT">Khẩn cấp</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1124,7 +678,7 @@ export function RecurrencePage() {
 
                                 <div className="space-y-1">
                                     <label className="font-bold text-text-secondary">
-                                        Hạn nộp báo cáo (giờ sau khi sinh)
+                                        Hạn nộp sau khi giao (giờ)
                                     </label>
                                     <input
                                         type="number"
@@ -1176,8 +730,8 @@ export function RecurrencePage() {
                     isOpen={Boolean(ruleToDelete)}
                     onClose={() => setRuleToDelete(null)}
                     onConfirm={handleConfirmDeleteRule}
-                    title={`Xóa mẫu định kỳ: ${ruleToDelete?.title}?`}
-                    description="Các nhiệm vụ của những kỳ trước đã phát hành từ mẫu này vẫn được lưu trữ nguyên vẹn trong hệ thống. Tuy nhiên hệ thống sẽ dừng tự động sinh các kỳ tiếp theo."
+                    title={`Xóa lịch giao việc: ${ruleToDelete?.title}?`}
+                    description="Các nhiệm vụ đã giao vẫn được lưu. Hệ thống sẽ ngừng giao những kỳ sau theo lịch này."
                     confirmText="Xác nhận xóa"
                     cancelText="Bỏ qua"
                     variant="danger"

@@ -208,13 +208,36 @@ export function TaskCreatePage() {
       const message = saveError instanceof Error ? saveError.message : "Không thể lưu công việc.";
       setError(message);
       if (created) {
-        const persisted = await workspaceRepository.getTaskById(created.id).catch(() => null);
-        if (persisted?.status && persisted.status !== "DRAFT") {
-          showToast(`Đã giao công việc ${persisted.code} cho người nhận.`, "success");
-        } else {
-          showToast(`Chưa giao được công việc ${created.code}: lỗi ở bước ${failedStep}. ${message} Bản nháp vẫn được giữ lại để bạn có thể hoàn tất sau.`, "error");
+        if (failedStep !== "phát hành công việc") {
+          try {
+            await workspaceRepository.cancelTask(created.id, currentUser.id);
+            showToast(`Chưa giao được công việc ${created.code}: lỗi ở bước ${failedStep}. Bản tạm đã được xóa; bạn có thể sửa lỗi rồi giao lại.`, "error");
+            return;
+          } catch {
+            // Check the persisted state below before deciding whether cleanup failed.
+          }
         }
-        navigate(`/tasks/${created.id}`);
+
+        const persisted = await workspaceRepository.getTaskById(created.id).catch(() => null);
+        if (persisted?.status && persisted.status !== "DRAFT" && persisted.status !== "CANCELLED") {
+          showToast(`Đã giao công việc ${persisted.code} cho người nhận.`, "success");
+          navigate(`/tasks/${created.id}`);
+        } else if (persisted?.status === "DRAFT") {
+          try {
+            await workspaceRepository.cancelTask(created.id, currentUser.id);
+            showToast(`Chưa giao được công việc ${created.code}: lỗi ở bước ${failedStep}. Bản tạm đã được xóa; bạn có thể sửa lỗi rồi giao lại.`, "error");
+          } catch {
+            const remaining = await workspaceRepository.getTaskById(created.id).catch(() => null);
+            if (!remaining) {
+              showToast(`Chưa giao được công việc ${created.code}: lỗi ở bước ${failedStep}. Bản tạm đã được xóa; bạn có thể giao lại.`, "error");
+            } else {
+              setError(`${message} Chưa thể xóa bản tạm của công việc ${created.code}; hãy kiểm tra kết nối rồi thử lại.`);
+              showToast(`Chưa giao được công việc ${created.code}; chưa xóa được bản tạm.`, "error");
+            }
+          }
+        } else {
+          showToast(`Chưa xác nhận được trạng thái giao công việc ${created.code}: lỗi ở bước ${failedStep}. Kiểm tra danh sách công việc trước khi giao lại.`, "error");
+        }
       }
     } finally {
       setIsLoading(false);

@@ -34,7 +34,6 @@ export function syncRealtimeSession(
     chatRoomCounts.forEach((_count, roomId) => socket?.emit("chat:join", { roomId }));
     onDataChanged();
   });
-  socket.on("notification:new", onDataChanged);
   socket.on("task:updated", onDataChanged);
   socket.on("chat:message", onDataChanged);
   socket.on("connect_error", (error) => {

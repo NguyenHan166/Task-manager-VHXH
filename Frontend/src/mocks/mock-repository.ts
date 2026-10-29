@@ -628,7 +628,7 @@ export class MockRepository {
             actorId,
             kind: "CREATED",
             note: isDraft
-                ? `Lưu bản nháp công việc [${newTask.code}] ${newTask.title}`
+                ? `Khởi tạo công việc [${newTask.code}] ${newTask.title}`
                 : `Tạo công việc [${newTask.code}] ${newTask.title}`,
             before: null,
             after: { status: newTask.status },
@@ -1048,19 +1048,21 @@ export class MockRepository {
                 : file,
         );
 
-        const nowIso = toIsoUtc();
-        for (const recipientId of recipientIds) {
-            db.notifications.push({
-                id: `n_${Date.now()}_${recipientId}_withdrawn`,
-                recipientId,
-                type: "TASK_UPDATED",
-                title: "Công việc đã được thu hồi",
-                body: `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
-                entityType: "TASK",
-                entityId: "",
-                createdAt: nowIso,
-                readAt: null,
-            });
+        if (task.status !== "DRAFT") {
+            const nowIso = toIsoUtc();
+            for (const recipientId of recipientIds) {
+                db.notifications.push({
+                    id: `n_${Date.now()}_${recipientId}_withdrawn`,
+                    recipientId,
+                    type: "TASK_UPDATED",
+                    title: "Công việc đã được thu hồi",
+                    body: `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
+                    entityType: "TASK",
+                    entityId: "",
+                    createdAt: nowIso,
+                    readAt: null,
+                });
+            }
         }
 
         this.persist();

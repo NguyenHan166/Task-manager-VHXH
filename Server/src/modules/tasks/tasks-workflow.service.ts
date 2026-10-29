@@ -802,7 +802,10 @@ export class TasksWorkflowService {
           data: {
             status: FileStatus.REMOVED,
             removedAt: now,
-            purgeAfter: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+            purgeAfter:
+              task.status === TaskStatus.DRAFT
+                ? now
+                : new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
             uploadExpiresAt: null,
           },
         });
@@ -830,7 +833,7 @@ export class TasksWorkflowService {
         task.primaryAssigneeId,
         ...collaborators.map(({ userId }) => userId),
       ].filter((id): id is string => Boolean(id) && id !== actor.id);
-      if (recipientIds.length) {
+      if (task.status !== TaskStatus.DRAFT && recipientIds.length) {
         const activeUsers = await tx.user.findMany({
           where: { id: { in: [...new Set(recipientIds)] }, status: UserStatus.ACTIVE },
           select: { id: true },
