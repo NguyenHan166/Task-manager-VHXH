@@ -11,9 +11,10 @@ type Props = {
   project?: Project;
   currentUserId?: string;
   isLeader: boolean;
+  roleLabel?: string;
 };
 
-export function TaskListItem({ task, assignee, project, currentUserId, isLeader }: Props) {
+export function TaskListItem({ task, assignee, project, currentUserId, isLeader, roleLabel }: Props) {
   const overdue = isTaskOverdue(task);
   const dueSoon = !overdue && isTaskDueSoon(task);
   const deliverable = task.deliverable?.trim();
@@ -43,7 +44,8 @@ export function TaskListItem({ task, assignee, project, currentUserId, isLeader 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-text-secondary">
             <PriorityBadge priority={task.priority} />
             {project && <span className="inline-flex min-w-0 items-center gap-1"><FolderOpen className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Dự án: {project.name}</span></span>}
-            {(isLeader || task.primaryAssigneeId !== currentUserId) && <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />Chủ trì: {assignee?.displayName || "Chưa phân công"}</span>}
+            {roleLabel && <span className="text-text-secondary">Vai trò: <strong className={roleLabel === "Chủ trì chính" ? "text-brand-700" : "text-purple-700"}>{roleLabel}</strong></span>}
+            {!roleLabel && (isLeader || task.primaryAssigneeId !== currentUserId) && <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />Chủ trì: {assignee?.displayName || "Chưa phân công"}</span>}
           </div>
         </div>
 

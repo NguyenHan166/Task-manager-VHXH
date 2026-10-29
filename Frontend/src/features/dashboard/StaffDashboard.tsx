@@ -13,9 +13,6 @@ import {
 import {
   StatCard,
   StatusBadge,
-  PriorityBadge,
-  OverdueBadge,
-  BlockedBadge,
   Button,
   Card,
   CardHeader,
@@ -24,7 +21,7 @@ import {
   CardContent,
   SkeletonCard,
 } from "../../components/ui";
-import { formatDateTimeVN, formatRelativeVN } from "../../shared/datetime";
+import { formatRelativeVN } from "../../shared/datetime";
 import {
   CheckSquare,
   Users,
@@ -212,89 +209,60 @@ export function StaffDashboard() {
         {/* Left Column (8 cols): Danh sách việc cần làm sắp xếp theo độ khẩn */}
         <div className="lg:col-span-8 space-y-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
+            <CardHeader className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2">
                   <CheckSquare className="w-4 h-4 text-brand-700" />
-                  Việc của tôi cần làm ({todoList.length})
+                  Việc cần xử lý <span className="text-text-muted">({todoList.length})</span>
                 </CardTitle>
-                <CardDescription>
-                  Sắp xếp ưu tiên: Quá hạn → Khẩn cấp → Sắp đến hạn → Đang tiến hành.
-                </CardDescription>
+                <CardDescription className="mt-1">Ưu tiên việc quá hạn và sắp đến hạn.</CardDescription>
               </div>
-              <Link to="/tasks">
+              <Link to="/tasks" className="self-start shrink-0">
                 <Button variant="ghost" size="sm" className="text-xs text-brand-700">
-                  Xem tất cả <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                  Tất cả công việc <ArrowRight className="w-3.5 h-3.5 ml-1" />
                 </Button>
               </Link>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="space-y-2 p-3 sm:p-4">
               {todoList.length === 0 ? (
                 <div className="p-8 text-center text-text-muted text-xs">
                   Hiện bạn không có công việc nào đang tồn đọng.
                 </div>
               ) : (
-                <div className="divide-y divide-border/60">
-                  {todoList.map((t) => {
-                    const overdue = isTaskOverdue(t, now);
-                    const dueSoon = isTaskDueSoon(t, 48, now);
+                <div className="space-y-2">
+                  {todoList.slice(0, 5).map((t) => {
                     const isAssignee = t.primaryAssigneeId === currentUser.id;
+                    const overdue = isTaskOverdue(t, now);
+                    const dueSoon = !overdue && isTaskDueSoon(t, 48, now);
 
                     return (
-                      <div
+                      <Link
                         key={t.id}
-                        onClick={() => navigate(`/tasks/${t.id}`)}
-                        className="p-4 hover:bg-slate-50 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                        to={`/tasks/${t.id}`}
+                        className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:bg-slate-50 ${overdue ? "border-red-200" : "border-border"}`}
                       >
-                        <div className="space-y-1.5 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-xs text-text-primary">
-                              {t.code}
-                            </span>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-mono text-[10px] font-semibold text-text-muted">{t.code}</span>
                             <StatusBadge status={t.status} />
-                            <PriorityBadge priority={t.priority} />
-                            {overdue && <OverdueBadge />}
-                            {!overdue && dueSoon && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                                Sắp đến hạn
-                              </span>
-                            )}
-                            {t.isBlocked && <BlockedBadge reason={t.blockedReason} />}
+                            {overdue && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Quá hạn</span>}
+                            {dueSoon && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Sắp đến hạn</span>}
                           </div>
-
-                          <div className="font-semibold text-sm text-text-primary truncate">
-                            {t.title}
-                          </div>
-
-                          <div className="text-xs text-text-muted flex items-center gap-3">
-                            <span>
-                              Vai trò:{" "}
-                              <strong className={isAssignee ? "text-brand-700" : "text-purple-700"}>
-                                {isAssignee ? "Chủ trì chính" : "Phối hợp"}
-                              </strong>
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5 text-text-muted" />
-                              <span className={overdue ? "text-danger font-semibold" : ""}>
-                                Hạn: {formatDateTimeVN(t.dueAt)} ({formatRelativeVN(t.dueAt)})
-                              </span>
+                          <div className="truncate text-sm font-semibold text-text-primary">{t.title}</div>
+                          <div className="flex flex-wrap gap-x-3 text-[11px] text-text-muted">
+                            <span>{isAssignee ? "Chủ trì" : "Phối hợp"}</span>
+                            <span className={overdue ? "font-semibold text-danger" : dueSoon ? "font-semibold text-amber-700" : ""}>
+                              Hạn {t.dueAt ? formatRelativeVN(t.dueAt) : "chưa xác định"}
                             </span>
                           </div>
                         </div>
-
-                        <div className="text-right shrink-0">
-                          <div className="text-xs font-bold font-mono text-text-primary">
-                            {t.progressPercent}%
-                          </div>
-                          <div className="w-16 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                            <div
-                              className="h-full bg-brand-700 rounded-full"
-                              style={{ width: `${t.progressPercent}%` }}
-                            />
+                        <div className="w-10 shrink-0 text-right">
+                          <div className="text-[10px] font-bold font-mono text-text-secondary">{t.progressPercent}%</div>
+                          <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-brand-700" style={{ width: `${t.progressPercent}%` }} />
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
