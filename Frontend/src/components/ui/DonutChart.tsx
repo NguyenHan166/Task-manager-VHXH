@@ -35,7 +35,7 @@ export function DonutChart({
   const hoveredSegment = segments.find((s) => s.key === hoveredKey);
 
   return (
-    <div className={cn("flex flex-col sm:flex-row items-center gap-6", className)}>
+    <div className={cn("flex flex-wrap items-center justify-center gap-6", className)}>
       {/* SVG Donut Circle */}
       <div className="relative shrink-0 flex items-center justify-center" style={{ width: size, height: size }}>
         <svg
@@ -104,7 +104,7 @@ export function DonutChart({
       </div>
 
       {/* Legend & Breakdown List (Accessible on both desktop and mobile) */}
-      <div className="flex-1 w-full space-y-2">
+      <div className="flex-1 w-full min-w-[180px] space-y-2">
         {segments.map((seg) => {
           const percent = total > 0 ? Math.round((seg.value / total) * 100) : 0;
           const isHovered = hoveredKey === seg.key;

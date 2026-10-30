@@ -179,7 +179,7 @@ export interface TaskEvent {
   id: Id;
   taskId: Id;
   actorId: Id;
-  kind: "CREATED" | "DETAILS_UPDATED" | "COMMENT_ADDED" | "PUBLISHED" | "STARTED" | "PROGRESS_UPDATED" | "COMPLETED" | "SUBMITTED" | "SUBMISSION_WITHDRAWN" | "APPROVED" | "RETURNED" | "DEADLINE_REQUESTED" | "DEADLINE_REQUEST_DECIDED" | "DEADLINE_CHANGED" | "ASSIGNEE_REQUESTED" | "ASSIGNEE_REQUEST_DECIDED" | "ASSIGNEE_CHANGED" | "TYPE_CHANGED" | "TEAM_INVITE_RESPONDED" | "RECURRENCE_GENERATED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "REOPENED";
+  kind: "CREATED" | "DETAILS_UPDATED" | "COMMENT_ADDED" | "PUBLISHED" | "STARTED" | "PROGRESS_UPDATED" | "COMPLETED" | "SUBMITTED" | "SUBMISSION_WITHDRAWN" | "APPROVED" | "RETURNED" | "DEADLINE_REQUESTED" | "DEADLINE_REQUEST_DECIDED" | "DEADLINE_CHANGED" | "ASSIGNEE_REQUESTED" | "ASSIGNEE_REQUEST_DECIDED" | "ASSIGNEE_CHANGED" | "TYPE_CHANGED" | "TEAM_INVITE_RESPONDED" | "RECURRENCE_GENERATED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "REOPENED" | "DELETED" | "FINISHED";
   note: string;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
@@ -366,6 +366,7 @@ export function isTaskOverdue(task: Task, now: Date = new Date()): boolean {
 }
 
 export function canSeeTask(task: Task, viewer: User, participants: TaskParticipant[]): boolean {
+  if (task.archivedAt) return false;
   if (task.status === "DRAFT" && task.createdById !== viewer.id) return false;
   if (task.type === "PERSONAL") return task.createdById === viewer.id;
   if (task.type === "OFFICIAL" && (viewer.role === "MANAGER" || viewer.role === "DEPUTY_MANAGER")) return true;

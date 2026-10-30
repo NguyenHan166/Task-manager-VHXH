@@ -19,10 +19,6 @@ import {
 } from "../tasks/task-selectors";
 import {
     StatCard,
-    StatusBadge,
-    PriorityBadge,
-    OverdueBadge,
-    BlockedBadge,
     UserAvatar,
     Button,
     Card,
@@ -36,6 +32,7 @@ import {
     useToast,
 } from "../../components/ui";
 import { formatDateTimeVN } from "../../shared/datetime";
+import { TaskListItem } from "../tasks/TaskListItem";
 import {
     FolderKanban,
     Clock,
@@ -45,7 +42,6 @@ import {
     AlertTriangle,
     PlusCircle,
     Eye,
-    Calendar,
     AlertOctagon,
     ArrowRight,
     Filter,
@@ -355,10 +351,10 @@ export function ManagerDashboard() {
                         className="h-9 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
                     >
                         <option value="ALL">Mọi mức ưu tiên</option>
-                        <option value="URGENT">Khẩn cấp (Urgent)</option>
-                        <option value="HIGH">Cao (High)</option>
-                        <option value="NORMAL">Bình thường (Normal)</option>
-                        <option value="LOW">Thấp (Low)</option>
+                        <option value="URGENT">Khẩn cấp</option>
+                        <option value="HIGH">Cao</option>
+                        <option value="NORMAL">Bình thường</option>
+                        <option value="LOW">Thấp</option>
                     </select>
 
                     {/* Time range */}
@@ -555,8 +551,8 @@ export function ManagerDashboard() {
                 <div className="lg:col-span-7 space-y-6">
                     {/* Cần xử lý ngay */}
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-3">
-                            <div>
+                        <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
                                 <CardTitle className="flex items-center gap-2">
                                     <AlertOctagon className="w-4 h-4 text-danger" />
                                     Nhiệm vụ cần xử lý ngay (
@@ -567,7 +563,7 @@ export function ManagerDashboard() {
                                     tiên khẩn cấp hoặc chờ duyệt.
                                 </CardDescription>
                             </div>
-                            <Link to="/tasks?type=OFFICIAL">
+                            <Link to="/tasks?type=OFFICIAL" className="shrink-0 self-start">
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -584,91 +580,17 @@ export function ManagerDashboard() {
                                     Không có nhiệm vụ nào cần xử lý khẩn cấp.
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/60">
-                                    {urgentTasks.map((t) => {
-                                        const assignee = users.find(
-                                            (u) => u.id === t.primaryAssigneeId,
-                                        );
-                                        const overdue = isTaskOverdue(t, now);
-                                        return (
-                                            <div
-                                                key={t.id}
-                                                onClick={() =>
-                                                    navigate(`/tasks/${t.id}`)
-                                                }
-                                                className="p-3.5 hover:bg-slate-50 flex items-center justify-between gap-3 cursor-pointer transition-colors"
-                                            >
-                                                <div className="space-y-1 min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-mono font-bold text-xs text-text-primary">
-                                                            {t.code}
-                                                        </span>
-                                                        <StatusBadge
-                                                            status={t.status}
-                                                        />
-                                                        <PriorityBadge
-                                                            priority={
-                                                                t.priority
-                                                            }
-                                                        />
-                                                        {overdue && (
-                                                            <OverdueBadge />
-                                                        )}
-                                                        {t.isBlocked && (
-                                                            <BlockedBadge
-                                                                reason={
-                                                                    t.blockedReason
-                                                                }
-                                                            />
-                                                        )}
-                                                    </div>
-
-                                                    <div className="font-semibold text-sm text-text-primary truncate">
-                                                        {t.title}
-                                                    </div>
-
-                                                    <div className="text-xs text-text-muted flex items-center gap-3">
-                                                        <span>
-                                                            XLC:{" "}
-                                                            <strong>
-                                                                {assignee?.displayName ||
-                                                                    "—"}
-                                                            </strong>
-                                                        </span>
-                                                        <span>•</span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Calendar className="w-3 h-3 text-text-muted" />
-                                                            <span
-                                                                className={
-                                                                    overdue
-                                                                        ? "text-danger font-semibold"
-                                                                        : ""
-                                                                }
-                                                            >
-                                                                {formatDateTimeVN(
-                                                                    t.dueAt,
-                                                                )}
-                                                            </span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-right shrink-0">
-                                                    <div className="text-xs font-bold font-mono text-text-primary">
-                                                        {t.progressPercent}%
-                                                    </div>
-                                                    <div className="w-14 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-brand-700 rounded-full"
-                                                            style={{
-                                                                width: `${t.progressPercent}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                <div className="space-y-3 p-4">
+                                    {urgentTasks.map((task) => (
+                                        <TaskListItem
+                                            key={task.id}
+                                            task={task}
+                                            assignee={users.find((user) => user.id === task.primaryAssigneeId)}
+                                            project={projects.find((project) => project.id === task.projectId)}
+                                            currentUserId={currentUser?.id}
+                                            isLeader
+                                        />
+                                    ))}
                                 </div>
                             )}
                         </CardContent>
@@ -786,7 +708,7 @@ export function ManagerDashboard() {
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-red-700">
-                                        Khẩn cấp (Urgent)
+                                        Khẩn cấp
                                     </span>
                                     <span className="font-mono font-bold">
                                         {priorityBreakdown.URGENT} việc
@@ -813,7 +735,7 @@ export function ManagerDashboard() {
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-amber-700">
-                                        Cao (High)
+                                        Cao
                                     </span>
                                     <span className="font-mono font-bold">
                                         {priorityBreakdown.HIGH} việc
@@ -840,7 +762,7 @@ export function ManagerDashboard() {
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-blue-700">
-                                        Bình thường (Normal)
+                                        Bình thường
                                     </span>
                                     <span className="font-mono font-bold">
                                         {priorityBreakdown.NORMAL} việc
@@ -867,7 +789,7 @@ export function ManagerDashboard() {
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-slate-600">
-                                        Thấp (Low)
+                                        Thấp
                                     </span>
                                     <span className="font-mono font-bold">
                                         {priorityBreakdown.LOW} việc

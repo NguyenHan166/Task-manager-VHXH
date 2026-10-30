@@ -628,7 +628,7 @@ export function TaskDetailPage() {
     try {
       await workspaceRepository.cancelTask(task.id, currentUser.id);
       setShowCancelModal(false);
-      showToast("Đã thu hồi và xóa công việc.", "info");
+      showToast("Đã thu hồi và ẩn công việc.", "info");
       navigate("/tasks", { replace: true });
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi hủy công việc", "error");
@@ -643,7 +643,7 @@ export function TaskDetailPage() {
     try {
       await workspaceRepository.finishTask(task.id, currentUser.id);
       setShowFinishModal(false);
-      showToast("Đã kết thúc và xóa công việc khỏi hệ thống.", "success");
+      showToast("Đã kết thúc và lưu trữ công việc.", "success");
       navigate("/tasks", { replace: true });
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Không thể kết thúc công việc", "error");
@@ -2606,8 +2606,8 @@ export function TaskDetailPage() {
         {/* --- MODAL 10: THU HỒI VÀ XÓA CÔNG VIỆC --- */}
         <ConfirmDialog
           isOpen={showCancelModal}
-          title="Thu hồi và xóa công việc này?"
-          description="Công việc và lịch sử xử lý sẽ bị xóa. Tệp đính kèm được gỡ khỏi công việc. Người nhận sẽ được thông báo; thao tác này không thể hoàn tác."
+          title="Thu hồi và ẩn công việc này?"
+          description="Công việc sẽ được ẩn khỏi danh sách hiện hành. Lịch sử xử lý được giữ lại; các liên kết tệp được gỡ và chuyển sang quy trình lưu trữ. Người nhận sẽ được thông báo."
           confirmLabel="Xác nhận thu hồi"
           variant="danger"
           isLoading={isSubmittingAction}
@@ -2617,8 +2617,8 @@ export function TaskDetailPage() {
 
         <ConfirmDialog
           isOpen={showFinishModal}
-          title="Kết thúc và xóa công việc này?"
-          description="Công việc đã được duyệt hoàn thành. Xác nhận sẽ xóa công việc, lịch sử xử lý và các liên kết tệp khỏi DB; thao tác không thể hoàn tác. Người nhận sẽ được thông báo."
+          title="Kết thúc và ẩn công việc này?"
+          description="Công việc đã được duyệt hoàn thành. Xác nhận sẽ ẩn công việc khỏi danh sách hiện hành, giữ lại lịch sử xử lý và gỡ các liên kết tệp. Người nhận sẽ được thông báo."
           confirmLabel="Xác nhận kết thúc"
           variant="danger"
           isLoading={isSubmittingAction}

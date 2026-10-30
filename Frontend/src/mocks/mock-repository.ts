@@ -547,14 +547,14 @@ export class MockRepository {
     public async getTasks(): Promise<Task[]> {
         await this.delay();
         this.checkFailure();
-        return [...this.getDb().tasks];
+        return this.getDb().tasks.filter((task) => !task.archivedAt);
     }
 
     public async getTaskById(id: Id): Promise<Task | null> {
         await this.delay();
         this.checkFailure();
         const task = this.getDb().tasks.find((t) => t.id === id);
-        return task ? { ...task } : null;
+        return task && !task.archivedAt ? { ...task } : null;
     }
 
     public async createTask(
@@ -1091,40 +1091,25 @@ export class MockRepository {
                 .map((link) => link.fileId),
         );
 
-        db.tasks = db.tasks
-            .filter((item) => item.id !== taskId)
-            .map((item) =>
-                item.parentTaskId === taskId
-                    ? { ...item, parentTaskId: null }
-                    : item,
-            );
-        db.participants = db.participants.filter(
-            (item) => item.taskId !== taskId,
-        );
-        db.comments = db.comments.filter((item) => item.taskId !== taskId);
-        db.submissions = db.submissions.filter(
-            (item) => item.taskId !== taskId,
-        );
-        db.approvals = db.approvals.filter((item) => item.taskId !== taskId);
-        db.deadlineRequests = db.deadlineRequests.filter(
-            (item) => item.taskId !== taskId,
-        );
-        db.assigneeRequests = db.assigneeRequests.filter(
-            (item) => item.taskId !== taskId,
-        );
-        db.events = db.events.filter((item) => item.taskId !== taskId);
-        db.notifications = db.notifications.filter(
-            (item) => item.entityId !== taskId,
-        );
-        db.recurrenceInstances = db.recurrenceInstances
-            .filter(
-                (item) =>
-                    item.taskId !== taskId && !item.taskIds?.includes(taskId),
-            )
-            .map((item) => ({
-                ...item,
-                taskIds: item.taskIds?.filter((id) => id !== taskId),
-            }));
+        const nowIso = toIsoUtc();
+        db.tasks[taskIdx] = {
+            ...task,
+            archivedAt: nowIso,
+            updatedAt: nowIso,
+        };
+        db.events.push({
+            id: `e_${Date.now()}_${mode}`,
+            taskId,
+            actorId: _actorId,
+            kind: mode === "finish" ? "FINISHED" : "DELETED",
+            note:
+                mode === "finish"
+                    ? "Đã kết thúc và lưu trữ công việc sau khi duyệt hoàn thành."
+                    : "Đã thu hồi và lưu trữ công việc theo xác nhận của lãnh đạo.",
+            before: { status: task.status, archivedAt: null },
+            after: { status: task.status, archivedAt: nowIso },
+            createdAt: nowIso,
+        });
         db.fileLinks = db.fileLinks.filter(
             (link) =>
                 !(
@@ -1145,14 +1130,19 @@ export class MockRepository {
         );
 
         if (task.status !== "DRAFT") {
-            const nowIso = toIsoUtc();
             for (const recipientId of recipientIds) {
                 db.notifications.push({
                     id: `n_${Date.now()}_${recipientId}_withdrawn`,
                     recipientId,
                     type: "TASK_UPDATED",
-                    title: "Công việc đã được thu hồi",
-                    body: `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
+                    title:
+                        mode === "finish"
+                            ? "Công việc đã kết thúc"
+                            : "Công việc đã được thu hồi",
+                    body:
+                        mode === "finish"
+                            ? `[${task.code}] ${task.title} đã được Trưởng phòng kết thúc và lưu trữ sau khi duyệt hoàn thành.`
+                            : `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
                     entityType: "TASK",
                     entityId: "",
                     createdAt: nowIso,

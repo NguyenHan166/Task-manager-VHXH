@@ -718,7 +718,7 @@ export class TasksWorkflowService {
 
   async cancel(actor: AuthenticatedUser, taskId: string) {
     this.requireLeader(actor);
-    return this.deleteTask(actor, taskId, 'cancel');
+    return this.archiveTask(actor, taskId, 'cancel');
   }
 
   async recall(actor: AuthenticatedUser, taskId: string) {
@@ -726,7 +726,11 @@ export class TasksWorkflowService {
     return this.prisma.$transaction(async (tx) => {
       const task = await this.commandTask(tx, actor, taskId);
       this.requireOfficial(task);
-      if (![TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW].includes(task.status)) {
+      if (
+        task.status !== TaskStatus.TODO &&
+        task.status !== TaskStatus.IN_PROGRESS &&
+        task.status !== TaskStatus.IN_REVIEW
+      ) {
         throw conflict('Only an active assignment can be recalled');
       }
       const now = new Date();
@@ -791,10 +795,10 @@ export class TasksWorkflowService {
     if (actor.role !== UserRole.MANAGER) {
       throw forbidden('Only the manager can finish a completed task');
     }
-    return this.deleteTask(actor, taskId, 'finish');
+    return this.archiveTask(actor, taskId, 'finish');
   }
 
-  private async deleteTask(actor: AuthenticatedUser, taskId: string, mode: 'cancel' | 'finish') {
+  private async archiveTask(actor: AuthenticatedUser, taskId: string, mode: 'cancel' | 'finish') {
     return this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: { id: taskId, archivedAt: null },
@@ -819,6 +823,7 @@ export class TasksWorkflowService {
 
       const fileLinks = await tx.fileLink.findMany({
         where: {
+          removedAt: null,
           OR: [
             { taskId },
             { submission: { is: { taskId } } },
@@ -828,10 +833,6 @@ export class TasksWorkflowService {
         select: { fileId: true },
       });
       const fileIds = [...new Set(fileLinks.map(({ fileId }) => fileId))];
-      const notificationIds = await tx.notification.findMany({
-        where: { taskId },
-        select: { id: true },
-      });
       const collaborators = await tx.taskParticipant.findMany({
         where: {
           taskId,
@@ -841,36 +842,33 @@ export class TasksWorkflowService {
         select: { userId: true },
       });
 
-      await tx.realtimeOutbox.deleteMany({
+      const changed = await tx.task.updateMany({
         where: {
-          OR: [
-            { taskId },
-            { notificationId: { in: notificationIds.map(({ id }) => id) } },
-          ],
+          id: task.id,
+          archivedAt: null,
+          version: task.version,
+          status: task.status,
+        },
+        data: {
+          archivedAt: now,
+          version: { increment: 1 },
+          updatedAt: now,
         },
       });
-      await tx.notification.deleteMany({ where: { taskId } });
-      await tx.recurrenceInstanceTask.deleteMany({ where: { taskId } });
-      await tx.fileLink.deleteMany({
+      if (changed.count !== 1) {
+        throw conflict('Task changed while the command was running');
+      }
+
+      await tx.fileLink.updateMany({
         where: {
+          removedAt: null,
           OR: [
             { taskId },
             { submission: { is: { taskId } } },
             { comment: { is: { taskId } } },
           ],
         },
-      });
-      await tx.taskApproval.deleteMany({ where: { taskId } });
-      await tx.taskSubmission.deleteMany({ where: { taskId } });
-      await tx.taskComment.deleteMany({ where: { taskId } });
-      await tx.taskParticipant.deleteMany({ where: { taskId } });
-      await tx.taskDeadlineRequest.deleteMany({ where: { taskId } });
-      await tx.taskAssigneeRequest.deleteMany({ where: { taskId } });
-      await tx.reminderEvent.deleteMany({ where: { taskId } });
-      await tx.taskEvent.deleteMany({ where: { taskId } });
-      await tx.task.updateMany({
-        where: { parentTaskId: taskId },
-        data: { parentTaskId: null },
+        data: { removedAt: now },
       });
 
       if (fileIds.length) {
@@ -892,6 +890,19 @@ export class TasksWorkflowService {
         });
       }
 
+      const event = await this.event(
+        tx,
+        actor,
+        task,
+        mode === 'finish' ? 'FINISHED' : 'DELETED',
+        mode === 'finish'
+          ? 'Đã kết thúc và lưu trữ công việc sau khi duyệt hoàn thành.'
+          : 'Đã thu hồi và lưu trữ công việc theo xác nhận của lãnh đạo.',
+        { status: task.status, archivedAt: null },
+        { status: task.status, archivedAt: now.toISOString() },
+        now,
+      );
+
       await tx.auditLog.create({
         data: {
           actorId: actor.id,
@@ -904,11 +915,10 @@ export class TasksWorkflowService {
             status: task.status,
             primaryAssigneeId: task.primaryAssigneeId,
           },
-          after: { deleted: true },
+          after: { archived: true, archivedAt: now.toISOString() },
           createdAt: now,
         },
       });
-      await tx.task.delete({ where: { id: taskId } });
 
       const recipientIds = [
         task.primaryAssigneeId,
@@ -919,7 +929,6 @@ export class TasksWorkflowService {
           where: { id: { in: [...new Set(recipientIds)] }, status: UserStatus.ACTIVE },
           select: { id: true },
         });
-        const businessEventId = randomUUID();
         await tx.notification.createMany({
           data: activeUsers.map(({ id }) => ({
             recipientId: id,
@@ -927,15 +936,15 @@ export class TasksWorkflowService {
             type: NotificationType.TASK_UPDATED,
             title: mode === 'finish' ? 'Công việc đã kết thúc' : 'Công việc đã được thu hồi',
             body: mode === 'finish'
-              ? `[${task.code}] ${task.title} đã được Trưởng phòng kết thúc sau khi duyệt hoàn thành.`
+              ? `[${task.code}] ${task.title} đã được Trưởng phòng kết thúc và lưu trữ sau khi duyệt hoàn thành.`
               : `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
-            businessEventId,
+            businessEventId: event.id,
             createdAt: now,
           })),
           skipDuplicates: true,
         });
         const notifications = await tx.notification.findMany({
-          where: { businessEventId },
+          where: { businessEventId: event.id },
           select: { id: true, recipientId: true },
         });
         if (notifications.length) {
@@ -943,7 +952,7 @@ export class TasksWorkflowService {
             data: notifications.map(({ id, recipientId }) => ({
               type: RealtimeOutboxType.NOTIFICATION_NEW,
               idempotencyKey: `notification:${id}`,
-              businessEventId,
+              businessEventId: event.id,
               taskId: null,
               recipientId,
               notificationId: id,
