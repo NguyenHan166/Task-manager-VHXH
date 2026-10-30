@@ -1,6 +1,6 @@
 import { ArrowUpRight, CalendarClock, FolderOpen, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import { BlockedBadge, OverdueBadge, PriorityBadge, StatusBadge } from "../../components/ui";
+import { BlockedBadge, DueSoonBadge, OverdueBadge, PriorityBadge, StatusBadge } from "../../components/ui";
 import type { Project, Task, User } from "../../shared/data-contract";
 import { formatDateTimeVN, formatRelativeVN } from "../../shared/datetime";
 import { isTaskDueSoon, isTaskOverdue } from "./task-selectors";
@@ -28,7 +28,7 @@ export function TaskListItem({ task, assignee, project, currentUserId, isLeader,
             <span className="font-mono text-[11px] font-bold tracking-wide text-text-muted">{task.code}</span>
             <StatusBadge status={task.status} />
             {overdue && <OverdueBadge />}
-            {dueSoon && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Sắp đến hạn</span>}
+            {dueSoon && <DueSoonBadge />}
             {task.isBlocked && <BlockedBadge reason={task.blockedReason} />}
           </div>
 

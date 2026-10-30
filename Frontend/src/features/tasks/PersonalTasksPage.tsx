@@ -10,6 +10,7 @@ import {
   Button,
   StatusBadge,
   PriorityBadge,
+  OverdueBadge,
   DataTable,
   EmptyState,
   ConfirmDialog,
@@ -423,11 +424,7 @@ export function PersonalTasksPage() {
                           {t.code}
                         </span>
                         <PriorityBadge priority={t.priority} />
-                        {isOverdue && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-danger border border-red-200">
-                            Quá hạn
-                          </span>
-                        )}
+                        {isOverdue && <OverdueBadge className="px-2 py-0.5 text-[10px]" />}
                       </div>
                       <StatusBadge status={t.status} />
                     </div>

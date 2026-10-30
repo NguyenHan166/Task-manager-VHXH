@@ -32,6 +32,7 @@ import {
   CardContent,
   StatusBadge,
   PriorityBadge,
+  DueSoonBadge,
   OverdueBadge,
   BlockedBadge,
   UserAvatar,
@@ -1057,11 +1058,7 @@ export function TaskDetailPage() {
                 <StatusBadge status={task.status} />
                 <PriorityBadge priority={task.priority} />
                 {overdue && <OverdueBadge />}
-                {!overdue && dueSoon && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Sắp đến hạn
-                  </span>
-                )}
+                {!overdue && dueSoon && <DueSoonBadge className="text-xs" />}
                 {task.isBlocked && <BlockedBadge reason={task.blockedReason} />}
               </div>
 

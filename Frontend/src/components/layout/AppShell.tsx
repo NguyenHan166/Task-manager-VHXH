@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../../features/auth/SessionContext";
 import { useWorkspaceSettings } from "../../features/tasks/use-tasks";
 import { UserAvatar } from "../ui/Avatar";
+import { FloatingNetworkBackground } from "../ui/FloatingNetworkBackground";
 import { workspaceRepository, httpRepository } from "../../shared/repository";
 import { getUnreadCount } from "../../features/tasks/task-selectors";
 import { canSeeTask } from "../../shared/data-contract";
@@ -214,9 +215,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     location.pathname.startsWith("/tasks/") || location.pathname === "/approvals";
 
   return (
-    <div className="min-h-screen flex bg-canvas text-text-primary antialiased">
+    <div className="relative isolate min-h-screen flex network-background-surface text-text-primary antialiased">
+      <FloatingNetworkBackground />
       {/* Desktop Sidebar (Fixed 248px) */}
-      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start flex-col w-[248px] bg-surface border-r border-border shrink-0 z-20">
+      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start flex-col w-[248px] bg-surface/78 backdrop-blur-sm border-r border-border shrink-0 z-20">
         {/* Brand Header */}
         <div className="h-16 flex items-center px-5 border-b border-border/80 gap-3">
           <div className="w-8 h-8 rounded-lg bg-brand-700 text-white flex items-center justify-center font-bold text-base shadow-sm">
@@ -248,21 +250,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors relative ${
+                aria-current={isActive ? "page" : undefined}
+                className={`group relative flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm transition-all duration-200 ${
                   isActive
-                    ? "bg-brand-50 text-brand-700 font-semibold"
-                    : "text-text-secondary hover:text-text-primary hover:bg-slate-50"
+                    ? "bg-white/90 font-semibold text-emerald-900 shadow-sm ring-1 ring-emerald-300/80"
+                    : "font-medium text-text-secondary hover:bg-white/65 hover:text-text-primary"
                 }`}
               >
                 {isActive && (
-                  <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-brand-700 rounded-r" />
+                  <span className="absolute -left-0.5 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-emerald-700" />
                 )}
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isActive ? "text-brand-700" : "text-text-muted"
-                  }`}
-                />
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${isActive ? "bg-emerald-100 text-emerald-700" : "text-text-muted group-hover:bg-white/80"}`}>
+                  <Icon className="h-4 w-4" />
+                </span>
                 <span className="truncate">{item.label}</span>
+                {isActive && <span aria-hidden="true" className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600 shadow-[0_0_0_3px_rgba(16,185,129,0.14)]" />}
               </Link>
             );
           })}
@@ -272,7 +274,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               to="/ui-kit"
               className={`flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
                 location.pathname === "/ui-kit"
-                  ? "bg-brand-50 text-brand-700 font-semibold"
+                  ? "bg-white/90 text-emerald-900 font-semibold shadow-sm ring-1 ring-emerald-300/80"
                   : "text-text-muted hover:text-brand-700 hover:bg-slate-50"
               }`}
             >
@@ -314,7 +316,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar (Height 64px, compact) */}
-        <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-3 sm:px-6 z-30 sticky top-0 shadow-2xs">
+        <header className="h-16 bg-surface/78 backdrop-blur-sm border-b border-border flex items-center justify-between px-3 sm:px-6 z-30 sticky top-0 shadow-2xs">
           {/* Left: Mobile hamburger & Global Search */}
           <div className="flex items-center gap-3 flex-1 min-w-0 mr-2 sm:mr-4">
             <button
@@ -614,7 +616,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile Search Overlay Bar */}
         {mobileSearchOpen && (
-          <div className="sm:hidden bg-surface border-b border-border p-3 flex items-center gap-2 z-20">
+          <div className="sm:hidden bg-surface/78 backdrop-blur-sm border-b border-border p-3 flex items-center gap-2 z-20">
             <Search className="w-4 h-4 text-text-muted shrink-0" />
             <input
               type="text"
@@ -638,7 +640,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden sticky top-16 z-20 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-surface border-b border-border p-4 space-y-1 shadow-lg">
+          <div className="lg:hidden sticky top-16 z-20 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-surface/90 backdrop-blur-sm border-b border-border p-4 space-y-1 shadow-lg">
             <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-3 mb-2">
               {isManager ? "Quản trị & Điều hành (Manager)" : "Không gian Chuyên viên (Staff)"}
             </div>
@@ -654,14 +656,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.path}
                   to={item.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                  aria-current={isActive ? "page" : undefined}
+                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200 ${
                     isActive
-                      ? "bg-brand-50 text-brand-700 font-semibold"
-                      : "text-text-secondary hover:bg-slate-50"
+                      ? "bg-white/90 font-semibold text-emerald-900 shadow-sm ring-1 ring-emerald-300/80"
+                      : "font-medium text-text-secondary hover:bg-white/65 hover:text-text-primary"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  {isActive && <span className="absolute -left-0.5 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-emerald-700" />}
+                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${isActive ? "bg-emerald-100 text-emerald-700" : "text-text-muted group-hover:bg-white/80"}`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
                   <span>{item.label}</span>
+                  {isActive && <span aria-hidden="true" className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600 shadow-[0_0_0_3px_rgba(16,185,129,0.14)]" />}
                 </Link>
               );
             })}
@@ -681,17 +688,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Content Body Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto pb-28">
-          {isMockMode && isP1Route && (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
-              Dữ liệu mẫu · Tính năng P1 đang chạy trên bản dùng thử và chưa kết nối API thật.
-            </div>
-          )}
-          {isMockMode && hasP1TaskControls && (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
-              Các thao tác việc nhóm/cá nhân, việc con, xin gia hạn và đổi chủ trì thuộc P1; hiện chỉ chạy trên dữ liệu mẫu.
-            </div>
-          )}
-          {children}
+          <div>
+            {isMockMode && isP1Route && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+                Dữ liệu mẫu · Tính năng P1 đang chạy trên bản dùng thử và chưa kết nối API thật.
+              </div>
+            )}
+            {isMockMode && hasP1TaskControls && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+                Các thao tác việc nhóm/cá nhân, việc con, xin gia hạn và đổi chủ trì thuộc P1; hiện chỉ chạy trên dữ liệu mẫu.
+              </div>
+            )}
+            {children}
+          </div>
         </main>
       </div>
 

@@ -13,6 +13,8 @@ import {
 import {
   StatCard,
   StatusBadge,
+  DueSoonBadge,
+  OverdueBadge,
   Button,
   Card,
   CardHeader,
@@ -245,8 +247,8 @@ export function StaffDashboard() {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono text-[10px] font-semibold text-text-muted">{t.code}</span>
                             <StatusBadge status={t.status} />
-                            {overdue && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Quá hạn</span>}
-                            {dueSoon && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Sắp đến hạn</span>}
+                            {overdue && <OverdueBadge className="px-2 py-0.5 text-[10px]" />}
+                            {dueSoon && <DueSoonBadge className="px-2 py-0.5 text-[10px]" />}
                           </div>
                           <div className="truncate text-sm font-semibold text-text-primary">{t.title}</div>
                           <div className="flex flex-wrap gap-x-3 text-[11px] text-text-muted">

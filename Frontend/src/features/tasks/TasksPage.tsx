@@ -7,6 +7,7 @@ import {
   Breadcrumb,
   PageHeader,
   Button,
+  DueSoonBadge,
   PriorityBadge,
   OverdueBadge,
   BlockedBadge,
@@ -665,11 +666,7 @@ export function TasksPage() {
                               {(overdue || task.isBlocked || dueSoon) && (
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   {overdue && <OverdueBadge />}
-                                  {!overdue && dueSoon && (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
-                                      Sắp đến hạn
-                                    </span>
-                                  )}
+                                  {!overdue && dueSoon && <DueSoonBadge />}
                                   {task.isBlocked && <BlockedBadge reason={task.blockedReason} />}
                                 </div>
                               )}
