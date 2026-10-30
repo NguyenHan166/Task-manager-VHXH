@@ -9,7 +9,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-card bg-surface border border-border shadow-card overflow-hidden",
+        "rounded-card bg-surface border border-transparent shadow-card overflow-hidden",
         className
       )}
       {...props}
@@ -25,7 +25,7 @@ export function CardHeader({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("px-5 py-4 border-b border-border/60", className)} {...props}>
+    <div className={cn("px-5 pt-4 pb-2", className)} {...props}>
       {children}
     </div>
   );
@@ -52,7 +52,7 @@ export function CardDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("text-xs text-text-muted mt-0.5", className)} {...props}>
+    <p className={cn("text-sm text-text-muted mt-0.5", className)} {...props}>
       {children}
     </p>
   );
@@ -64,7 +64,7 @@ export function CardContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("p-5", className)} {...props}>
+    <div className={cn("px-5 pt-2 pb-4", className)} {...props}>
       {children}
     </div>
   );

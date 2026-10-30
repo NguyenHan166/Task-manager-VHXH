@@ -43,7 +43,7 @@ export function FilterBar({
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full h-10 pl-9 pr-8 rounded-btn bg-slate-50 border border-border text-xs text-text-primary placeholder:text-text-muted focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-700"
+            className="w-full h-9 pl-9 pr-8 rounded-btn bg-white border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-700"
           />
           {searchValue && (
             <button

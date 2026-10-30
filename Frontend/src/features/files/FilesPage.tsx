@@ -25,6 +25,7 @@ import {
   getFileCategoryIcon,
 } from "./file-session-store";
 import { downloadFile } from "./file-download";
+import { DocumentPreview, supportsInlinePreview } from "./DocumentPreview";
 import {
   FileText,
   FileSpreadsheet,
@@ -34,6 +35,7 @@ import {
   Trash2,
   Eye,
   ExternalLink,
+  Download,
   ShieldAlert,
   Search,
   Cloud,
@@ -65,6 +67,7 @@ export function FilesPage() {
 
   // Preview Modal
   const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
+  const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
   const [downloadingFileId, setDownloadingFileId] = useState<Id | null>(null);
 
   // Delete/Unlink Modal
@@ -228,27 +231,21 @@ export function FilesPage() {
 
   const columns = [
     {
-      key: "id",
-      header: "Mã tệp",
-      width: "90px",
+      key: "file",
+      header: "Tệp tin",
+      width: "30%",
       render: (f: FileObject) => (
-        <span className="font-mono text-xs font-bold text-text-muted bg-slate-100 px-2 py-0.5 rounded">
-          {f.id}
-        </span>
-      ),
-    },
-    {
-      key: "originalName",
-      header: "Tên tệp tin & Định dạng",
-      render: (f: FileObject) => (
-        <div className="flex items-center gap-2.5">
-          {renderFileIcon(f.originalName)}
-          <div className="space-y-0.5 min-w-0">
-            <div className="font-semibold text-xs text-text-primary hover:text-brand-700 truncate max-w-xs">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50">
+            {renderFileIcon(f.originalName)}
+          </span>
+          <div className="min-w-0 space-y-0.5">
+            <div className="truncate text-xs font-semibold text-text-primary" title={f.originalName}>
               {f.originalName}
             </div>
-            <div className="text-[11px] text-text-muted">
-              {f.mimeType || "application/octet-stream"}
+            <div className="truncate text-[10px] text-text-muted" title={f.mimeType || "application/octet-stream"}>
+              {f.mimeType || "application/octet-stream"} <span className="mx-1 text-slate-300">·</span>
+              <span className="font-mono" title={f.id}>Mã {f.id}</span>
             </div>
           </div>
         </div>
@@ -257,9 +254,9 @@ export function FilesPage() {
     {
       key: "sizeBytes",
       header: "Dung lượng",
-      width: "110px",
+      width: "9%",
       render: (f: FileObject) => (
-        <span className="text-xs font-medium text-text-secondary">
+        <span className="whitespace-nowrap text-xs font-medium text-text-secondary">
           {formatFileSize(f.sizeBytes)}
         </span>
       ),
@@ -267,11 +264,11 @@ export function FilesPage() {
     {
       key: "uploadedBy",
       header: "Người tải lên",
-      width: "170px",
+      width: "15%",
       render: (f: FileObject) => {
         const uploader = users.find((u) => u.id === f.uploadedById);
         return (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex min-w-0 items-center gap-2 text-xs">
             <UserAvatar name={uploader?.displayName || "N/A"} size="sm" />
             <span className="text-text-primary truncate">{uploader?.displayName || f.uploadedById}</span>
           </div>
@@ -281,6 +278,7 @@ export function FilesPage() {
     {
       key: "linkedEntity",
       header: "Đối tượng liên kết",
+      width: "22%",
       render: (f: FileObject) => {
         const fLinks = links.filter((l) => l.fileId === f.id);
         if (fLinks.length === 0) {
@@ -294,18 +292,19 @@ export function FilesPage() {
                 const sub = submissions.find((s) => s.id === l.entityId);
                 const linkedTask = sub ? tasks.find((t) => t.id === sub.taskId) : null;
                 return (
-                  <div key={l.id} className="flex items-center gap-1.5 text-purple-700">
-                    <span className="font-semibold">Nộp kết quả ({l.entityId}):</span>
+                  <div key={l.id} className="flex min-w-0 items-center gap-1.5 text-purple-700">
+                    <span className="shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold">Nộp kết quả</span>
                     {linkedTask ? (
                       <Link
                         to={`/tasks/${linkedTask.id}`}
-                        className="hover:underline flex items-center gap-0.5 font-medium"
+                        className="inline-flex min-w-0 items-center gap-0.5 truncate font-medium hover:underline"
+                        title={`${linkedTask.code} · ${linkedTask.title}`}
                       >
                         {linkedTask.code}
                         <ExternalLink className="w-3 h-3" />
                       </Link>
                     ) : (
-                      <span>{l.entityId}</span>
+                      <span className="truncate font-mono" title={l.entityId}>{l.entityId}</span>
                     )}
                   </div>
                 );
@@ -314,12 +313,13 @@ export function FilesPage() {
               if (l.entityType === "TASK") {
                 const linkedTask = tasks.find((t) => t.id === l.entityId);
                 return (
-                  <div key={l.id} className="flex items-center gap-1.5 text-brand-700">
-                    <span className="font-semibold">Nhiệm vụ:</span>
+                  <div key={l.id} className="flex min-w-0 items-center gap-1.5 text-brand-700">
+                    <span className="shrink-0 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold">Nhiệm vụ</span>
                     {linkedTask ? (
                       <Link
                         to={`/tasks/${linkedTask.id}`}
-                        className="hover:underline flex items-center gap-0.5 font-medium"
+                        className="inline-flex min-w-0 items-center gap-0.5 truncate font-medium hover:underline"
+                        title={`${linkedTask.code} · ${linkedTask.title}`}
                       >
                         {linkedTask.code}
                         <ExternalLink className="w-3 h-3" />
@@ -332,7 +332,7 @@ export function FilesPage() {
               }
 
               return (
-                <div key={l.id} className="text-text-muted">
+                <div key={l.id} className="truncate text-text-muted" title={`${l.entityType}: ${l.entityId}`}>
                   {l.entityType}: {l.entityId}
                 </div>
               );
@@ -342,37 +342,33 @@ export function FilesPage() {
       },
     },
     {
-      key: "createdAt",
-      header: "Thời gian tải",
-      width: "130px",
+      key: "uploadedAt",
+      header: "Ngày tải",
+      width: "14%",
       render: (f: FileObject) => (
-        <span className="text-xs text-text-secondary" title={formatDateTimeVN(f.createdAt)}>
-          {formatRelativeVN(f.createdAt)}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Trạng thái",
-      width: "110px",
-      render: (f: FileObject) => (
-        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-          {f.status}
-        </span>
+        <div className="space-y-1">
+          <span className="block whitespace-nowrap text-xs font-medium text-text-secondary" title={formatDateTimeVN(f.createdAt)}>
+            {formatRelativeVN(f.createdAt)}
+          </span>
+          <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+            {f.status}
+          </span>
+        </div>
       ),
     },
     {
       key: "actions",
       header: "Thao tác",
-      width: "110px",
+      width: "10%",
       render: (f: FileObject) => {
         const canDelete = currentUser?.id === f.uploadedById || isLeader;
         return (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setPreviewFile(f)}
               title="Xem thông tin chi tiết / Xem thử"
-              className="p-1.5 text-text-muted hover:text-brand-700 rounded hover:bg-slate-100 transition-colors"
+              aria-label={`Xem trước ${f.originalName}`}
+              className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-brand-50 hover:text-brand-700"
             >
               <Eye className="w-3.5 h-3.5" />
             </button>
@@ -381,7 +377,8 @@ export function FilesPage() {
               <button
                 onClick={() => setDeletingFile(f)}
                 title="Gỡ / Xóa tệp"
-                className="p-1.5 text-text-muted hover:text-danger-600 rounded hover:bg-red-50 transition-colors"
+                aria-label={`Xóa ${f.originalName}`}
+                className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-red-50 hover:text-danger-600"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -430,7 +427,7 @@ export function FilesPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-text-secondary font-medium">Lọc theo nguồn:</span>
+            <span className="whitespace-nowrap text-xs font-medium text-text-secondary">Lọc theo nguồn</span>
             <Select
               value={entityFilter}
               onChange={(e) => setEntityFilter(e.target.value as "ALL" | "TASK" | "SUBMISSION")}
@@ -463,6 +460,7 @@ export function FilesPage() {
                 data={filteredFiles}
                 keyExtractor={(f) => f.id}
                 isLoading={isLoading}
+                className="files-table"
               />
             </div>
 
@@ -687,7 +685,7 @@ export function FilesPage() {
         </ConfirmDialog>
 
         {/* Modal Xem thông tin chi tiết / Xem thử tệp */}
-        {previewFile && (
+        {previewFile && !isDocumentPreviewOpen && (
           <ConfirmDialog
             isOpen={!!previewFile}
             onClose={() => setPreviewFile(null)}
@@ -726,15 +724,33 @@ export function FilesPage() {
 
               {/* In-Session Object URL Preview if available */}
               {!isMockMode ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-text-secondary">Tệp được tải qua liên kết có chữ ký từ kho lưu trữ riêng.</p>
-                  <Button
-                    variant="primary"
-                    disabled={downloadingFileId === previewFile.id}
-                    onClick={() => void handleDownloadFile(previewFile)}
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" /> {downloadingFileId === previewFile.id ? "Đang tải…" : "Tải tệp"}
-                  </Button>
+                <div className="space-y-3 rounded-xl border border-border bg-white p-3.5">
+                  <div>
+                    <p className="text-xs font-semibold text-text-primary">Mở hoặc tải tài liệu</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-text-muted">Tệp được truy cập an toàn qua liên kết có chữ ký. Tài liệu PDF, ảnh, Word và Excel có thể xem trực tiếp trong ứng dụng.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {supportsInlinePreview(previewFile) && (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={() => setIsDocumentPreviewOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Eye className="h-4 w-4" /> Xem trực tiếp
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={downloadingFileId === previewFile.id}
+                      onClick={() => void handleDownloadFile(previewFile)}
+                      className="gap-1.5"
+                    >
+                      <Download className="h-4 w-4" /> {downloadingFileId === previewFile.id ? "Đang tải…" : "Tải tệp"}
+                    </Button>
+                  </div>
+                  {!supportsInlinePreview(previewFile) && <p className="text-[11px] text-amber-700">Định dạng này chưa hỗ trợ xem trực tiếp. Hãy tải tệp về để mở.</p>}
                 </div>
               ) : getSessionFileUrl(previewFile.id) ? (
                 <div className="space-y-2">
@@ -765,6 +781,15 @@ export function FilesPage() {
               )}
             </div>
           </ConfirmDialog>
+        )}
+
+        {previewFile && isDocumentPreviewOpen && (
+          <DocumentPreview
+            file={previewFile}
+            onClose={() => setIsDocumentPreviewOpen(false)}
+            onDownload={() => void handleDownloadFile(previewFile)}
+            isDownloading={downloadingFileId === previewFile.id}
+          />
         )}
 
         {/* Modal Xóa tệp */}

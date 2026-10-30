@@ -8,12 +8,14 @@ import {
   InvitationStatus,
   ParticipantRole,
   Prisma,
+  RequestStatus,
   TaskStatus,
   TaskType,
   UserRole,
   type User,
 } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
+import { TaskAccessPolicy } from '../../common/auth/task-access.policy';
 import { SystemClockService } from '../../common/time/system-clock.service';
 import { PrismaService } from '../../database/prisma.service';
 import type { DashboardQueryDto, ReportFiltersDto } from './dashboard.dto';
@@ -52,6 +54,7 @@ const forbidden = (): ForbiddenException =>
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly access: TaskAccessPolicy,
     private readonly config: ConfigService,
     private readonly clock: SystemClockService,
   ) {}
@@ -70,7 +73,11 @@ export class DashboardService {
     if (query.primaryAssigneeId && query.primaryAssigneeId !== actor.id) {
       throw forbidden();
     }
-    return this.staffStats(actor.id, query);
+    const [summary, sidebarCounts] = await Promise.all([
+      this.staffStats(actor.id, query),
+      this.sidebarCounts(actor),
+    ]);
+    return { ...summary, sidebarCounts };
   }
 
   async kpiReport(actor: AuthenticatedUser, filters: ReportFiltersDto) {
@@ -86,14 +93,15 @@ export class DashboardService {
     }
 
     if (!isLeader) {
-      const [summary, workloads] = await Promise.all([
+      const [summary, workloads, sidebarCounts] = await Promise.all([
         this.staffStats(actor.id, filters),
         this.workloads(filters, [actor.id], false),
+        this.sidebarCounts(actor),
       ]);
-      return { scope: 'STAFF' as const, summary, workloads };
+      return { scope: 'STAFF' as const, summary, workloads, sidebarCounts };
     }
 
-    const [summary, users] = await Promise.all([
+    const [summary, users, sidebarCounts] = await Promise.all([
       this.departmentStats(filters),
       this.prisma.user.findMany({
         where: filters.primaryAssigneeId
@@ -101,6 +109,7 @@ export class DashboardService {
           : undefined,
         orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
       }),
+      this.sidebarCounts(actor),
     ]);
     const workloads = await this.workloads(
       filters,
@@ -108,7 +117,70 @@ export class DashboardService {
       true,
       users,
     );
-    return { scope: 'DEPT' as const, summary, workloads };
+    return { scope: 'DEPT' as const, summary, workloads, sidebarCounts };
+  }
+
+  private async sidebarCounts(actor: AuthenticatedUser) {
+    const isLeader =
+      actor.role === UserRole.MANAGER || actor.role === UserRole.DEPUTY_MANAGER;
+    const readableTasks = this.access.readableTaskWhere(actor);
+    const projectWhere: Prisma.ProjectWhereInput = isLeader
+      ? {}
+      : {
+          OR: [
+            { ownerId: actor.id },
+            { tasks: { some: { AND: [readableTasks] } } },
+          ],
+        };
+    const recurrenceWhere: Prisma.RecurrenceRuleWhereInput =
+      actor.role === UserRole.STAFF
+        ? {
+            OR: [
+              { scope: 'ALL' },
+              { assignees: { some: { userId: actor.id } } },
+            ],
+          }
+        : {};
+
+    const [tasks, projects, recurrence, reviewTasks, deadlineRequests, assigneeRequests] =
+      await Promise.all([
+        this.prisma.task.count({ where: readableTasks }),
+        this.prisma.project.count({ where: projectWhere }),
+        this.prisma.recurrenceRule.count({ where: recurrenceWhere }),
+        isLeader
+          ? this.prisma.task.count({
+              where: {
+                AND: [
+                  readableTasks,
+                  { type: TaskType.OFFICIAL, status: TaskStatus.IN_REVIEW },
+                ],
+              },
+            })
+          : Promise.resolve(0),
+        isLeader
+          ? this.prisma.taskDeadlineRequest.count({
+              where: {
+                status: RequestStatus.PENDING,
+                task: { is: { AND: [readableTasks] } },
+              },
+            })
+          : Promise.resolve(0),
+        isLeader
+          ? this.prisma.taskAssigneeRequest.count({
+              where: {
+                status: RequestStatus.PENDING,
+                task: { is: { AND: [readableTasks] } },
+              },
+            })
+          : Promise.resolve(0),
+      ]);
+
+    return {
+      tasks,
+      approvals: reviewTasks + deadlineRequests + assigneeRequests,
+      projects,
+      recurrence,
+    };
   }
 
   private async departmentStats(filters: ReportFiltersDto) {

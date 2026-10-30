@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
+import { setSidebarCount } from "../../shared/sidebar-counts";
 import {
   Breadcrumb,
   PageHeader,
@@ -66,6 +67,7 @@ export function TasksPage() {
 
   // Drag and drop state for Kanban
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null);
 
   const queryKey = searchParams.toString();
   useEffect(() => {
@@ -124,6 +126,19 @@ export function TasksPage() {
     const unsubscribe = workspaceRepository.subscribe(() => { void loadData(); });
     return () => { live = false; unsubscribe(); };
   }, [queryKey, currentUser?.id, isLeader, viewMode, showToast]);
+
+  useEffect(() => {
+    const isUnfilteredTaskList =
+      scope === (isLeader ? "ALL" : "OWNED") &&
+      statusFilter === "ALL" &&
+      priorityFilter === "ALL" &&
+      projectId === "ALL" &&
+      primaryAssigneeId === "ALL" &&
+      !search.trim() &&
+      !isOverdueParam;
+    if (!currentUser || isLoading || !isUnfilteredTaskList) return;
+    setSidebarCount(currentUser.id, "tasks", serverTotal);
+  }, [currentUser?.id, isLoading, isLeader, scope, statusFilter, priorityFilter, projectId, primaryAssigneeId, search, isOverdueParam, serverTotal]);
 
   // Update query params helper
   const updateParams = (updates: Record<string, string | undefined>) => {
@@ -314,6 +329,7 @@ export function TasksPage() {
 
   const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
+    setDragOverStatus(null);
     if (!draggedTaskId) return;
 
     const task = allTasks.find((t) => t.id === draggedTaskId);
@@ -348,12 +364,21 @@ export function TasksPage() {
   };
 
   // Kanban Columns
-  const kanbanColumns: Array<{ status: TaskStatus; label: string; color: string; bg: string }> = [
-    { status: "TODO", label: "Chưa làm", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-    { status: "IN_PROGRESS", label: "Đang làm", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
-    { status: "IN_REVIEW", label: "Chờ duyệt", color: "text-purple-700", bg: "bg-purple-50 border-purple-200" },
-    { status: "DONE", label: "Hoàn thành", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  const kanbanColumns: Array<{
+    status: TaskStatus;
+    label: string;
+    color: string;
+    accent: string;
+    dot: string;
+  }> = [
+    { status: "TODO", label: "Chưa làm", color: "text-blue-700", accent: "border-t-blue-500", dot: "bg-blue-500" },
+    { status: "IN_PROGRESS", label: "Đang làm", color: "text-amber-700", accent: "border-t-amber-500", dot: "bg-amber-500" },
+    { status: "IN_REVIEW", label: "Chờ duyệt", color: "text-purple-700", accent: "border-t-purple-500", dot: "bg-purple-500" },
+    { status: "DONE", label: "Hoàn thành", color: "text-emerald-700", accent: "border-t-emerald-500", dot: "bg-emerald-500" },
   ];
+  const kanbanTaskCount = filteredTasks.filter((task) =>
+    kanbanColumns.some((column) => column.status === task.status)
+  ).length;
 
   return (
     <AppShell>
@@ -443,28 +468,28 @@ export function TasksPage() {
                 className="h-10 w-full rounded-lg border border-border bg-slate-50 pl-10 pr-3 text-sm text-text-primary outline-none focus:border-brand-400 focus:bg-white"
               />
             </div>
-            <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-50 p-1 text-xs">
+            <div className="grid w-full grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-1.5 text-xs sm:flex sm:w-fit sm:gap-1 sm:p-1">
               {(isLeader
                 ? [["ALL", "Toàn phòng"], ["OWNED", "Việc của tôi"], ["COLLABORATING", "Cùng thực hiện"], ["WATCHING", "Theo dõi"]]
                 : [["OWNED", "Việc của tôi"], ["COLLABORATING", "Cùng thực hiện"], ["WATCHING", "Theo dõi"]]
               ).map(([value, label]) => (
                 <button key={value} type="button" onClick={() => updateParams({ scope: value, page: "1" })}
-                  className={`shrink-0 rounded-md px-3 py-2 font-semibold ${scope === value ? "bg-white text-brand-700 shadow-xs" : "text-text-secondary hover:text-text-primary"}`}>
+                  className={`min-w-0 rounded-md px-2 py-2 text-center font-semibold sm:shrink-0 sm:px-3 ${scope === value ? "bg-white text-brand-700 shadow-xs" : "text-text-secondary hover:text-text-primary"}`}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {viewMode === "list" && <div className="mt-4 flex gap-1 overflow-x-auto border-t border-border pt-4 text-xs">
+          {viewMode === "list" && <div className="mt-4 grid grid-cols-3 gap-1 border-t border-border pt-4 text-xs sm:flex sm:flex-wrap">
             {([ ["ALL", "Tất cả"], ["TODO", "Chưa làm"], ["IN_PROGRESS", "Đang làm"], ["IN_REVIEW", "Chờ duyệt"], ["DONE", "Hoàn thành"] ] as const).map(([value, label]) => (
               <button key={value} type="button" onClick={() => updateParams({ status: value, page: "1" })}
-                className={`shrink-0 rounded-lg px-3 py-2 font-semibold ${statusFilter === value ? "bg-brand-700 text-white" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>
+                className={`min-w-0 rounded-lg px-2 py-2 text-center font-semibold sm:shrink-0 sm:px-3 ${statusFilter === value ? "bg-brand-700 text-white" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>
                 {label}
               </button>
             ))}
             <button type="button" onClick={() => updateParams({ isOverdue: isOverdueParam ? undefined : "true", page: "1" })}
-              className={`ml-auto shrink-0 rounded-lg px-3 py-2 font-semibold ${isOverdueParam ? "bg-red-50 text-red-700" : "text-text-secondary hover:bg-red-50 hover:text-red-700"}`}>
+              className={`min-w-0 rounded-lg px-2 py-2 text-center font-semibold sm:ml-auto sm:shrink-0 sm:px-3 ${isOverdueParam ? "bg-red-50 text-red-700" : "text-text-secondary hover:bg-red-50 hover:text-red-700"}`}>
               Quá hạn
             </button>
           </div>}
@@ -474,8 +499,8 @@ export function TasksPage() {
               <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50">
                 <span>Bộ lọc khác</span><ChevronDown className="h-3.5 w-3.5 group-open:rotate-180" />
               </summary>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <select aria-label="Lọc trạng thái" value={statusFilter} onChange={(event) => updateParams({ status: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                <select aria-label="Lọc trạng thái" value={statusFilter} onChange={(event) => updateParams({ status: event.target.value, page: "1" })} className="h-9 w-full rounded-lg border border-border bg-white px-2.5 text-xs sm:w-auto">
                   <option value="ALL">Mọi trạng thái</option>
                   <option value="TODO">Chưa làm</option>
                   <option value="IN_PROGRESS">Đang làm</option>
@@ -484,22 +509,22 @@ export function TasksPage() {
                   <option value="DRAFT">Bản nháp</option>
                   <option value="CANCELLED">Đã hủy</option>
                 </select>
-                <select aria-label="Lọc mức ưu tiên" value={priorityFilter} onChange={(event) => updateParams({ priority: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                <select aria-label="Lọc mức ưu tiên" value={priorityFilter} onChange={(event) => updateParams({ priority: event.target.value, page: "1" })} className="h-9 w-full rounded-lg border border-border bg-white px-2.5 text-xs sm:w-auto">
                   <option value="ALL">Mọi mức ưu tiên</option>
                   <option value="URGENT">Khẩn cấp</option>
                   <option value="HIGH">Cao</option>
                   <option value="NORMAL">Bình thường</option>
                   <option value="LOW">Thấp</option>
                 </select>
-                <select aria-label="Lọc dự án" value={projectId} onChange={(event) => updateParams({ projectId: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                <select aria-label="Lọc dự án" value={projectId} onChange={(event) => updateParams({ projectId: event.target.value, page: "1" })} className="h-9 w-full rounded-lg border border-border bg-white px-2.5 text-xs sm:w-auto">
                   <option value="ALL">Mọi dự án</option>
                   {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
                 </select>
-                {isLeader && <select aria-label="Lọc người nhận" value={primaryAssigneeId} onChange={(event) => updateParams({ primaryAssigneeId: event.target.value, page: "1" })} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                {isLeader && <select aria-label="Lọc người nhận" value={primaryAssigneeId} onChange={(event) => updateParams({ primaryAssigneeId: event.target.value, page: "1" })} className="h-9 w-full rounded-lg border border-border bg-white px-2.5 text-xs sm:w-auto">
                   <option value="ALL">Mọi người nhận</option>
                   {users.map((user) => <option key={user.id} value={user.id}>{user.displayName}</option>)}
                 </select>}
-                <select aria-label="Sắp xếp công việc" value={`${sortBy}:${sortDirection}`} onChange={(event) => { const [nextSortBy, nextDirection] = event.target.value.split(":"); updateParams({ sortBy: nextSortBy, sortDirection: nextDirection, page: "1" }); }} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs">
+                <select aria-label="Sắp xếp công việc" value={`${sortBy}:${sortDirection}`} onChange={(event) => { const [nextSortBy, nextDirection] = event.target.value.split(":"); updateParams({ sortBy: nextSortBy, sortDirection: nextDirection, page: "1" }); }} className="h-9 w-full rounded-lg border border-border bg-white px-2.5 text-xs sm:w-auto">
                   <option value="UPDATED_AT:DESC">Mới cập nhật</option>
                   <option value="DUE_AT:ASC">Hạn gần nhất</option>
                   <option value="PRIORITY:DESC">Ưu tiên cao nhất</option>
@@ -588,155 +613,152 @@ export function TasksPage() {
 
         {/* --- VIEW MODE 2: KANBAN VIEW --- */}
         {viewMode === "kanban" && (
-          <div className="space-y-4">
-            {/* Note on DRAFT & CANCELLED in Kanban */}
-            <div className="flex items-center justify-between text-xs text-text-muted px-1">
-              <span>
-                💡 Kéo thẻ để đổi trạng thái, hoặc dùng nút menu góc thẻ. Cột Kanban chỉ thể hiện 4 bước thực thi chính.
-              </span>
-              {(statusFilter === "DRAFT" || statusFilter === "CANCELLED") && (
-                <span className="text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded">
-                  Đang lọc trạng thái riêng: {statusFilter}
-                </span>
-              )}
+          <section className="space-y-3" aria-label="Bảng Kanban công việc" aria-busy={isLoading}>
+            <div className="flex flex-col gap-2 rounded-card border border-brand-100 bg-brand-50/70 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <Columns3 className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text-primary">Kéo thẻ sang cột khác để cập nhật tiến độ</p>
+                  <p className="mt-0.5 text-xs leading-5 text-text-secondary">Bảng hiển thị 4 bước thực thi chính. Bạn cũng có thể đổi trạng thái bằng menu trên từng thẻ.</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 pl-6 sm:pl-0">
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-text-secondary shadow-xs">{kanbanTaskCount} công việc</span>
+                {(statusFilter === "DRAFT" || statusFilter === "CANCELLED") && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                    Bộ lọc {statusFilter === "DRAFT" ? "Nháp" : "Đã hủy"} không có cột tương ứng
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* 4-column Kanban Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-              {kanbanColumns.map((col) => {
-                const columnTasks = filteredTasks.filter((t) => t.status === col.status);
+            <div
+              role="region"
+              aria-label="Các cột trạng thái công việc"
+              tabIndex={0}
+              className="-mx-1 touch-pan-x overflow-x-auto overscroll-x-contain px-1 pb-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+            >
+              <div className="flex min-w-max items-start gap-3 sm:gap-4">
+                {kanbanColumns.map((col) => {
+                  const columnTasks = filteredTasks.filter((t) => t.status === col.status);
+                  const isDropTarget = dragOverStatus === col.status;
 
-                return (
-                  <div
-                    key={col.status}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleDrop(e, col.status)}
-                    className="bg-slate-100/70 rounded-card p-3 border border-border flex flex-col min-h-[500px]"
-                  >
-                    {/* Column Header */}
-                    <div className="flex items-center justify-between pb-3 mb-2 border-b border-border/80">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-bold text-xs ${col.color}`}>{col.label}</span>
-                        <span className="w-5 h-5 rounded-full bg-surface text-text-primary text-[11px] font-bold flex items-center justify-center border border-border shadow-2xs">
-                          {columnTasks.length}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Column Cards */}
-                    <div className="space-y-3 flex-1 overflow-y-auto max-h-[700px] pr-0.5">
-                      {columnTasks.length === 0 ? (
-                        <div className="p-6 text-center text-text-muted text-xs border border-dashed border-border/80 rounded-btn">
-                          Trống
+                  return (
+                    <section
+                      key={col.status}
+                      onDragEnter={() => setDragOverStatus(col.status)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => handleDrop(event, col.status)}
+                      aria-label={`${col.label}: ${columnTasks.length} công việc`}
+                      className={`flex w-[280px] shrink-0 flex-col rounded-card border-x border-b border-t-4 bg-white/75 p-3 shadow-xs transition-colors sm:w-[300px] ${col.accent} ${
+                        isDropTarget
+                          ? "border-x-brand-700 border-b-brand-700 border-t-brand-700 bg-brand-50/70 ring-2 ring-brand-200"
+                          : "border-x-border border-b-border"
+                      }`}
+                    >
+                      <div className="mb-3 flex items-center justify-between border-b border-border/70 pb-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${col.dot}`} aria-hidden="true" />
+                          <h2 className={`truncate text-sm font-semibold ${col.color}`}>{col.label}</h2>
+                          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-text-secondary">
+                            {columnTasks.length}
+                          </span>
                         </div>
-                      ) : (
-                        columnTasks.map((task) => {
-                          const assignee = users.find((u) => u.id === task.primaryAssigneeId);
-                          const overdue = isTaskOverdue(task);
-                          const dueSoon = isTaskDueSoon(task);
+                      </div>
 
-                          return (
-                            <div
-                              key={task.id}
-                              draggable
-                              onDragStart={() => setDraggedTaskId(task.id)}
-                              className={`p-3.5 rounded-card bg-surface border border-border shadow-card hover:shadow-md transition-all cursor-grab active:cursor-grabbing space-y-2.5 ${
-                                overdue ? "border-l-4 border-l-danger" : ""
-                              }`}
-                            >
-                              {/* Card Header: Code & Type & Priority */}
-                              <div className="flex items-center justify-between gap-1.5">
-                                <span className="font-mono font-bold text-xs text-text-primary">
-                                  {task.code}
-                                </span>
-                                <div className="flex items-center gap-1">
+                      <div className="flex flex-col gap-2.5">
+                        {isLoading ? (
+                          [0, 1, 2].map((item) => (
+                            <div key={item} className="h-32 animate-pulse rounded-lg border border-border/70 bg-slate-50" />
+                          ))
+                        ) : columnTasks.length === 0 ? (
+                          <div className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-slate-50/60 px-4 py-5 text-center">
+                            <span className="text-sm font-medium text-text-secondary">Chưa có công việc</span>
+                            <span className="mt-1 text-xs text-text-muted">Thả thẻ vào đây để chuyển trạng thái</span>
+                          </div>
+                        ) : (
+                          columnTasks.map((task) => {
+                            const assignee = users.find((u) => u.id === task.primaryAssigneeId);
+                            const overdue = isTaskOverdue(task);
+                            const dueSoon = isTaskDueSoon(task);
+
+                            return (
+                              <article
+                                key={task.id}
+                                draggable
+                                onDragStart={(event) => {
+                                  setDraggedTaskId(task.id);
+                                  event.dataTransfer.effectAllowed = "move";
+                                  event.dataTransfer.setData("text/plain", task.id);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedTaskId(null);
+                                  setDragOverStatus(null);
+                                }}
+                                className={`group space-y-3 rounded-lg border border-border bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md active:cursor-grabbing ${
+                                  overdue ? "border-l-4 border-l-danger" : ""
+                                } ${draggedTaskId === task.id ? "cursor-grabbing opacity-50" : "cursor-grab"}`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="rounded bg-slate-50 px-1.5 py-1 font-mono text-[11px] font-semibold text-text-secondary">
+                                    {task.code}
+                                  </span>
                                   <PriorityBadge priority={task.priority} />
                                 </div>
-                              </div>
 
-                              {/* Title */}
-                              <Link
-                                to={`/tasks/${task.id}`}
-                                className="block font-semibold text-xs text-text-primary hover:text-brand-700 line-clamp-2 leading-snug"
-                              >
-                                {task.title}
-                              </Link>
+                                <Link
+                                  to={`/tasks/${task.id}`}
+                                  className="block text-sm font-semibold leading-5 text-text-primary hover:text-brand-700"
+                                >
+                                  {task.title}
+                                </Link>
 
-                              {/* Overdue / Blocked Badge */}
-                              {(overdue || task.isBlocked || dueSoon) && (
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {overdue && <OverdueBadge />}
-                                  {!overdue && dueSoon && <DueSoonBadge />}
-                                  {task.isBlocked && <BlockedBadge reason={task.blockedReason} />}
-                                </div>
-                              )}
+                                {(overdue || task.isBlocked || dueSoon) && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {overdue && <OverdueBadge />}
+                                    {!overdue && dueSoon && <DueSoonBadge />}
+                                    {task.isBlocked && <BlockedBadge reason={task.blockedReason} />}
+                                  </div>
+                                )}
 
-                              {/* Footer: Assignee & Due Date */}
-                              <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <UserAvatar user={assignee} size="sm" />
-                                  <span className="text-text-muted text-[11px] truncate max-w-[90px]">
-                                    {assignee?.displayName || "Chưa giao"}
-                                  </span>
+                                <div className="flex items-center justify-between border-t border-border/70 pt-2.5">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <UserAvatar user={assignee} size="sm" />
+                                    <span className="truncate text-xs font-medium text-text-secondary">
+                                      {assignee?.displayName || "Chưa giao"}
+                                    </span>
+                                  </div>
+                                  <span className="shrink-0 font-mono text-[11px] text-text-muted">{task.progressPercent}%</span>
                                 </div>
 
-                                <div className="text-[11px] font-mono text-text-muted">
-                                  {task.progressPercent}%
+                                <div className="border-t border-dashed border-border/70 pt-2">
+                                  <label className="sr-only" htmlFor={`kanban-status-${task.id}`}>Chuyển trạng thái {task.code}</label>
+                                  <select
+                                    id={`kanban-status-${task.id}`}
+                                    value=""
+                                    onChange={(event) => {
+                                      const nextStatus = event.target.value as TaskStatus;
+                                      if (nextStatus) void handleStatusTransition(task, nextStatus);
+                                    }}
+                                    className="h-8 w-full cursor-pointer rounded-md border border-border bg-slate-50 px-2 text-xs font-medium text-text-secondary outline-none transition-colors hover:border-brand-300 hover:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                                  >
+                                    <option value="" disabled>Chuyển trạng thái…</option>
+                                    {kanbanColumns.filter((option) => option.status !== task.status).map((option) => (
+                                      <option key={option.status} value={option.status}>{option.label}</option>
+                                    ))}
+                                  </select>
                                 </div>
-                              </div>
-
-                              {/* Mobile / Click Transition Menu */}
-                              <div className="pt-1.5 flex items-center justify-between text-[11px] border-t border-dashed border-border/60">
-                                <span className="text-text-muted">Chuyển sang:</span>
-                                <div className="flex items-center gap-1">
-                                  {col.status !== "TODO" && (
-                                    <button
-                                      onClick={() => handleStatusTransition(task, "TODO")}
-                                      className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-text-secondary"
-                                      title="Chuyển về Chưa làm"
-                                    >
-                                      Chưa làm
-                                    </button>
-                                  )}
-                                  {col.status !== "IN_PROGRESS" && (
-                                    <button
-                                      onClick={() => handleStatusTransition(task, "IN_PROGRESS")}
-                                      className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900"
-                                      title="Chuyển sang Đang làm"
-                                    >
-                                      Đang làm
-                                    </button>
-                                  )}
-                                  {col.status !== "IN_REVIEW" && (
-                                    <button
-                                      onClick={() => handleStatusTransition(task, "IN_REVIEW")}
-                                      className="px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-900"
-                                      title="Chuyển sang Chờ duyệt"
-                                    >
-                                      Nộp duyệt
-                                    </button>
-                                  )}
-                                  {col.status !== "DONE" && (
-                                    <button
-                                      onClick={() => handleStatusTransition(task, "DONE")}
-                                      className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900"
-                                      title="Phê duyệt hoàn thành"
-                                    >
-                                      Hoàn thành
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                              </article>
+                            );
+                          })
+                        )}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </section>
         )}
       </div>
     </AppShell>

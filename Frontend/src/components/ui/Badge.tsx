@@ -1,6 +1,13 @@
 import { cn } from "../../shared/utils";
 import type { TaskPriority, TaskStatus, TaskType } from "../../shared/data-contract";
 
+// Small outlined labels follow the light, semantic Ant Design tags used by the
+// reference admin while keeping the task manager's Vietnamese labels.
+const badgeBase =
+  "inline-flex min-h-[22px] items-center rounded border px-2 py-0.5 text-xs font-medium leading-4 whitespace-nowrap";
+const categoryBadgeBase =
+  "inline-flex min-h-[22px] items-center rounded px-2 py-0.5 text-xs font-semibold leading-4 whitespace-nowrap text-white";
+
 export interface StatusBadgeProps {
   status: TaskStatus;
   className?: string;
@@ -8,28 +15,20 @@ export interface StatusBadgeProps {
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config: Record<TaskStatus, { label: string; style: string }> = {
-    DRAFT: { label: "Nháp", style: "bg-slate-50 text-slate-700 border-slate-200" },
-    TODO: { label: "Chưa làm", style: "bg-blue-50 text-blue-700 border-blue-200" },
-    IN_PROGRESS: { label: "Đang làm", style: "bg-amber-50 text-amber-800 border-amber-200" },
-    IN_REVIEW: { label: "Chờ duyệt", style: "bg-violet-50 text-violet-700 border-violet-200" },
-    DONE: { label: "Hoàn thành", style: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    CANCELLED: { label: "Đã hủy", style: "bg-slate-50 text-slate-600 border-slate-200" },
+    DRAFT: { label: "Nháp", style: "bg-[#fafafa] text-[#595959] border-[#d9d9d9]" },
+    TODO: { label: "Chưa làm", style: "bg-[#e6f4ff] text-[#1677ff] border-[#91caff]" },
+    IN_PROGRESS: { label: "Đang làm", style: "bg-[#fff7e6] text-[#d46b08] border-[#ffd591]" },
+    IN_REVIEW: { label: "Chờ duyệt", style: "bg-[#f9f0ff] text-[#722ed1] border-[#d3adf7]" },
+    DONE: { label: "Hoàn thành", style: "bg-[#f6ffed] text-[#389e0d] border-[#b7eb8f]" },
+    CANCELLED: { label: "Đã hủy", style: "bg-[#fafafa] text-[#595959] border-[#d9d9d9]" },
   };
 
-  const item = config[status] || { label: status, style: "bg-gray-50 text-text-secondary border-gray-200" };
+  const item = config[status] || {
+    label: status,
+    style: "bg-[#fafafa] text-[#595959] border-[#d9d9d9]",
+  };
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold leading-none shadow-[0_1px_2px_rgba(15,23,42,0.05)]",
-        item.style,
-        className
-      )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
-      {item.label}
-    </span>
-  );
+  return <span className={cn(badgeBase, item.style, className)}>{item.label}</span>;
 }
 
 export interface PriorityBadgeProps {
@@ -39,26 +38,15 @@ export interface PriorityBadgeProps {
 
 export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
   const config: Record<TaskPriority, { label: string; style: string }> = {
-    LOW: { label: "Thấp", style: "bg-slate-50 text-slate-600 border-slate-200" },
-    NORMAL: { label: "Bình thường", style: "bg-blue-50 text-blue-700 border-blue-200" },
-    HIGH: { label: "Cao", style: "bg-amber-50 text-amber-800 border-amber-200" },
-    URGENT: { label: "Khẩn cấp", style: "bg-red-50 text-red-700 border-red-200" },
+    LOW: { label: "Thấp", style: "bg-[#8c8c8c]" },
+    NORMAL: { label: "Bình thường", style: "bg-[#1890ff]" },
+    HIGH: { label: "Cao", style: "bg-[#fa8c16]" },
+    URGENT: { label: "Khẩn cấp", style: "bg-[#ff4d4f]" },
   };
 
   const item = config[priority];
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-[11px] font-semibold leading-none",
-        item.style,
-        className
-      )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
-      {item.label}
-    </span>
-  );
+  return <span className={cn(categoryBadgeBase, item.style, className)}>{item.label}</span>;
 }
 
 export interface TaskTypeBadgeProps {
@@ -70,43 +58,26 @@ export function TaskTypeBadge({ type, className }: TaskTypeBadgeProps) {
   const config: Record<TaskType, { label: string; style: string }> = {
     OFFICIAL: {
       label: "Chính thức",
-      style: "bg-brand-50 text-brand-700 border border-brand-100",
+      style: "bg-[#1890ff]",
     },
     TEAM: {
       label: "Cộng tác nhóm",
-      style: "bg-purple-50 text-purple-700 border border-purple-100",
+      style: "bg-[#722ed1]",
     },
     PERSONAL: {
       label: "Cá nhân",
-      style: "bg-gray-100 text-gray-700 border border-gray-200",
+      style: "bg-[#8c8c8c]",
     },
   };
 
   const item = config[type];
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none",
-        item.style,
-        className
-      )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
-      {item.label}
-    </span>
-  );
+  return <span className={cn(categoryBadgeBase, item.style, className)}>{item.label}</span>;
 }
 
 export function OverdueBadge({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-red-700",
-        className
-      )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
+    <span className={cn(badgeBase, "border-[#ffa39e] bg-[#fff1f0] text-[#cf1322]", className)}>
       Quá hạn
     </span>
   );
@@ -116,12 +87,8 @@ export function BlockedBadge({ reason, className }: { reason?: string | null; cl
   return (
     <span
       title={reason || undefined}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-amber-800",
-        className
-      )}
+      className={cn(badgeBase, "border-[#ffd591] bg-[#fff7e6] text-[#d46b08]", className)}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
       Vướng mắc
     </span>
   );
@@ -129,13 +96,7 @@ export function BlockedBadge({ reason, className }: { reason?: string | null; cl
 
 export function DueSoonBadge({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-amber-800",
-        className
-      )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
+    <span className={cn(badgeBase, "border-[#ffd591] bg-[#fff7e6] text-[#d46b08]", className)}>
       Sắp đến hạn
     </span>
   );

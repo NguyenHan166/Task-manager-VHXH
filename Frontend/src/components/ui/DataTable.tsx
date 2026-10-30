@@ -30,7 +30,7 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="rounded-card border border-border bg-surface overflow-hidden">
+      <div className="rounded-card border border-transparent bg-surface overflow-hidden shadow-card">
         <div className="h-11 bg-slate-50 border-b border-border flex items-center px-4">
           <div className="h-4 bg-slate-200 rounded w-1/4 animate-pulse" />
         </div>
@@ -49,7 +49,7 @@ export function DataTable<T>({
 
   if (data.length === 0) {
     return (
-      <div className="rounded-card border border-border bg-surface p-8 text-center">
+      <div className="rounded-card border border-transparent bg-surface p-8 text-center shadow-card">
         {emptyContent || <p className="text-sm text-text-muted">Không có dữ liệu để hiển thị.</p>}
       </div>
     );
@@ -58,13 +58,13 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        "rounded-card border border-border bg-surface overflow-hidden shadow-card",
+        "rounded-card border border-transparent bg-surface overflow-hidden shadow-card",
         className
       )}
     >
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm border-collapse">
-          <thead className="bg-slate-50/90 border-b border-border text-xs font-semibold text-text-secondary select-none">
+          <thead className="bg-[#fafafa] border-b border-[#f0f0f0] text-[13px] font-semibold text-text-secondary select-none">
             <tr className="h-11">
               {columns.map((col) => (
                 <th
@@ -77,7 +77,7 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/70 text-text-primary">
+          <tbody className="divide-y divide-[#f0f0f0] text-text-primary">
             {data.map((item, idx) => {
               const isClickable = Boolean(onRowClick);
               return (
@@ -102,7 +102,7 @@ export function DataTable<T>({
                   {columns.map((col) => (
                     <td
                       key={col.key}
-                      className={cn("px-4 py-2 text-xs", col.className)}
+                      className={cn("px-4 py-2 text-[13px]", col.className)}
                     >
                       {col.render(item, idx)}
                     </td>

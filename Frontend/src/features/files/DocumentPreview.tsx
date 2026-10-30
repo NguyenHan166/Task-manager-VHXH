@@ -28,6 +28,10 @@ function fileKind(file: FileObject): Content["kind"] {
   return "unsupported";
 }
 
+export function supportsInlinePreview(file: FileObject): boolean {
+  return fileKind(file) !== "unsupported";
+}
+
 export function DocumentPreview({ file, onClose, onDownload, isDownloading }: Props) {
   const [content, setContent] = useState<Content | null>(null);
   const [error, setError] = useState<string | null>(null);

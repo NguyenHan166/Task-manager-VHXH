@@ -50,7 +50,24 @@ export class ApiError extends Error {
 }
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-const apiBaseUrl = (configuredBaseUrl || "http://localhost:3000/api").replace(/\/$/, "");
+const configuredApiUrl = configuredBaseUrl || "http://localhost:3000/api";
+const apiBaseUrl = (() => {
+  try {
+    const url = new URL(configuredApiUrl);
+    const localHosts = ["localhost", "127.0.0.1"];
+    if (
+      typeof window !== "undefined" &&
+      localHosts.includes(window.location.hostname) &&
+      localHosts.includes(url.hostname)
+    ) {
+      // Keep the refresh cookie on the same local host as the frontend origin.
+      url.hostname = window.location.hostname;
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return configuredApiUrl.replace(/\/$/, "");
+  }
+})();
 
 export const isMockMode = import.meta.env.VITE_DATA_MODE === "mock";
 

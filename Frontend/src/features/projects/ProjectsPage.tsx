@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository } from "../../shared/repository";
+import { setSidebarCount } from "../../shared/sidebar-counts";
 import { canSeeTask, isTaskOverdue } from "../../shared/data-contract";
 import type { Project, Task, TaskParticipant } from "../../shared/data-contract";
 import {
@@ -78,6 +79,11 @@ export function ProjectsPage() {
       return projTasks.some((t) => canSeeTask(t, currentUser, participants));
     });
   }, [projects, tasks, participants, currentUser, isLeader]);
+
+  useEffect(() => {
+    if (!currentUser || isLoading) return;
+    setSidebarCount(currentUser.id, "projects", visibleProjects.length);
+  }, [currentUser?.id, isLoading, visibleProjects.length]);
 
   // Compute stats dynamically for each project from selectors
   const getProjectStats = (projId: string) => {

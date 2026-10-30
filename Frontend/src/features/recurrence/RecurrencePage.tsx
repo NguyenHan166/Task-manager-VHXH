@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository } from "../../shared/repository";
+import { setSidebarCount } from "../../shared/sidebar-counts";
 import type {
     RecurrenceRule,
     RecurrenceInstance,
@@ -132,6 +133,18 @@ export function RecurrencePage() {
 
         return list;
     }, [rules, isStaff, currentUser, filterTab]);
+
+    const sidebarVisibleRuleCount = useMemo(() => {
+        if (!isStaff || !currentUser) return rules.length;
+        return rules.filter((rule) =>
+            rule.scope === "ALL" || rule.assigneeIds?.includes(currentUser.id) || rule.primaryAssigneeId === currentUser.id
+        ).length;
+    }, [rules, isStaff, currentUser]);
+
+    useEffect(() => {
+        if (!currentUser || isLoading) return;
+        setSidebarCount(currentUser.id, "recurrence", sidebarVisibleRuleCount);
+    }, [currentUser?.id, isLoading, sidebarVisibleRuleCount]);
 
     // Handle Toggle Active
     const handleToggleActive = async (rule: RecurrenceRule) => {

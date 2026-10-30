@@ -21,7 +21,7 @@ export function TaskListItem({ task, assignee, project, currentUserId, isLeader,
   const showDeliverable = deliverable && deliverable.toLowerCase() !== "hoàn thành công việc được giao.";
 
   return (
-    <article className={`rounded-xl border bg-white p-4 shadow-xs transition-colors hover:border-brand-200 hover:bg-brand-50/20 sm:p-5 ${overdue ? "border-red-200" : "border-border"}`}>
+    <article className={`rounded-card border border-transparent bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md hover:bg-brand-50/20 sm:p-5 ${overdue ? "border-red-200" : ""}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">

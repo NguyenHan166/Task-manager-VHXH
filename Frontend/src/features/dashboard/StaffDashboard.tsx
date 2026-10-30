@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
+import { setSidebarCounts, type SidebarCounts } from "../../shared/sidebar-counts";
 import type { Task, TaskParticipant } from "../../shared/data-contract";
 import {
   getStaffDashboardStats,
@@ -63,6 +64,9 @@ export function StaffDashboard() {
           httpRepository.queryAllTasks({ page: 1, pageSize: 100, sortBy: "DUE_AT", sortDirection: "ASC" }),
         ]);
         const allParts = await httpRepository.getParticipantsForTasks(allTasks.map((task) => task.id));
+        if (currentUser && stats.sidebarCounts && typeof stats.sidebarCounts === "object") {
+          setSidebarCounts(currentUser.id, stats.sidebarCounts as SidebarCounts);
+        }
         setApiStaffStats(stats);
         setTasks(allTasks);
         setParticipants(allParts);

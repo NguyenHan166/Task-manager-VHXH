@@ -631,9 +631,9 @@ export function MembersPage() {
           <CardContent className="p-0">
             {/* Desktop Table View (>= 768px) - Cleaned: Workload column removed */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-xs text-left border-collapse">
+              <table className="w-full text-[13px] text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-y border-border text-text-secondary font-semibold">
+                  <tr className="bg-[#fafafa] border-y border-[#f0f0f0] text-text-secondary font-medium">
                     <th className="py-2.5 px-3">Thành viên & Chức danh</th>
                     <th className="py-2.5 px-3">Tên đăng nhập (Email)</th>
                     <th className="py-2.5 px-3">Tổ / Bộ phận</th>
@@ -642,7 +642,7 @@ export function MembersPage() {
                     <th className="py-2.5 px-3 text-right">Thao tác quản trị</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-[#f0f0f0]">
                   {filteredUsers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-text-muted">
@@ -669,7 +669,7 @@ export function MembersPage() {
                       }
 
                       return (
-                        <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
+                        <tr key={u.id} className="hover:bg-[#fafafa] transition-colors">
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-2.5">
                               <UserAvatar user={u} size="md" showRoleBadge />

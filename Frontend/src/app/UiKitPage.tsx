@@ -82,18 +82,18 @@ export function UiKitPage() {
     loadSampleData();
   }, []);
 
-  // Palette definitions according to Prompt 01A
+  // Palette definitions shown by the live design system.
   const colorTokens = [
     { name: "brand-700", hex: "#0F766E", desc: "Nút chính, link chính, sidebar active, focus ring", bg: "bg-brand-700", text: "text-white" },
     { name: "brand-800", hex: "#115E59", desc: "Hover của nút chính", bg: "bg-brand-800", text: "text-white" },
     { name: "brand-100", hex: "#CCFBF1", desc: "Nền nhấn rất nhẹ, chip active", bg: "bg-brand-100", text: "text-brand-800" },
     { name: "brand-50", hex: "#F0FDFA", desc: "Nền khu lời chào, hover nhạt", bg: "bg-brand-50", text: "text-brand-800" },
-    { name: "canvas", hex: "#F7F9FB", desc: "Nền toàn ứng dụng", bg: "bg-[#F7F9FB]", text: "text-text-primary" },
+    { name: "canvas", hex: "#F4F7FE", desc: "Nền toàn ứng dụng", bg: "bg-[#F4F7FE]", text: "text-text-primary" },
     { name: "surface", hex: "#FFFFFF", desc: "Card, sidebar, topbar, modal dialog", bg: "bg-[#FFFFFF]", text: "text-text-primary", border: true },
-    { name: "text-primary", hex: "#0F172A", desc: "Tiêu đề, dữ liệu chính, văn bản chính", bg: "bg-text-primary", text: "text-white" },
-    { name: "text-secondary", hex: "#475569", desc: "Nội dung phụ, mô tả, nhãn trường", bg: "bg-text-secondary", text: "text-white" },
-    { name: "text-muted", hex: "#64748B", desc: "Chú thích, placeholder, icon phụ", bg: "bg-text-muted", text: "text-white" },
-    { name: "border", hex: "#E2E8F0", desc: "Viền card, input, ngăn cách bảng", bg: "bg-border", text: "text-text-primary" },
+    { name: "text-primary", hex: "#111827", desc: "Tiêu đề, dữ liệu chính, văn bản chính", bg: "bg-text-primary", text: "text-white" },
+    { name: "text-secondary", hex: "#6B7280", desc: "Nội dung phụ, mô tả, nhãn trường", bg: "bg-text-secondary", text: "text-white" },
+    { name: "text-muted", hex: "#959CA9", desc: "Chú thích, placeholder, icon phụ", bg: "bg-text-muted", text: "text-white" },
+    { name: "border", hex: "#E5E7EB", desc: "Viền card, input, ngăn cách bảng", bg: "bg-border", text: "text-text-primary" },
     { name: "info", hex: "#2563EB", desc: "Trạng thái cần làm, thông báo thông tin", bg: "bg-info", text: "text-white" },
     { name: "success", hex: "#15803D", desc: "Hoàn thành, thành công, đúng hạn", bg: "bg-success", text: "text-white" },
     { name: "warning", hex: "#B45309", desc: "Đang làm, vướng mắc, cần chú ý", bg: "bg-warning", text: "text-white" },

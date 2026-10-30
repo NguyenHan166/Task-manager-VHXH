@@ -1079,9 +1079,9 @@ export function ReportsPage() {
                             <CardContent className="p-0">
                                 {/* Desktop View (>= 768px) */}
                                 <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-xs text-left border-collapse">
+                                    <table className="w-full text-[13px] text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-50 border-y border-border text-text-secondary font-semibold">
+                                            <tr className="bg-[#fafafa] border-y border-[#f0f0f0] text-text-secondary font-medium">
                                                 <th className="py-2.5 px-3">
                                                     Thành viên
                                                 </th>
@@ -1114,11 +1114,11 @@ export function ReportsPage() {
                                                 </th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-border">
+                                        <tbody className="divide-y divide-[#f0f0f0]">
                                             {staffWorkload.map((row) => (
                                                 <tr
                                                     key={row.user.id}
-                                                    className="hover:bg-slate-50/60 transition-colors"
+                                                    className="hover:bg-[#fafafa] transition-colors"
                                                 >
                                                     <td className="py-3 px-3">
                                                         <div className="flex items-center gap-2.5">
@@ -1531,9 +1531,9 @@ export function ReportsPage() {
                             <CardContent className="p-0">
                                 {/* Desktop View (>= 768px) */}
                                 <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-xs text-left border-collapse">
+                                    <table className="w-full text-[13px] text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-50 border-y border-border text-text-secondary font-semibold">
+                                            <tr className="bg-[#fafafa] border-y border-[#f0f0f0] text-text-secondary font-medium">
                                                 <th className="py-2.5 px-3">
                                                     Mã
                                                 </th>
@@ -1560,7 +1560,7 @@ export function ReportsPage() {
                                                 </th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-border">
+                                        <tbody className="divide-y divide-[#f0f0f0]">
                                             {filteredTasks.map((t) => {
                                                 const assignee = users.find(
                                                     (u) =>
@@ -1600,7 +1600,7 @@ export function ReportsPage() {
                                                 return (
                                                     <tr
                                                         key={t.id}
-                                                        className="hover:bg-slate-50/60 transition-colors"
+                                                        className="hover:bg-[#fafafa] transition-colors"
                                                     >
                                                         <td className="py-2.5 px-3 font-mono font-bold text-brand-700">
                                                             {t.code}

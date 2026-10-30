@@ -10,16 +10,16 @@
   --brand-50: #F0FDFA;
 
   /* Surfaces & Canvas */
-  --canvas: #F7F9FB;
+  --canvas: #F4F7FE;
   --surface: #FFFFFF;
 
   /* Typography Colors */
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-muted: #959CA9;
 
   /* Border */
-  --border: #E2E8F0;
+  --border: #E5E7EB;
 
   /* Functional Status Colors */
   --info: #2563EB;
@@ -50,10 +50,16 @@
 
 body {
   margin: 0;
-  font-family: "Be Vietnam Pro", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Be Vietnam", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
   background-color: var(--canvas);
   color: var(--text-primary);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .network-background-surface {
@@ -62,6 +68,75 @@ body {
     radial-gradient(ellipse at 8% 8%, rgba(74, 222, 128, 0.11), transparent 38%),
     radial-gradient(ellipse at 94% 88%, rgba(134, 239, 172, 0.14), transparent 42%),
     linear-gradient(135deg, #f1f9f3 0%, #fbfefb 54%, #f2faf4 100%);
+}
+
+:root {
+  --card-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+}
+
+.rounded-card.bg-surface.shadow-xs:not(:hover),
+.rounded-card.bg-white.shadow-xs:not(:hover),
+.shadow-card:not(:hover) {
+  box-shadow: var(--card-shadow);
+}
+
+.files-table table {
+  table-layout: fixed;
+  min-width: 800px;
+}
+
+select:not([multiple]) {
+  appearance: none;
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%236B7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 0.65rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem 1rem;
+  padding-right: 2.25rem;
+  border-color: #d5dde7;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+select:not([multiple]):hover:not(:disabled) {
+  border-color: rgba(15, 118, 110, 0.5);
+}
+
+select:not([multiple]):focus {
+  border-color: var(--brand-700);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+select:not([multiple]):disabled {
+  cursor: not-allowed;
+}
+
+select:not([multiple]) option {
+  background-color: var(--surface);
+  color: var(--text-primary);
+}
+
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: light;
+  accent-color: var(--brand-700);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 0.375rem;
+  padding: 0.2rem;
+  transition: background-color 150ms ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  background-color: rgba(15, 118, 110, 0.1);
 }
 
 :focus-visible {

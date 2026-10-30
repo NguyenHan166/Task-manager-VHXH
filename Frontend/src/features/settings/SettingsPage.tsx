@@ -453,35 +453,35 @@ export function SettingsPage() {
 
         {/* TAB 2: AUDIT LOGS */}
         {activeTab === "AUDIT_LOGS" && (
-          <div className="space-y-4">
-            <Card className="p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="space-y-5">
+            <Card className="border-border/80 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 text-xs lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end">
                 {/* Search */}
-                <div className="sm:col-span-2 relative">
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                <div className="min-w-0">
+                  <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
                     Tìm kiếm sự kiện kiểm toán
                   </label>
                   <div className="relative">
-                    <Search className="w-4 h-4 text-text-muted absolute left-3 top-2.5" />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
                     <input
                       type="text"
-                      placeholder="Tìm theo tiêu đề nhiệm vụ, mã công việc, tên người thực hiện, ghi chú..."
+                      placeholder="Tìm theo công việc, mã, người thực hiện hoặc ghi chú…"
                       value={searchAudit}
                       onChange={(e) => setSearchAudit(e.target.value)}
-                      className="w-full h-9 pl-9 pr-3 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
+                      className="h-10 w-full rounded-lg border border-border bg-white pl-10 pr-3 text-xs shadow-sm outline-none transition placeholder:text-text-muted focus:border-brand-700 focus:ring-4 focus:ring-brand-100"
                     />
                   </div>
                 </div>
 
                 {/* Event Kind Filter */}
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Loại hành động (Event Kind)
+                  <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+                    Loại hành động
                   </label>
                   <select
                     value={filterEventKind}
                     onChange={(e) => setFilterEventKind(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
+                    className="h-10 w-full rounded-lg border border-border bg-white px-3 text-xs shadow-sm outline-none transition focus:border-brand-700 focus:ring-4 focus:ring-brand-100"
                   >
                     <option value="ALL">Tất cả hành động</option>
                     <option value="PUBLISHED">Giao việc (PUBLISHED)</option>
@@ -500,122 +500,96 @@ export function SettingsPage() {
             </Card>
 
             {/* Audit Logs Table */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            <Card className="border-border/80">
+              <CardHeader className="border-b border-border/70 bg-gradient-to-r from-brand-50/70 to-white px-4 pb-3 pt-4 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="text-sm">
-                      Dòng thời gian kiểm toán ({filteredEvents.length} sự kiện)
+                    <CardTitle className="text-base">
+                      Dòng thời gian kiểm toán
                     </CardTitle>
-                    <CardDescription className="text-xs">
-                      Bản ghi kiểm toán bất biến (Immutable Audit Logs). Hệ thống không hỗ trợ chỉnh sửa hoặc xóa sự kiện.
+                    <CardDescription className="text-xs leading-relaxed">
+                      Lịch sử hoạt động chỉ đọc, dùng để tra cứu thay đổi trong không gian làm việc.
                     </CardDescription>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                    Bất biến (Read-only)
-                  </span>
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    <span className="rounded-full border border-border bg-white px-2.5 py-1 text-[11px] font-semibold text-text-secondary">
+                      {filteredEvents.length} sự kiện
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-[10px] font-semibold text-brand-800">
+                      <ShieldCheck className="h-3.5 w-3.5" /> Chỉ đọc
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-y border-border text-text-secondary font-semibold">
-                        <th className="py-2.5 px-3">Thời gian</th>
-                        <th className="py-2.5 px-3">Người thực hiện</th>
-                        <th className="py-2.5 px-3">Hành động</th>
-                        <th className="py-2.5 px-3">Công việc liên quan</th>
-                        <th className="py-2.5 px-3">Chi tiết thay đổi</th>
-                        <th className="py-2.5 px-3">Ghi chú / Lý do</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {filteredEvents.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center text-text-muted">
-                            Không tìm thấy sự kiện nào thỏa mãn điều kiện tìm kiếm.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredEvents.map((ev) => {
-                          const actor = users.find((u) => u.id === ev.actorId);
-                          const task = tasks.find((t) => t.id === ev.taskId);
+                {filteredEvents.length === 0 ? (
+                  <div className="px-5 py-12 text-center">
+                    <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-text-muted"><Search className="h-5 w-5" /></span>
+                    <p className="mt-3 text-sm font-semibold text-text-primary">Không tìm thấy sự kiện</p>
+                    <p className="mt-1 text-xs text-text-muted">Thử đổi từ khóa hoặc loại hành động để xem thêm kết quả.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/70">
+                    {filteredEvents.map((ev) => {
+                      const actor = users.find((u) => u.id === ev.actorId);
+                      const task = tasks.find((t) => t.id === ev.taskId);
 
-                          // Summarize before/after diff if available
-                          let diffSummary: string | null = null;
-                          if (ev.before || ev.after) {
-                            const keys = Object.keys(ev.after || ev.before || {});
-                            if (keys.length > 0) {
-                              diffSummary = keys
-                                .map((k) => {
-                                  const bVal = ev.before ? String((ev.before as any)[k] ?? "") : "—";
-                                  const aVal = ev.after ? String((ev.after as any)[k] ?? "") : "—";
-                                  return `${k}: ${bVal} → ${aVal}`;
-                                })
-                                .join(", ");
-                            }
-                          }
+                      let diffSummary: string | null = null;
+                      if (ev.before || ev.after) {
+                        const keys = Object.keys(ev.after || ev.before || {});
+                        if (keys.length > 0) {
+                          diffSummary = keys
+                            .map((k) => {
+                              const bVal = ev.before ? String((ev.before as any)[k] ?? "") : "—";
+                              const aVal = ev.after ? String((ev.after as any)[k] ?? "") : "—";
+                              return `${k}: ${bVal} → ${aVal}`;
+                            })
+                            .join(", ");
+                        }
+                      }
 
-                          return (
-                            <tr key={ev.id} className="hover:bg-slate-50/60 transition-colors">
-                              <td className="py-3 px-3 whitespace-nowrap text-text-muted">
-                                {formatDateTimeVN(ev.createdAt)}
-                              </td>
-                              <td className="py-3 px-3 whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                  <UserAvatar user={actor} size="sm" />
-                                  <div>
-                                    <div className="font-semibold text-text-primary">
-                                      {actor?.displayName || ev.actorId}
-                                    </div>
-                                    <div className="text-[10px] text-text-muted">
-                                      {actor?.role === "MANAGER" ? "Trưởng phòng" : "Chuyên viên"}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 whitespace-nowrap">
-                                {renderKindBadge(ev.kind)}
-                              </td>
-                              <td className="py-3 px-3 max-w-xs">
-                                {task ? (
-                                  <div>
-                                    <Link
-                                      to={`/tasks/${task.id}`}
-                                      className="font-medium text-brand-700 hover:underline flex items-center gap-1"
-                                    >
-                                      <span className="font-mono font-bold">[{task.code}]</span>
-                                      <span className="truncate">{task.title}</span>
-                                      <ExternalLink className="w-3 h-3 shrink-0" />
-                                    </Link>
-                                  </div>
-                                ) : (
-                                  <span className="text-text-muted font-mono">{ev.taskId}</span>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 max-w-xs font-mono text-[11px] text-text-secondary">
-                                {diffSummary ? (
-                                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                    {diffSummary}
-                                  </span>
-                                ) : (
-                                  <span className="text-text-muted">—</span>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 max-w-xs text-text-secondary">
-                                {ev.note ? (
-                                  <span className="italic">"{ev.note}"</span>
-                                ) : (
-                                  <span className="text-text-muted">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      return (
+                        <article key={ev.id} className="grid gap-x-4 gap-y-3 px-4 py-4 transition-colors hover:bg-brand-50/30 sm:px-5 lg:grid-cols-[150px_minmax(170px,0.85fr)_minmax(220px,1.3fr)]">
+                          <div className="flex items-start gap-2 text-xs text-text-secondary">
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
+                            <span className="font-medium">{formatDateTimeVN(ev.createdAt)}</span>
+                          </div>
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <UserAvatar user={actor} size="sm" />
+                            <div className="min-w-0">
+                              <div className="truncate text-xs font-semibold text-text-primary">{actor?.displayName || ev.actorId}</div>
+                              <div className="mt-0.5 text-[10px] text-text-muted">{actor?.role === "MANAGER" ? "Trưởng phòng" : "Chuyên viên"}</div>
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            {renderKindBadge(ev.kind)}
+                            <div className="mt-1.5 min-w-0">
+                              {task ? (
+                                <Link to={`/tasks/${task.id}`} className="inline-flex min-w-0 max-w-full items-center gap-1 text-xs font-medium text-brand-700 hover:underline" title={`${task.code} · ${task.title}`}>
+                                  <span className="shrink-0 font-mono font-bold">{task.code}</span>
+                                  <span className="min-w-0 truncate text-text-secondary">{task.title}</span>
+                                  <ExternalLink className="h-3 w-3 shrink-0" />
+                                </Link>
+                              ) : (
+                                <span className="truncate font-mono text-[11px] text-text-muted" title={ev.taskId || "Không liên kết công việc"}>{ev.taskId || "Không liên kết công việc"}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid gap-2 border-t border-border/60 pt-3 sm:grid-cols-2 lg:col-span-3">
+                            <div className="min-w-0 rounded-lg bg-slate-50/80 px-3 py-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Chi tiết thay đổi</p>
+                              <p className="mt-1 line-clamp-2 break-words font-mono text-[11px] text-text-secondary" title={diffSummary || undefined}>{diffSummary || "Không có dữ liệu thay đổi."}</p>
+                            </div>
+                            <div className="min-w-0 rounded-lg bg-slate-50/80 px-3 py-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Ghi chú / lý do</p>
+                              <p className="mt-1 line-clamp-2 break-words text-xs text-text-secondary" title={ev.note || undefined}>{ev.note ? `“${ev.note}”` : "Không có ghi chú."}</p>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

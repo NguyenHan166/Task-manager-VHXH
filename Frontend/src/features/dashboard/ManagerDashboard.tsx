@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository, httpRepository, isMockMode } from "../../shared/repository";
+import { setSidebarCounts, type SidebarCounts } from "../../shared/sidebar-counts";
 import type {
     Task,
     Project,
@@ -103,6 +104,9 @@ export function ManagerDashboard() {
             const taskParticipants = await httpRepository.getParticipantsForTasks(taskPage.items.map((task) => task.id));
             setApiSummary(report.summary as unknown as ManagerDashboardStats);
             setApiWorkloads(Array.isArray(report.workloads) ? report.workloads as unknown as UserWorkloadStats[] : []);
+            if (currentUser && report.sidebarCounts && typeof report.sidebarCounts === "object") {
+              setSidebarCounts(currentUser.id, report.sidebarCounts as SidebarCounts);
+            }
             setTasks(taskPage.items);
             setProjects([]);
             setParticipants(taskParticipants);
@@ -320,7 +324,7 @@ export function ManagerDashboard() {
                     <select
                         value={filterProjectId}
                         onChange={(e) => setFilterProjectId(e.target.value)}
-                        className="h-9 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
+                        className="h-9 px-2.5 rounded-btn bg-white border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
                     >
                         <option value="ALL">Mọi dự án</option>
                         {projects.map((p) => (
@@ -334,7 +338,7 @@ export function ManagerDashboard() {
                     <select
                         value={filterAssigneeId}
                         onChange={(e) => setFilterAssigneeId(e.target.value)}
-                        className="h-9 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
+                        className="h-9 px-2.5 rounded-btn bg-white border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
                     >
                         <option value="ALL">Mọi người chủ trì</option>
                         {users.map((u) => (
@@ -348,7 +352,7 @@ export function ManagerDashboard() {
                     <select
                         value={filterPriority}
                         onChange={(e) => setFilterPriority(e.target.value)}
-                        className="h-9 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
+                        className="h-9 px-2.5 rounded-btn bg-white border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
                     >
                         <option value="ALL">Mọi mức ưu tiên</option>
                         <option value="URGENT">Khẩn cấp</option>
@@ -361,7 +365,7 @@ export function ManagerDashboard() {
                     <select
                         value={filterTimeRange}
                         onChange={(e) => setFilterTimeRange(e.target.value)}
-                        className="h-9 px-2.5 rounded-btn bg-slate-50 border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
+                        className="h-9 px-2.5 rounded-btn bg-white border border-border text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-brand-700"
                     >
                         <option value="ALL">Mọi mốc thời gian</option>
                         <option value="THIS_WEEK">Đến hạn tuần này</option>
@@ -832,8 +836,8 @@ export function ManagerDashboard() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                            <thead className="bg-slate-50 border-b border-border text-text-secondary font-medium">
+                        <table className="w-full text-left text-[13px] border-collapse">
+                            <thead className="bg-[#fafafa] border-b border-[#f0f0f0] text-text-secondary font-medium">
                                 <tr className="h-11">
                                     <th className="px-4 py-2">Thành viên</th>
                                     <th className="px-4 py-2">Chức danh</th>
@@ -857,11 +861,11 @@ export function ManagerDashboard() {
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-border/70 text-text-primary">
+                            <tbody className="divide-y divide-[#f0f0f0] text-text-primary">
                                 {workloadStats.map((stat) => (
                                     <tr
                                         key={stat.user.id}
-                                        className="h-12 hover:bg-slate-50/80 transition-colors"
+                                        className="h-12 hover:bg-[#fafafa] transition-colors"
                                     >
                                         <td className="px-4 py-2">
                                             <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { useSession } from "../auth/SessionContext";
 import { workspaceRepository, isMockMode } from "../../shared/repository";
+import { setSidebarCount } from "../../shared/sidebar-counts";
 import type {
   Task,
   User,
@@ -255,6 +256,10 @@ export function ApprovalsPage() {
 
   const pendingDeadlines = deadlineRequests.filter((r) => r.status === "PENDING");
   const pendingAssignees = assigneeRequests.filter((r) => r.status === "PENDING");
+  useEffect(() => {
+    if (!currentUser || isLoading) return;
+    setSidebarCount(currentUser.id, "approvals", reviewTasks.length + pendingDeadlines.length + pendingAssignees.length);
+  }, [currentUser?.id, isLoading, reviewTasks.length, pendingDeadlines.length, pendingAssignees.length]);
   const query = normalizeSearchText(searchQuery.trim());
   const matchesSearch = (...values: Array<string | number | null | undefined>) =>
     !query || values.some((value) => normalizeSearchText(String(value ?? "")).includes(query));

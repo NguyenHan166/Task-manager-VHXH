@@ -13,11 +13,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
     return (
-      <div className="space-y-1.5 w-full">
+      <div className="space-y-2 w-full">
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-xs font-semibold text-text-primary select-none"
+            className="block text-[13px] font-medium text-text-primary select-none"
           >
             {label}
             {required && <span className="text-danger ml-0.5">*</span>}
@@ -27,7 +27,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           ref={ref}
           className={cn(
-            "w-full h-10 px-3.5 rounded-btn bg-surface border text-sm text-text-primary placeholder:text-text-muted transition-colors",
+            "w-full h-9 px-3 rounded-btn bg-surface border text-sm text-text-primary placeholder:text-text-muted transition-colors",
             "focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent",
             "disabled:bg-slate-50 disabled:text-text-muted disabled:cursor-not-allowed",
             error ? "border-danger focus:ring-danger" : "border-border",
@@ -60,11 +60,11 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     const textareaId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
     return (
-      <div className="space-y-1.5 w-full">
+      <div className="space-y-2 w-full">
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-xs font-semibold text-text-primary select-none"
+            className="block text-[13px] font-medium text-text-primary select-none"
           >
             {label}
             {required && <span className="text-danger ml-0.5">*</span>}
@@ -109,11 +109,11 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
     return (
-      <div className="space-y-1.5 w-full">
+      <div className="space-y-2 w-full">
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-xs font-semibold text-text-primary select-none"
+            className="block text-[13px] font-medium text-text-primary select-none"
           >
             {label}
             {required && <span className="text-danger ml-0.5">*</span>}
@@ -123,7 +123,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           id={selectId}
           ref={ref}
           className={cn(
-            "w-full h-10 px-3 rounded-btn bg-surface border text-sm text-text-primary transition-colors cursor-pointer",
+            "w-full h-9 px-3 rounded-btn bg-surface border text-sm text-text-primary transition-colors cursor-pointer",
             "focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent",
             "disabled:bg-slate-50 disabled:text-text-muted disabled:cursor-not-allowed",
             error ? "border-danger focus:ring-danger" : "border-border",

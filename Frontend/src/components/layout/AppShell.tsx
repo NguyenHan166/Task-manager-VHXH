@@ -5,6 +5,8 @@ import { useWorkspaceSettings } from "../../features/tasks/use-tasks";
 import { UserAvatar } from "../ui/Avatar";
 import { FloatingNetworkBackground } from "../ui/FloatingNetworkBackground";
 import { workspaceRepository, httpRepository } from "../../shared/repository";
+import { mockRepository } from "../../mocks/mock-repository";
+import { setSidebarCounts, useSidebarCounts, type SidebarCountKey } from "../../shared/sidebar-counts";
 import { getUnreadCount } from "../../features/tasks/task-selectors";
 import { canSeeTask } from "../../shared/data-contract";
 import type { Task, Notification } from "../../shared/data-contract";
@@ -40,12 +42,48 @@ import {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { currentUser, isManager, isDeputy, users, switchUser, logout, isMockMode } = useSession();
+  const sidebarCounts = useSidebarCounts(currentUser?.id);
   const { settings } = useWorkspaceSettings();
   const location = useLocation();
   const navigate = useNavigate();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isMockMode || !currentUser) return;
+    const updateCounts = () => {
+      const snapshot = mockRepository.getSnapshot();
+      const visibleTasks = snapshot.tasks.filter((task) => canSeeTask(task, currentUser, snapshot.participants));
+      const visibleProjects = snapshot.projects.filter((project) =>
+        isManager || isDeputy || project.ownerId === currentUser.id ||
+        snapshot.tasks.some((task) => task.projectId === project.id && canSeeTask(task, currentUser, snapshot.participants))
+      );
+      const visibleRules = snapshot.recurrenceRules.filter((rule) =>
+        !currentUser.role || currentUser.role !== "STAFF" || rule.scope === "ALL" ||
+        rule.assigneeIds?.includes(currentUser.id) || rule.primaryAssigneeId === currentUser.id
+      );
+      const pendingApprovals = snapshot.tasks.filter((task) => task.type === "OFFICIAL" && task.status === "IN_REVIEW").length +
+        snapshot.deadlineRequests.filter((request) => request.status === "PENDING").length +
+        snapshot.assigneeRequests.filter((request) => request.status === "PENDING").length;
+
+      setSidebarCounts(currentUser.id, {
+        tasks: visibleTasks.length,
+        approvals: pendingApprovals,
+        projects: visibleProjects.length,
+        recurrence: visibleRules.length,
+        members: snapshot.users.length,
+      });
+    };
+
+    updateCounts();
+    return workspaceRepository.subscribe(updateCounts);
+  }, [currentUser, isManager, isDeputy, isMockMode]);
+
+  useEffect(() => {
+    if (isMockMode || !currentUser) return;
+    setSidebarCounts(currentUser.id, { members: users.length });
+  }, [currentUser?.id, isMockMode, users.length]);
 
   // Search state & popover
   const [searchQuery, setSearchQuery] = useState("");
@@ -208,6 +246,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   const currentNavItems = isManager ? managerNavItems : isDeputy ? deputyNavItems : staffNavItems;
+  const navCountKeys: Partial<Record<string, SidebarCountKey>> = {
+    "/tasks": "tasks",
+    "/approvals": "approvals",
+    "/projects": "projects",
+    "/recurrence": "recurrence",
+    "/members": "members",
+  };
+  const getNavCount = (path: string) => {
+    const key = navCountKeys[path];
+    return key ? sidebarCounts[key] : undefined;
+  };
   const isP1Route = ["/personal-tasks", "/projects", "/calendar", "/recurrence", "/chat"].some(
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
@@ -236,7 +285,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Navigation Links */}
         <nav className="min-h-0 flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-3 mb-2">
+          <div className="text-sm font-semibold text-text-primary px-3 mb-2">
             {isManager ? "Quản trị & Điều hành" : isDeputy ? "Điều hành & Phê duyệt" : "Không gian Chuyên viên"}
           </div>
 
@@ -251,20 +300,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.path}
                 to={item.path}
                 aria-current={isActive ? "page" : undefined}
-                className={`group relative flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm transition-all duration-200 ${
+                className={`group relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-sm transition-all duration-200 ${
                   isActive
-                    ? "bg-white/90 font-semibold text-emerald-900 shadow-sm ring-1 ring-emerald-300/80"
+                    ? "bg-brand-700 font-semibold text-white shadow-sm"
                     : "font-medium text-text-secondary hover:bg-white/65 hover:text-text-primary"
                 }`}
               >
-                {isActive && (
-                  <span className="absolute -left-0.5 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-emerald-700" />
-                )}
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${isActive ? "bg-emerald-100 text-emerald-700" : "text-text-muted group-hover:bg-white/80"}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${isActive ? "text-white" : "text-text-muted group-hover:bg-white/80"}`}>
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="truncate">{item.label}</span>
-                {isActive && <span aria-hidden="true" className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600 shadow-[0_0_0_3px_rgba(16,185,129,0.14)]" />}
+                {getNavCount(item.path) !== undefined && (
+                  <span className={`ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ${isActive ? "bg-white/15 text-white" : "bg-slate-100 text-text-muted group-hover:bg-brand-50 group-hover:text-brand-700"}`}>
+                    {getNavCount(item.path)}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -274,7 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               to="/ui-kit"
               className={`flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
                 location.pathname === "/ui-kit"
-                  ? "bg-white/90 text-emerald-900 font-semibold shadow-sm ring-1 ring-emerald-300/80"
+                  ? "bg-brand-700 text-white font-semibold shadow-sm"
                   : "text-text-muted hover:text-brand-700 hover:bg-slate-50"
               }`}
             >
@@ -315,7 +365,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar (Height 64px, compact) */}
+        {/* Top bar */}
         <header className="h-16 bg-surface/78 backdrop-blur-sm border-b border-border flex items-center justify-between px-3 sm:px-6 z-30 sticky top-0 shadow-2xs">
           {/* Left: Mobile hamburger & Global Search */}
           <div className="flex items-center gap-3 flex-1 min-w-0 mr-2 sm:mr-4">
@@ -657,18 +707,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   to={item.path}
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive ? "page" : undefined}
-                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200 ${
+                  className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                     isActive
-                      ? "bg-white/90 font-semibold text-emerald-900 shadow-sm ring-1 ring-emerald-300/80"
+                      ? "bg-brand-700 font-semibold text-white shadow-sm"
                       : "font-medium text-text-secondary hover:bg-white/65 hover:text-text-primary"
                   }`}
                 >
-                  {isActive && <span className="absolute -left-0.5 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-emerald-700" />}
-                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${isActive ? "bg-emerald-100 text-emerald-700" : "text-text-muted group-hover:bg-white/80"}`}>
+                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${isActive ? "text-white" : "text-text-muted group-hover:bg-white/80"}`}>
                     <Icon className="h-4 w-4" />
                   </span>
-                  <span>{item.label}</span>
-                  {isActive && <span aria-hidden="true" className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600 shadow-[0_0_0_3px_rgba(16,185,129,0.14)]" />}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {getNavCount(item.path) !== undefined && (
+                    <span className={`ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ${isActive ? "bg-white/15 text-white" : "bg-slate-100 text-text-muted group-hover:bg-brand-50 group-hover:text-brand-700"}`}>
+                      {getNavCount(item.path)}
+                    </span>
+                  )}
                 </Link>
               );
             })}
