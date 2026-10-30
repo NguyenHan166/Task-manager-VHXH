@@ -28,7 +28,7 @@ export class TaskAccessPolicy {
           participant.invitationStatus === 'ACCEPTED',
       ) ?? false;
     if (task.type === TaskType.OFFICIAL) {
-      if (task.status === TaskStatus.DRAFT) return isCreator;
+      if (task.status === TaskStatus.DRAFT) return isCreator || actor.role === 'MANAGER';
       if (actor.role === 'MANAGER' || actor.role === 'DEPUTY_MANAGER')
         return true;
     }
@@ -53,7 +53,9 @@ export class TaskAccessPolicy {
       ],
     };
     const official: Prisma.TaskWhereInput =
-      actor.role === 'MANAGER' || actor.role === 'DEPUTY_MANAGER'
+      actor.role === 'MANAGER'
+        ? { type: 'OFFICIAL' as const }
+        : actor.role === 'DEPUTY_MANAGER'
         ? {
             OR: [
               { type: 'OFFICIAL' as const, status: { not: 'DRAFT' as const } },
@@ -98,8 +100,8 @@ export class TaskAccessPolicy {
     if (task.type !== 'OFFICIAL') return false;
     if (task.status === 'DRAFT') {
       return (
-        (actor.role === 'MANAGER' || actor.role === 'DEPUTY_MANAGER') &&
-        task.createdById === actor.id
+        actor.role === 'MANAGER' ||
+        (actor.role === 'DEPUTY_MANAGER' && task.createdById === actor.id)
       );
     }
     return actor.role === 'MANAGER' || actor.role === 'DEPUTY_MANAGER';

@@ -336,6 +336,26 @@ export class TasksController {
     return this.workflow.cancel(actor, taskId);
   }
 
+  @Roles(UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/recall')
+  recall(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) taskId: string,
+  ) {
+    return this.workflow.recall(actor, taskId);
+  }
+
+  @Roles(UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/finish')
+  finish(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) taskId: string,
+  ) {
+    return this.workflow.finish(actor, taskId);
+  }
+
   @HttpCode(HttpStatus.OK)
   @Post(':id/reopen')
   reopen(

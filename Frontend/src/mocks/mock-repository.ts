@@ -217,7 +217,9 @@ export class MockRepository {
             );
         }
 
-        const cleanEmail = (input.email || input.username || "").trim().toLowerCase();
+        const cleanEmail = (input.email || input.username || "")
+            .trim()
+            .toLowerCase();
         if (!cleanEmail) {
             throw new DomainError(
                 "VALIDATION",
@@ -253,7 +255,9 @@ export class MockRepository {
 
         const count = db.users.length + 1;
         const newUserId = `u${String(count).padStart(2, "0")}`;
-        const tempPassword = input.initialPassword?.trim() || `Ows@${Math.floor(100000 + Math.random() * 900000)}`;
+        const tempPassword =
+            input.initialPassword?.trim() ||
+            `Ows@${Math.floor(100000 + Math.random() * 900000)}`;
 
         const newUser: User = {
             id: newUserId,
@@ -279,7 +283,17 @@ export class MockRepository {
     public async updateUser(
         id: Id,
         updates: Partial<
-            Pick<User, "displayName" | "jobTitle" | "status" | "role" | "email" | "phoneNumber" | "department" | "username">
+            Pick<
+                User,
+                | "displayName"
+                | "jobTitle"
+                | "status"
+                | "role"
+                | "email"
+                | "phoneNumber"
+                | "department"
+                | "username"
+            >
         >,
         actorId: Id,
     ): Promise<User> {
@@ -320,7 +334,10 @@ export class MockRepository {
         }
 
         // Rule 2: Cannot lock last active manager & Cannot self-lock
-        if (updates.status !== undefined && updates.status !== targetUser.status) {
+        if (
+            updates.status !== undefined &&
+            updates.status !== targetUser.status
+        ) {
             if (actor?.role !== "MANAGER") {
                 throw new DomainError(
                     "FORBIDDEN",
@@ -363,7 +380,9 @@ export class MockRepository {
 
         let nextEmail = targetUser.email;
         if (updates.email !== undefined || updates.username !== undefined) {
-            const rawEmail = (updates.email || updates.username || "").trim().toLowerCase();
+            const rawEmail = (updates.email || updates.username || "")
+                .trim()
+                .toLowerCase();
             if (!rawEmail) {
                 throw new DomainError(
                     "VALIDATION",
@@ -469,8 +488,6 @@ export class MockRepository {
             message: `Đã đặt lại mật khẩu thành công cho ${user.displayName}`,
         };
     }
-
-
 
     // --- Projects ---
 
@@ -983,6 +1000,7 @@ export class MockRepository {
     public async cancelTask(
         taskId: Id,
         _actorId: Id,
+        mode: "cancel" | "finish" = "cancel",
     ): Promise<void> {
         await this.delay();
         this.checkFailure();
@@ -993,55 +1011,133 @@ export class MockRepository {
 
         const task = db.tasks[taskIdx];
         const actor = db.users.find((user) => user.id === _actorId);
-        if (actor?.role !== "MANAGER" && actor?.role !== "DEPUTY_MANAGER") {
-            throw new DomainError("FORBIDDEN", "Chỉ Trưởng phòng hoặc Phó phòng mới có quyền thu hồi công việc");
+        if (mode === "finish" && actor?.role !== "MANAGER") {
+            throw new DomainError(
+                "FORBIDDEN",
+                "Chỉ Trưởng phòng mới có quyền kết thúc công việc",
+            );
+        }
+        if (
+            mode === "cancel" &&
+            actor?.role !== "MANAGER" &&
+            actor?.role !== "DEPUTY_MANAGER"
+        ) {
+            throw new DomainError(
+                "FORBIDDEN",
+                "Chỉ Trưởng phòng hoặc Phó phòng mới có quyền thu hồi công việc",
+            );
         }
         if (task.type === "PERSONAL") {
-            throw new DomainError("FORBIDDEN", "Công việc cá nhân chỉ do chủ sở hữu xóa được");
+            throw new DomainError(
+                "FORBIDDEN",
+                "Công việc cá nhân chỉ do chủ sở hữu xóa được",
+            );
         }
-        if (!["DRAFT", "TODO", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)) {
-            throw new DomainError("CONFLICT", "Không thể thu hồi công việc ở trạng thái hiện tại");
+        if (
+            mode === "finish" &&
+            (task.type !== "OFFICIAL" ||
+                task.status !== "DONE" ||
+                !task.approvedAt ||
+                !task.approvedById)
+        ) {
+            throw new DomainError(
+                "CONFLICT",
+                "Chỉ công việc đã được duyệt hoàn thành mới có thể kết thúc",
+            );
+        }
+        if (
+            mode === "cancel" &&
+            !["DRAFT", "TODO", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)
+        ) {
+            throw new DomainError(
+                "CONFLICT",
+                "Không thể thu hồi công việc ở trạng thái hiện tại",
+            );
         }
 
         const recipientIds = new Set([
             ...(task.primaryAssigneeId ? [task.primaryAssigneeId] : []),
             ...db.participants
-                .filter((participant) => participant.taskId === taskId && participant.role === "COLLABORATOR" && participant.invitationStatus === "ACCEPTED")
+                .filter(
+                    (participant) =>
+                        participant.taskId === taskId &&
+                        participant.role === "COLLABORATOR" &&
+                        participant.invitationStatus === "ACCEPTED",
+                )
                 .map((participant) => participant.userId),
         ]);
         recipientIds.delete(_actorId);
-        const submissionIds = new Set(db.submissions.filter((item) => item.taskId === taskId).map((item) => item.id));
-        const commentIds = new Set(db.comments.filter((item) => item.taskId === taskId).map((item) => item.id));
-        const fileIds = new Set(db.fileLinks
-            .filter((link) =>
-                (link.entityType === "TASK" && link.entityId === taskId) ||
-                (link.entityType === "SUBMISSION" && submissionIds.has(link.entityId)) ||
-                (link.entityType === "COMMENT" && commentIds.has(link.entityId)),
-            )
-            .map((link) => link.fileId));
+        const submissionIds = new Set(
+            db.submissions
+                .filter((item) => item.taskId === taskId)
+                .map((item) => item.id),
+        );
+        const commentIds = new Set(
+            db.comments
+                .filter((item) => item.taskId === taskId)
+                .map((item) => item.id),
+        );
+        const fileIds = new Set(
+            db.fileLinks
+                .filter(
+                    (link) =>
+                        (link.entityType === "TASK" &&
+                            link.entityId === taskId) ||
+                        (link.entityType === "SUBMISSION" &&
+                            submissionIds.has(link.entityId)) ||
+                        (link.entityType === "COMMENT" &&
+                            commentIds.has(link.entityId)),
+                )
+                .map((link) => link.fileId),
+        );
 
-        db.tasks = db.tasks.filter((item) => item.id !== taskId).map((item) =>
-            item.parentTaskId === taskId ? { ...item, parentTaskId: null } : item,
+        db.tasks = db.tasks
+            .filter((item) => item.id !== taskId)
+            .map((item) =>
+                item.parentTaskId === taskId
+                    ? { ...item, parentTaskId: null }
+                    : item,
+            );
+        db.participants = db.participants.filter(
+            (item) => item.taskId !== taskId,
         );
-        db.participants = db.participants.filter((item) => item.taskId !== taskId);
         db.comments = db.comments.filter((item) => item.taskId !== taskId);
-        db.submissions = db.submissions.filter((item) => item.taskId !== taskId);
-        db.approvals = db.approvals.filter((item) => item.taskId !== taskId);
-        db.deadlineRequests = db.deadlineRequests.filter((item) => item.taskId !== taskId);
-        db.assigneeRequests = db.assigneeRequests.filter((item) => item.taskId !== taskId);
-        db.events = db.events.filter((item) => item.taskId !== taskId);
-        db.notifications = db.notifications.filter((item) => item.entityId !== taskId);
-        db.recurrenceInstances = db.recurrenceInstances
-            .filter((item) => item.taskId !== taskId && !item.taskIds?.includes(taskId))
-            .map((item) => ({ ...item, taskIds: item.taskIds?.filter((id) => id !== taskId) }));
-        db.fileLinks = db.fileLinks.filter((link) =>
-            !(
-                (link.entityType === "TASK" && link.entityId === taskId) ||
-                (link.entityType === "SUBMISSION" && submissionIds.has(link.entityId)) ||
-                (link.entityType === "COMMENT" && commentIds.has(link.entityId))
-            ),
+        db.submissions = db.submissions.filter(
+            (item) => item.taskId !== taskId,
         );
-        const stillLinkedFileIds = new Set(db.fileLinks.map((link) => link.fileId));
+        db.approvals = db.approvals.filter((item) => item.taskId !== taskId);
+        db.deadlineRequests = db.deadlineRequests.filter(
+            (item) => item.taskId !== taskId,
+        );
+        db.assigneeRequests = db.assigneeRequests.filter(
+            (item) => item.taskId !== taskId,
+        );
+        db.events = db.events.filter((item) => item.taskId !== taskId);
+        db.notifications = db.notifications.filter(
+            (item) => item.entityId !== taskId,
+        );
+        db.recurrenceInstances = db.recurrenceInstances
+            .filter(
+                (item) =>
+                    item.taskId !== taskId && !item.taskIds?.includes(taskId),
+            )
+            .map((item) => ({
+                ...item,
+                taskIds: item.taskIds?.filter((id) => id !== taskId),
+            }));
+        db.fileLinks = db.fileLinks.filter(
+            (link) =>
+                !(
+                    (link.entityType === "TASK" && link.entityId === taskId) ||
+                    (link.entityType === "SUBMISSION" &&
+                        submissionIds.has(link.entityId)) ||
+                    (link.entityType === "COMMENT" &&
+                        commentIds.has(link.entityId))
+                ),
+        );
+        const stillLinkedFileIds = new Set(
+            db.fileLinks.map((link) => link.fileId),
+        );
         db.files = db.files.map((file) =>
             fileIds.has(file.id) && !stillLinkedFileIds.has(file.id)
                 ? { ...file, status: "REMOVED" }
@@ -1067,6 +1163,10 @@ export class MockRepository {
 
         this.persist();
         this.notify();
+    }
+
+    public async finishTask(taskId: Id, actorId: Id): Promise<void> {
+        return this.cancelTask(taskId, actorId, "finish");
     }
 
     public async reopenTask(
@@ -1480,7 +1580,8 @@ export class MockRepository {
     ): Promise<Task> {
         if (newStatus === "CANCELLED") {
             const task = this.getDb().tasks.find((item) => item.id === id);
-            if (!task) throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
+            if (!task)
+                throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
             await this.cancelTask(id, actorId);
             // Keep the legacy return type; cancellation removes the task from mock storage.
             return { ...task, status: "CANCELLED" };
@@ -1505,7 +1606,8 @@ export class MockRepository {
 
         db.tasks[idx] = updated;
 
-        const kind = newStatus === "IN_PROGRESS" ? "STARTED" : "PROGRESS_UPDATED";
+        const kind =
+            newStatus === "IN_PROGRESS" ? "STARTED" : "PROGRESS_UPDATED";
 
         db.events.push({
             id: `e_${Date.now()}`,
@@ -1822,7 +1924,10 @@ export class MockRepository {
             });
             // Also link to task so it appears under Task Files tab
             const alreadyLinked = db.fileLinks.some(
-                (fl) => fl.fileId === fileId && fl.entityType === "TASK" && fl.entityId === taskId
+                (fl) =>
+                    fl.fileId === fileId &&
+                    fl.entityType === "TASK" &&
+                    fl.entityId === taskId,
             );
             if (!alreadyLinked) {
                 db.fileLinks.push({
@@ -2038,7 +2143,10 @@ export class MockRepository {
         }
 
         // Validate actor is primary assignee or creator
-        if (task.primaryAssigneeId !== actorId && task.createdById !== actorId) {
+        if (
+            task.primaryAssigneeId !== actorId &&
+            task.createdById !== actorId
+        ) {
             throw new DomainError(
                 "FORBIDDEN",
                 "Chỉ chuyên viên thực hiện công việc mới có quyền thu hồi báo cáo",
@@ -2046,14 +2154,21 @@ export class MockRepository {
         }
 
         // Find the latest submission for this task
-        const taskSubmissions = db.submissions.filter((s) => s.taskId === taskId);
+        const taskSubmissions = db.submissions.filter(
+            (s) => s.taskId === taskId,
+        );
         if (taskSubmissions.length === 0) {
-            throw new DomainError("NOT_FOUND", "Không tìm thấy báo cáo kết quả để thu hồi");
+            throw new DomainError(
+                "NOT_FOUND",
+                "Không tìm thấy báo cáo kết quả để thu hồi",
+            );
         }
         const latestSub = taskSubmissions[taskSubmissions.length - 1];
 
         // Ensure no approval decision has been made for this submission
-        const hasApproval = db.approvals.some((a) => a.submissionId === latestSub.id);
+        const hasApproval = db.approvals.some(
+            (a) => a.submissionId === latestSub.id,
+        );
         if (hasApproval) {
             throw new DomainError(
                 "CONFLICT",
@@ -2072,7 +2187,8 @@ export class MockRepository {
         db.tasks[taskIdx] = {
             ...task,
             status: "IN_PROGRESS",
-            progressPercent: task.progressPercent === 100 ? 90 : task.progressPercent,
+            progressPercent:
+                task.progressPercent === 100 ? 90 : task.progressPercent,
             updatedAt: nowIso,
         };
 
@@ -2317,34 +2433,108 @@ export class MockRepository {
 
     // --- Assignee Requests ---
 
-    public async transferTask(taskId: Id, input: { assigneeId: Id; note?: string }, actorId: Id): Promise<Task> {
+    public async transferTask(
+        taskId: Id,
+        input: { assigneeId: Id; note?: string },
+        actorId: Id,
+    ): Promise<Task> {
         await this.delay();
         this.checkFailure();
         const db = this.getDb();
         const actor = db.users.find((user) => user.id === actorId);
         const taskIndex = db.tasks.findIndex((item) => item.id === taskId);
         const task = db.tasks[taskIndex];
-        if (!task) throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
-        if (actor?.role !== "STAFF" || task.primaryAssigneeId !== actorId || (task.type !== "OFFICIAL" && task.type !== "TEAM")) {
-            throw new DomainError("FORBIDDEN", "Chỉ chuyên viên đang nhận chính mới được chuyển xử lý");
+        if (!task)
+            throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
+        if (
+            actor?.role !== "STAFF" ||
+            task.primaryAssigneeId !== actorId ||
+            (task.type !== "OFFICIAL" && task.type !== "TEAM")
+        ) {
+            throw new DomainError(
+                "FORBIDDEN",
+                "Chỉ chuyên viên đang nhận chính mới được chuyển xử lý",
+            );
         }
-        if (task.status !== "TODO" && task.status !== "IN_PROGRESS") throw new DomainError("CONFLICT", "Chỉ có thể chuyển công việc đang thực hiện");
-        if (input.assigneeId === actorId) throw new DomainError("VALIDATION", "Hãy chọn chuyên viên khác");
-        const target = db.users.find((user) => user.id === input.assigneeId && user.role === "STAFF" && user.status === "ACTIVE");
-        if (!target) throw new DomainError("VALIDATION", "Chuyên viên nhận việc phải đang hoạt động");
+        if (task.status !== "TODO" && task.status !== "IN_PROGRESS")
+            throw new DomainError(
+                "CONFLICT",
+                "Chỉ có thể chuyển công việc đang thực hiện",
+            );
+        if (input.assigneeId === actorId)
+            throw new DomainError("VALIDATION", "Hãy chọn chuyên viên khác");
+        const target = db.users.find(
+            (user) =>
+                user.id === input.assigneeId &&
+                user.role === "STAFF" &&
+                user.status === "ACTIVE",
+        );
+        if (!target)
+            throw new DomainError(
+                "VALIDATION",
+                "Chuyên viên nhận việc phải đang hoạt động",
+            );
 
         const now = toIsoUtc();
         const note = input.note?.trim();
-        const updated: Task = { ...task, primaryAssigneeId: target.id, assignedAt: now, updatedAt: now, version: (task.version ?? 1) + 1 };
+        const updated: Task = {
+            ...task,
+            primaryAssigneeId: target.id,
+            assignedAt: now,
+            updatedAt: now,
+            version: (task.version ?? 1) + 1,
+        };
         db.tasks[taskIndex] = updated;
-        db.participants = db.participants.filter((participant) => participant.taskId !== taskId || participant.userId !== target.id);
-        db.assigneeRequests = db.assigneeRequests.map((request) => request.taskId === taskId && request.status === "PENDING"
-            ? { ...request, status: "REJECTED", decidedById: actorId, decidedAt: now, decisionReason: "Nhiệm vụ đã được chuyển xử lý trực tiếp." }
-            : request);
-        db.events.push({ id: `e_${Date.now()}_transfer`, taskId, actorId, kind: "ASSIGNEE_CHANGED", note: note || `Chuyển xử lý cho ${target.displayName}.`, before: { primaryAssigneeId: actorId }, after: { primaryAssigneeId: target.id }, createdAt: now });
-        db.notifications.push({ id: `n_${Date.now()}_transfer`, recipientId: target.id, type: "TASK_ASSIGNED", title: "Bạn được chuyển giao công việc", body: `[${task.code}] ${task.title} đã được chuyển cho bạn xử lý.${note ? ` Lời nhắn: ${note}` : ""}`, entityType: "TASK", entityId: taskId, createdAt: now, readAt: null });
+        db.participants = db.participants.filter(
+            (participant) =>
+                participant.taskId !== taskId ||
+                participant.userId !== target.id,
+        );
+        db.assigneeRequests = db.assigneeRequests.map((request) =>
+            request.taskId === taskId && request.status === "PENDING"
+                ? {
+                      ...request,
+                      status: "REJECTED",
+                      decidedById: actorId,
+                      decidedAt: now,
+                      decisionReason:
+                          "Nhiệm vụ đã được chuyển xử lý trực tiếp.",
+                  }
+                : request,
+        );
+        db.events.push({
+            id: `e_${Date.now()}_transfer`,
+            taskId,
+            actorId,
+            kind: "ASSIGNEE_CHANGED",
+            note: note || `Chuyển xử lý cho ${target.displayName}.`,
+            before: { primaryAssigneeId: actorId },
+            after: { primaryAssigneeId: target.id },
+            createdAt: now,
+        });
+        db.notifications.push({
+            id: `n_${Date.now()}_transfer`,
+            recipientId: target.id,
+            type: "TASK_ASSIGNED",
+            title: "Bạn được chuyển giao công việc",
+            body: `[${task.code}] ${task.title} đã được chuyển cho bạn xử lý.${note ? ` Lời nhắn: ${note}` : ""}`,
+            entityType: "TASK",
+            entityId: taskId,
+            createdAt: now,
+            readAt: null,
+        });
         if (task.createdById !== actorId && task.createdById !== target.id) {
-            db.notifications.push({ id: `n_${Date.now()}_transfer_creator`, recipientId: task.createdById, type: "TASK_UPDATED", title: "Công việc đã được chuyển xử lý", body: `[${task.code}] ${task.title} đã được chuyển cho ${target.displayName}.`, entityType: "TASK", entityId: taskId, createdAt: now, readAt: null });
+            db.notifications.push({
+                id: `n_${Date.now()}_transfer_creator`,
+                recipientId: task.createdById,
+                type: "TASK_UPDATED",
+                title: "Công việc đã được chuyển xử lý",
+                body: `[${task.code}] ${task.title} đã được chuyển cho ${target.displayName}.`,
+                entityType: "TASK",
+                entityId: taskId,
+                createdAt: now,
+                readAt: null,
+            });
         }
         this.persist();
         this.notify();
@@ -2707,21 +2897,32 @@ export class MockRepository {
         let targetUsers: User[] = [];
         if (rule.scope === "ALL") {
             // Assign to all active staff in the department
-            targetUsers = db.users.filter((u) => u.status === "ACTIVE" && u.role === "STAFF");
+            targetUsers = db.users.filter(
+                (u) => u.status === "ACTIVE" && u.role === "STAFF",
+            );
             if (targetUsers.length === 0) {
-                targetUsers = db.users.filter((u) => u.status === "ACTIVE" && u.id !== actorId);
+                targetUsers = db.users.filter(
+                    (u) => u.status === "ACTIVE" && u.id !== actorId,
+                );
             }
         } else if (rule.assigneeIds && rule.assigneeIds.length > 0) {
-            targetUsers = db.users.filter((u) => rule.assigneeIds!.includes(u.id) && u.status === "ACTIVE");
+            targetUsers = db.users.filter(
+                (u) =>
+                    rule.assigneeIds!.includes(u.id) && u.status === "ACTIVE",
+            );
         }
 
         if (targetUsers.length === 0 && rule.primaryAssigneeId) {
-            const fallbackUser = db.users.find((u) => u.id === rule.primaryAssigneeId);
+            const fallbackUser = db.users.find(
+                (u) => u.id === rule.primaryAssigneeId,
+            );
             if (fallbackUser) targetUsers = [fallbackUser];
         }
 
         if (targetUsers.length === 0) {
-            targetUsers = db.users.filter((u) => u.status === "ACTIVE" && u.role === "STAFF");
+            targetUsers = db.users.filter(
+                (u) => u.status === "ACTIVE" && u.role === "STAFF",
+            );
         }
 
         const now = new Date();
@@ -2835,7 +3036,10 @@ export class MockRepository {
         const db = this.getDb();
         const task = db.tasks.find((t) => t.id === taskId);
         if (!task) {
-            throw new DomainError("NOT_FOUND", "Không tìm thấy nhiệm vụ định kỳ");
+            throw new DomainError(
+                "NOT_FOUND",
+                "Không tìm thấy nhiệm vụ định kỳ",
+            );
         }
         if (task.status === "TODO") {
             task.status = "IN_PROGRESS";
@@ -2843,7 +3047,6 @@ export class MockRepository {
         }
         return this.addSubmission(taskId, input, submittedById);
     }
-
 
     // --- Notifications ---
 
@@ -2980,7 +3183,11 @@ export class MockRepository {
 
         const actor = db.users.find((u) => u.id === actorId);
         const file = db.files[idx];
-        if (file.uploadedById !== actorId && actor?.role !== "MANAGER" && actor?.role !== "DEPUTY_MANAGER") {
+        if (
+            file.uploadedById !== actorId &&
+            actor?.role !== "MANAGER" &&
+            actor?.role !== "DEPUTY_MANAGER"
+        ) {
             throw new DomainError(
                 "FORBIDDEN",
                 "Chỉ người tải lên hoặc Lãnh đạo phòng mới có quyền xóa tệp này",

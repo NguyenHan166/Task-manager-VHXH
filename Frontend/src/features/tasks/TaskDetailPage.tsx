@@ -78,7 +78,7 @@ import {
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser, isLeader } = useSession();
+  const { currentUser, isLeader, isManager } = useSession();
   const { showToast } = useToast();
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
@@ -150,6 +150,7 @@ export function TaskDetailPage() {
   const [deadlineReason, setDeadlineReason] = useState("");
 
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showFinishModal, setShowFinishModal] = useState(false);
 
   const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -631,6 +632,21 @@ export function TaskDetailPage() {
       navigate("/tasks", { replace: true });
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Lỗi hủy công việc", "error");
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  const handleFinishTask = async () => {
+    if (!task || !currentUser) return;
+    setIsSubmittingAction(true);
+    try {
+      await workspaceRepository.finishTask(task.id, currentUser.id);
+      setShowFinishModal(false);
+      showToast("Đã kết thúc và xóa công việc khỏi hệ thống.", "success");
+      navigate("/tasks", { replace: true });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Không thể kết thúc công việc", "error");
     } finally {
       setIsSubmittingAction(false);
     }
@@ -1246,6 +1262,17 @@ export function TaskDetailPage() {
                   className="gap-1.5 text-amber-800 border-amber-300 hover:bg-amber-50"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-amber-700" /> Mở lại công việc
+                </Button>
+              )}
+
+              {task.type === "OFFICIAL" && task.status === "DONE" && task.approvedAt && task.approvedById && isManager && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFinishModal(true)}
+                  className="gap-1.5 text-danger border-red-200 hover:bg-red-50"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Kết thúc công việc
                 </Button>
               )}
 
@@ -2586,6 +2613,17 @@ export function TaskDetailPage() {
           isLoading={isSubmittingAction}
           onConfirm={handleCancelTask}
           onCancel={() => setShowCancelModal(false)}
+        />
+
+        <ConfirmDialog
+          isOpen={showFinishModal}
+          title="Kết thúc và xóa công việc này?"
+          description="Công việc đã được duyệt hoàn thành. Xác nhận sẽ xóa công việc, lịch sử xử lý và các liên kết tệp khỏi DB; thao tác không thể hoàn tác. Người nhận sẽ được thông báo."
+          confirmLabel="Xác nhận kết thúc"
+          variant="danger"
+          isLoading={isSubmittingAction}
+          onConfirm={handleFinishTask}
+          onCancel={() => setShowFinishModal(false)}
         />
 
         {/* --- MODAL 11: DECIDE DEADLINE REQUEST (MANAGER) --- */}

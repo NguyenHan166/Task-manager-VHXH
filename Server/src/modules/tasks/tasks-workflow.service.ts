@@ -98,7 +98,7 @@ export class TasksWorkflowService {
       const task = await this.commandTask(tx, actor, taskId);
       this.requireLeader(actor);
       this.requireOfficial(task);
-      if (task.createdById !== actor.id) {
+      if (task.createdById !== actor.id && actor.role !== UserRole.MANAGER) {
         throw forbidden('Only the task creator can publish this draft');
       }
       if (task.status !== TaskStatus.DRAFT) {
@@ -718,6 +718,83 @@ export class TasksWorkflowService {
 
   async cancel(actor: AuthenticatedUser, taskId: string) {
     this.requireLeader(actor);
+    return this.deleteTask(actor, taskId, 'cancel');
+  }
+
+  async recall(actor: AuthenticatedUser, taskId: string) {
+    if (actor.role !== UserRole.MANAGER) throw forbidden('Only the manager can recall an assignment');
+    return this.prisma.$transaction(async (tx) => {
+      const task = await this.commandTask(tx, actor, taskId);
+      this.requireOfficial(task);
+      if (![TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW].includes(task.status)) {
+        throw conflict('Only an active assignment can be recalled');
+      }
+      const now = new Date();
+      const collaborators = await tx.taskParticipant.findMany({
+        where: { taskId, role: ParticipantRole.COLLABORATOR, invitationStatus: 'ACCEPTED' },
+        select: { userId: true },
+      });
+      const recipientIds = [...new Set([task.primaryAssigneeId, ...collaborators.map(({ userId }) => userId)].filter((id): id is string => Boolean(id) && id !== actor.id))];
+      const notificationIds = await tx.notification.findMany({ where: { taskId }, select: { id: true } });
+      await tx.realtimeOutbox.deleteMany({ where: { OR: [{ taskId }, { notificationId: { in: notificationIds.map(({ id }) => id) } }] } });
+      await tx.notification.deleteMany({ where: { taskId } });
+
+      const fileLinks = await tx.fileLink.findMany({
+        where: { OR: [{ submission: { is: { taskId } } }, { comment: { is: { taskId } } }] },
+        select: { fileId: true },
+      });
+      const fileIds = [...new Set(fileLinks.map(({ fileId }) => fileId))];
+      await tx.fileLink.deleteMany({ where: { OR: [{ submission: { is: { taskId } } }, { comment: { is: { taskId } } }] } });
+      await tx.taskApproval.deleteMany({ where: { taskId } });
+      await tx.taskSubmission.deleteMany({ where: { taskId } });
+      await tx.taskComment.deleteMany({ where: { taskId } });
+      await tx.taskDeadlineRequest.deleteMany({ where: { taskId } });
+      await tx.taskAssigneeRequest.deleteMany({ where: { taskId } });
+      await tx.reminderEvent.deleteMany({ where: { taskId } });
+      if (fileIds.length) {
+        await tx.fileObject.updateMany({
+          where: { id: { in: fileIds }, status: { in: [FileStatus.UPLOADING, FileStatus.READY] }, links: { none: { removedAt: null } } },
+          data: { status: FileStatus.REMOVED, removedAt: now, purgeAfter: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000), uploadExpiresAt: null },
+        });
+      }
+      const updated = await this.transition(tx, actor, task, {
+        status: TaskStatus.DRAFT,
+        assignedAt: null,
+        progressPercent: 0,
+        completedAt: null,
+        completionDueAtSnapshot: null,
+        approvedById: null,
+        approvedAt: null,
+        isBlocked: false,
+        blockedReason: null,
+      }, now);
+      const event = await this.event(tx, actor, task, 'RECALLED', 'Trưởng phòng đã thu hồi công việc về bản nháp.',
+        { status: task.status }, { status: TaskStatus.DRAFT }, now);
+      if (recipientIds.length) {
+        const activeUsers = await tx.user.findMany({ where: { id: { in: recipientIds }, status: UserStatus.ACTIVE }, select: { id: true } });
+        await tx.notification.createMany({
+          data: activeUsers.map(({ id }) => ({ recipientId: id, taskId: null, type: NotificationType.TASK_UPDATED,
+            title: 'Công việc đã được thu hồi', body: `[${task.code}] ${task.title} đã được Trưởng phòng thu hồi về bản nháp.`,
+            businessEventId: event.id, createdAt: now })), skipDuplicates: true,
+        });
+        const notifications = await tx.notification.findMany({ where: { businessEventId: event.id }, select: { id: true, recipientId: true } });
+        await tx.realtimeOutbox.createMany({ data: notifications.map(({ id, recipientId }) => ({
+          type: RealtimeOutboxType.NOTIFICATION_NEW, idempotencyKey: `notification:${id}`,
+          businessEventId: event.id, recipientId, notificationId: id, createdAt: now,
+        })), skipDuplicates: true });
+      }
+      return publicTask(updated);
+    });
+  }
+
+  async finish(actor: AuthenticatedUser, taskId: string) {
+    if (actor.role !== UserRole.MANAGER) {
+      throw forbidden('Only the manager can finish a completed task');
+    }
+    return this.deleteTask(actor, taskId, 'finish');
+  }
+
+  private async deleteTask(actor: AuthenticatedUser, taskId: string, mode: 'cancel' | 'finish') {
     return this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: { id: taskId, archivedAt: null },
@@ -726,7 +803,11 @@ export class TasksWorkflowService {
       if (task.type === TaskType.PERSONAL) {
         throw forbidden('Personal tasks can only be removed by their owner');
       }
-      if (
+      if (mode === 'finish') {
+        if (task.type !== TaskType.OFFICIAL || task.status !== TaskStatus.DONE || !task.approvedAt || !task.approvedById) {
+          throw conflict('Only an approved, completed assignment can be finished');
+        }
+      } else if (
         task.status !== TaskStatus.DRAFT &&
         task.status !== TaskStatus.TODO &&
         task.status !== TaskStatus.IN_PROGRESS &&
@@ -814,7 +895,7 @@ export class TasksWorkflowService {
       await tx.auditLog.create({
         data: {
           actorId: actor.id,
-          action: 'TASK_DELETED',
+          action: mode === 'finish' ? 'TASK_FINISHED' : 'TASK_DELETED',
           entity: 'TASK',
           entityId: task.id,
           before: {
@@ -844,8 +925,10 @@ export class TasksWorkflowService {
             recipientId: id,
             taskId: null,
             type: NotificationType.TASK_UPDATED,
-            title: 'Công việc đã được thu hồi',
-            body: `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
+            title: mode === 'finish' ? 'Công việc đã kết thúc' : 'Công việc đã được thu hồi',
+            body: mode === 'finish'
+              ? `[${task.code}] ${task.title} đã được Trưởng phòng kết thúc sau khi duyệt hoàn thành.`
+              : `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
             businessEventId,
             createdAt: now,
           })),

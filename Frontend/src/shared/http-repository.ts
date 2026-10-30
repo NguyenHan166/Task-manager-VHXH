@@ -559,6 +559,16 @@ export class HttpRepository {
     this.changed(undefined);
   }
 
+  async recallTask(taskId: Id, _actorId: Id): Promise<Task> {
+    const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/recall`, { method: "POST" });
+    return this.changed(asTask(result));
+  }
+
+  async finishTask(taskId: Id, _actorId: Id): Promise<void> {
+    await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/finish`, { method: "POST" });
+    this.changed(undefined);
+  }
+
   async reopenTask(taskId: Id, reason: string, _actorId: Id): Promise<Task> {
     const result = await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/reopen`, { method: "POST", body: JSON.stringify({ reason }) });
     return this.changed(asTask(result));
