@@ -792,8 +792,12 @@ export class TasksWorkflowService {
   }
 
   async finish(actor: AuthenticatedUser, taskId: string) {
+    return this.archiveCompleted(actor, taskId);
+  }
+
+  async archiveCompleted(actor: AuthenticatedUser, taskId: string) {
     if (actor.role !== UserRole.MANAGER) {
-      throw forbidden('Only the manager can finish a completed task');
+      throw forbidden('Only the manager can archive a completed task');
     }
     return this.archiveTask(actor, taskId, 'finish');
   }
@@ -809,7 +813,7 @@ export class TasksWorkflowService {
       }
       if (mode === 'finish') {
         if (task.type !== TaskType.OFFICIAL || task.status !== TaskStatus.DONE || !task.approvedAt || !task.approvedById) {
-          throw conflict('Only an approved, completed assignment can be finished');
+          throw conflict('Only an approved, completed assignment can be archived');
         }
       } else if (
         task.status !== TaskStatus.DRAFT &&
@@ -821,18 +825,21 @@ export class TasksWorkflowService {
       }
       const now = new Date();
 
-      const fileLinks = await tx.fileLink.findMany({
-        where: {
-          removedAt: null,
-          OR: [
-            { taskId },
-            { submission: { is: { taskId } } },
-            { comment: { is: { taskId } } },
-          ],
-        },
-        select: { fileId: true },
-      });
-      const fileIds = [...new Set(fileLinks.map(({ fileId }) => fileId))];
+      const fileIds: string[] = [];
+      if (mode === 'cancel') {
+        const fileLinks = await tx.fileLink.findMany({
+            where: {
+              removedAt: null,
+              OR: [
+                { taskId },
+                { submission: { is: { taskId } } },
+                { comment: { is: { taskId } } },
+              ],
+            },
+            select: { fileId: true },
+          });
+        fileIds.push(...new Set(fileLinks.map(({ fileId }) => fileId)));
+      }
       const collaborators = await tx.taskParticipant.findMany({
         where: {
           taskId,
@@ -859,17 +866,19 @@ export class TasksWorkflowService {
         throw conflict('Task changed while the command was running');
       }
 
-      await tx.fileLink.updateMany({
-        where: {
-          removedAt: null,
-          OR: [
-            { taskId },
-            { submission: { is: { taskId } } },
-            { comment: { is: { taskId } } },
-          ],
-        },
-        data: { removedAt: now },
-      });
+      if (mode === 'cancel') {
+        await tx.fileLink.updateMany({
+          where: {
+            removedAt: null,
+            OR: [
+              { taskId },
+              { submission: { is: { taskId } } },
+              { comment: { is: { taskId } } },
+            ],
+          },
+          data: { removedAt: now },
+        });
+      }
 
       if (fileIds.length) {
         await tx.fileObject.updateMany({
@@ -896,7 +905,7 @@ export class TasksWorkflowService {
         task,
         mode === 'finish' ? 'FINISHED' : 'DELETED',
         mode === 'finish'
-          ? 'Đã kết thúc và lưu trữ công việc sau khi duyệt hoàn thành.'
+          ? 'Đã lưu trữ công việc sau khi duyệt hoàn thành.'
           : 'Đã thu hồi và lưu trữ công việc theo xác nhận của lãnh đạo.',
         { status: task.status, archivedAt: null },
         { status: task.status, archivedAt: now.toISOString() },
@@ -934,9 +943,9 @@ export class TasksWorkflowService {
             recipientId: id,
             taskId: null,
             type: NotificationType.TASK_UPDATED,
-            title: mode === 'finish' ? 'Công việc đã kết thúc' : 'Công việc đã được thu hồi',
+            title: mode === 'finish' ? 'Công việc đã được lưu trữ' : 'Công việc đã được thu hồi',
             body: mode === 'finish'
-              ? `[${task.code}] ${task.title} đã được Trưởng phòng kết thúc và lưu trữ sau khi duyệt hoàn thành.`
+              ? `[${task.code}] ${task.title} đã được Trưởng phòng lưu trữ sau khi duyệt hoàn thành.`
               : `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
             businessEventId: event.id,
             createdAt: now,

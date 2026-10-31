@@ -65,6 +65,13 @@ export class TaskPageQueryDto {
 
 export class TaskListQueryDto extends TaskPageQueryDto {
   @ValidateIf(optional)
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  archived?: boolean;
+
+  @ValidateIf(optional)
   @IsEnum(TaskScope)
   scope?: TaskScope;
 

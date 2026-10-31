@@ -39,6 +39,7 @@ import {
   Repeat,
   FileText,
   Wrench,
+  Archive,
 } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -209,6 +210,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Chờ duyệt", path: "/approvals", icon: FileCheck },
     { label: "Dự án", path: "/projects", icon: FolderKanban },
     { label: "Nhiệm vụ định kỳ", path: "/recurrence", icon: Repeat },
+    { label: "Lưu trữ", path: "/tasks/archived", icon: Archive },
     { label: "Lịch", path: "/calendar", icon: Calendar },
     { label: "Tài liệu", path: "/files", icon: FileText },
     { label: "Tin nhắn", path: "/chat", icon: MessageSquare },

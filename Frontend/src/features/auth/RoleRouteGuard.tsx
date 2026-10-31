@@ -53,7 +53,7 @@ export function RoleRouteGuard({
     if (!isManager) {
       return (
         <ForbiddenPage
-          message={`Tính năng "${featureName || "này"}" chỉ dành cho Trưởng phòng (MANAGER).`}
+          message={`Tính năng "${featureName || "này"}" chỉ dành cho Trưởng phòng.`}
           resourceName={featureName}
         />
       );

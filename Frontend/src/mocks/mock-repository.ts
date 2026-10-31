@@ -550,6 +550,19 @@ export class MockRepository {
         return this.getDb().tasks.filter((task) => !task.archivedAt);
     }
 
+    public async getArchivedTasks(): Promise<Task[]> {
+        await this.delay();
+        this.checkFailure();
+        return this.getDb().tasks.filter(
+            (task) =>
+                task.archivedAt &&
+                task.type === "OFFICIAL" &&
+                task.status === "DONE" &&
+                task.approvedAt &&
+                task.approvedById,
+        );
+    }
+
     public async getTaskById(id: Id): Promise<Task | null> {
         await this.delay();
         this.checkFailure();
@@ -1005,7 +1018,7 @@ export class MockRepository {
         await this.delay();
         this.checkFailure();
         const db = this.getDb();
-        const taskIdx = db.tasks.findIndex((t) => t.id === taskId);
+        const taskIdx = db.tasks.findIndex((t) => t.id === taskId && !t.archivedAt);
         if (taskIdx === -1)
             throw new DomainError("NOT_FOUND", "Không tìm thấy công việc");
 
@@ -1014,7 +1027,7 @@ export class MockRepository {
         if (mode === "finish" && actor?.role !== "MANAGER") {
             throw new DomainError(
                 "FORBIDDEN",
-                "Chỉ Trưởng phòng mới có quyền kết thúc công việc",
+                "Chỉ Trưởng phòng mới có quyền lưu trữ công việc",
             );
         }
         if (
@@ -1042,7 +1055,7 @@ export class MockRepository {
         ) {
             throw new DomainError(
                 "CONFLICT",
-                "Chỉ công việc đã được duyệt hoàn thành mới có thể kết thúc",
+                "Chỉ công việc đã được duyệt hoàn thành mới có thể lưu trữ",
             );
         }
         if (
@@ -1104,30 +1117,32 @@ export class MockRepository {
             kind: mode === "finish" ? "FINISHED" : "DELETED",
             note:
                 mode === "finish"
-                    ? "Đã kết thúc và lưu trữ công việc sau khi duyệt hoàn thành."
+                    ? "Đã lưu trữ công việc sau khi duyệt hoàn thành."
                     : "Đã thu hồi và lưu trữ công việc theo xác nhận của lãnh đạo.",
             before: { status: task.status, archivedAt: null },
             after: { status: task.status, archivedAt: nowIso },
             createdAt: nowIso,
         });
-        db.fileLinks = db.fileLinks.filter(
-            (link) =>
-                !(
-                    (link.entityType === "TASK" && link.entityId === taskId) ||
-                    (link.entityType === "SUBMISSION" &&
-                        submissionIds.has(link.entityId)) ||
-                    (link.entityType === "COMMENT" &&
-                        commentIds.has(link.entityId))
-                ),
-        );
-        const stillLinkedFileIds = new Set(
-            db.fileLinks.map((link) => link.fileId),
-        );
-        db.files = db.files.map((file) =>
-            fileIds.has(file.id) && !stillLinkedFileIds.has(file.id)
-                ? { ...file, status: "REMOVED" }
-                : file,
-        );
+        if (mode === "cancel") {
+            db.fileLinks = db.fileLinks.filter(
+                (link) =>
+                    !(
+                        (link.entityType === "TASK" && link.entityId === taskId) ||
+                        (link.entityType === "SUBMISSION" &&
+                            submissionIds.has(link.entityId)) ||
+                        (link.entityType === "COMMENT" &&
+                            commentIds.has(link.entityId))
+                    ),
+            );
+            const stillLinkedFileIds = new Set(
+                db.fileLinks.map((link) => link.fileId),
+            );
+            db.files = db.files.map((file) =>
+                fileIds.has(file.id) && !stillLinkedFileIds.has(file.id)
+                    ? { ...file, status: "REMOVED" }
+                    : file,
+            );
+        }
 
         if (task.status !== "DRAFT") {
             for (const recipientId of recipientIds) {
@@ -1137,11 +1152,11 @@ export class MockRepository {
                     type: "TASK_UPDATED",
                     title:
                         mode === "finish"
-                            ? "Công việc đã kết thúc"
+                            ? "Công việc đã được lưu trữ"
                             : "Công việc đã được thu hồi",
                     body:
                         mode === "finish"
-                            ? `[${task.code}] ${task.title} đã được Trưởng phòng kết thúc và lưu trữ sau khi duyệt hoàn thành.`
+                            ? `[${task.code}] ${task.title} đã được Trưởng phòng lưu trữ sau khi duyệt hoàn thành.`
                             : `[${task.code}] ${task.title} đã được thu hồi theo xác nhận của lãnh đạo.`,
                     entityType: "TASK",
                     entityId: "",
@@ -1156,6 +1171,10 @@ export class MockRepository {
     }
 
     public async finishTask(taskId: Id, actorId: Id): Promise<void> {
+        return this.cancelTask(taskId, actorId, "finish");
+    }
+
+    public async archiveTask(taskId: Id, actorId: Id): Promise<void> {
         return this.cancelTask(taskId, actorId, "finish");
     }
 

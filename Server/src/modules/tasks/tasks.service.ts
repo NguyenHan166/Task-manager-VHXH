@@ -61,6 +61,7 @@ const toPublicTask = (task: Task) => ({
   assignedAt: task.assignedAt,
   dueAt: task.dueAt,
   completedAt: task.completedAt,
+  archivedAt: task.archivedAt,
   approvedById: task.approvedById,
   approvedAt: task.approvedAt,
   completionDueAtSnapshot: task.completionDueAtSnapshot,
@@ -95,6 +96,9 @@ export class TasksService {
     actor: AuthenticatedUser,
     query: TaskListQueryDto,
   ): Promise<Page<PublicTask>> {
+    if (query.archived && actor.role !== UserRole.MANAGER) {
+      throw forbidden('Only the manager can view archived completed tasks');
+    }
     if (
       query.dueFrom &&
       query.dueTo &&
@@ -104,7 +108,15 @@ export class TasksService {
     }
     const where: Prisma.TaskWhereInput = {
       AND: [
-        this.access.readableTaskWhere(actor),
+        query.archived
+          ? {
+              archivedAt: { not: null },
+              type: TaskType.OFFICIAL,
+              status: TaskStatus.DONE,
+              approvedAt: { not: null },
+              approvedById: { not: null },
+            }
+          : this.access.readableTaskWhere(actor),
         this.listFilters(actor, query),
       ],
     };

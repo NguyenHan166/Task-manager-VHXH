@@ -290,6 +290,7 @@ export interface TaskQuery {
   dueFrom?: IsoDateTime;
   dueTo?: IsoDateTime;
   isOverdue?: boolean;
+  archived?: boolean;
   page: number;
   pageSize: number;
   sortBy?: "DUE_AT" | "UPDATED_AT" | "PRIORITY" | "CREATED_AT";

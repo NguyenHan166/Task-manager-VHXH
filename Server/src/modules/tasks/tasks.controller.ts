@@ -348,6 +348,16 @@ export class TasksController {
 
   @Roles(UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
+  @Post(':id/archive')
+  archiveCompleted(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) taskId: string,
+  ) {
+    return this.workflow.archiveCompleted(actor, taskId);
+  }
+
+  @Roles(UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post(':id/finish')
   finish(
     @CurrentUser() actor: AuthenticatedUser,

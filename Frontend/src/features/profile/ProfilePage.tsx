@@ -109,7 +109,7 @@ export function ProfilePage() {
                       : "bg-blue-100 text-blue-800 border border-blue-200"
                   }`}
                 >
-                  {isManager ? "Trưởng phòng (MANAGER)" : isDeputy ? "Phó phòng (DEPUTY_MANAGER)" : "Chuyên viên (STAFF)"}
+                  {isManager ? "Trưởng phòng" : isDeputy ? "Phó phòng" : "Chuyên viên"}
                 </span>
               </div>
             </div>

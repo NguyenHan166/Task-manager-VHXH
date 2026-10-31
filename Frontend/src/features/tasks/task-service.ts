@@ -37,15 +37,23 @@ export class TaskService {
    */
   public async queryTasks(query: TaskQuery, viewer: User): Promise<Page<Task>> {
     if (!isMockMode) return httpRepository.queryTasks(query);
+    if (query.archived && viewer.role !== "MANAGER") {
+      throw new DomainError("FORBIDDEN", "Chỉ Trưởng phòng được xem công việc đã lưu trữ");
+    }
     const [allTasks, participants] = await Promise.all([
-      this.repo.getTasks(),
-      this.repo.getParticipants(),
+      query.archived ? this.repo.getArchivedTasks() : this.repo.getTasks(),
+      query.archived ? Promise.resolve([]) : this.repo.getParticipants(),
     ]);
 
     // 1. Permission filter: Only tasks visible to current viewer
-    let visibleTasks = allTasks.filter((task) =>
-      canSeeTask(task, viewer, participants)
-    );
+    let visibleTasks = query.archived
+      ? allTasks.filter(
+          (task) =>
+            task.type === "OFFICIAL" &&
+            task.status === "DONE" &&
+            Boolean(task.archivedAt && task.approvedAt && task.approvedById),
+        )
+      : allTasks.filter((task) => canSeeTask(task, viewer, participants));
 
     // 2. Scope filter
     if (query.scope && query.scope !== "ALL") {

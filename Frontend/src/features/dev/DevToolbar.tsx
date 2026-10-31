@@ -94,7 +94,7 @@ export function DevToolbar() {
             {isDeputy && <ShieldCheck className="w-3 h-3 text-indigo-400" />}
             {isStaff && <UserCheck className="w-3 h-3 text-blue-400" />}
             {isManager
-              ? "Trưởng phòng (Admin + Điều hành)"
+              ? "Trưởng phòng (Quản trị và điều hành)"
               : isDeputy
               ? "Phó phòng (Điều hành - Không quản trị)"
               : "Chuyên viên (Staff)"}

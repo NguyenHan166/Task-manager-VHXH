@@ -74,6 +74,7 @@ import {
   X,
   Download,
   Undo2,
+  Archive,
 } from "lucide-react";
 
 export function TaskDetailPage() {
@@ -642,12 +643,12 @@ export function TaskDetailPage() {
     if (!task || !currentUser) return;
     setIsSubmittingAction(true);
     try {
-      await workspaceRepository.finishTask(task.id, currentUser.id);
+      await workspaceRepository.archiveTask(task.id, currentUser.id);
       setShowFinishModal(false);
-      showToast("Đã kết thúc và lưu trữ công việc.", "success");
-      navigate("/tasks", { replace: true });
+      showToast("Đã lưu trữ công việc.", "success");
+      navigate("/tasks/archived", { replace: true });
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Không thể kết thúc công việc", "error");
+      showToast(err instanceof Error ? err.message : "Không thể lưu trữ công việc", "error");
     } finally {
       setIsSubmittingAction(false);
     }
@@ -1267,9 +1268,9 @@ export function TaskDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowFinishModal(true)}
-                  className="gap-1.5 text-danger border-red-200 hover:bg-red-50"
+                  className="gap-1.5 text-brand-700 border-brand-200 hover:bg-brand-50"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Kết thúc công việc
+                  <Archive className="w-3.5 h-3.5" /> Lưu trữ công việc
                 </Button>
               )}
 
@@ -2614,10 +2615,10 @@ export function TaskDetailPage() {
 
         <ConfirmDialog
           isOpen={showFinishModal}
-          title="Kết thúc và ẩn công việc này?"
-          description="Công việc đã được duyệt hoàn thành. Xác nhận sẽ ẩn công việc khỏi danh sách hiện hành, giữ lại lịch sử xử lý và gỡ các liên kết tệp. Người nhận sẽ được thông báo."
-          confirmLabel="Xác nhận kết thúc"
-          variant="danger"
+          title="Lưu trữ công việc này?"
+          description="Công việc đã được duyệt hoàn thành sẽ được chuyển vào mục Lưu trữ và ẩn khỏi danh sách Tất cả công việc. Lịch sử xử lý và các tệp đính kèm vẫn được giữ nguyên. Người nhận sẽ được thông báo."
+          confirmLabel="Lưu trữ công việc"
+          variant="primary"
           isLoading={isSubmittingAction}
           onConfirm={handleFinishTask}
           onCancel={() => setShowFinishModal(false)}

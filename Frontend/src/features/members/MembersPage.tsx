@@ -351,7 +351,7 @@ export function MembersPage() {
 
     // Safety rule: Cannot demote the last active manager
     if (editingUser.role === "MANAGER" && editRole !== "MANAGER" && activeManagersCount <= 1) {
-      setEditError("Không thể thay đổi vai trò vì đây là Trưởng phòng (Admin) hoạt động duy nhất của hệ thống");
+      setEditError("Không thể thay đổi vai trò vì đây là Trưởng phòng đang hoạt động duy nhất của hệ thống");
       return;
     }
 
@@ -462,13 +462,13 @@ export function MembersPage() {
       case "MANAGER":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-            <Shield className="w-3 h-3 text-emerald-600" /> Trưởng phòng (Admin)
+            <Shield className="w-3 h-3 text-emerald-600" /> Trưởng phòng
           </span>
         );
       case "DEPUTY_MANAGER":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
-            <Shield className="w-3 h-3 text-indigo-600" /> Phó phòng (Điều hành)
+            <Shield className="w-3 h-3 text-indigo-600" /> Phó phòng
           </span>
         );
       default:
@@ -585,9 +585,9 @@ export function MembersPage() {
                 className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
               >
                 <option value="ALL">Tất cả vai trò</option>
-                <option value="MANAGER">Trưởng phòng (MANAGER - Admin)</option>
-                <option value="DEPUTY_MANAGER">Phó phòng (DEPUTY_MANAGER - Điều hành)</option>
-                <option value="STAFF">Chuyên viên (STAFF - Thực hiện)</option>
+                <option value="MANAGER">Trưởng phòng - Quản trị hệ thống</option>
+                <option value="DEPUTY_MANAGER">Phó phòng - Điều hành</option>
+                <option value="STAFF">Chuyên viên - Thực hiện</option>
               </select>
             </div>
 
@@ -1050,7 +1050,7 @@ export function MembersPage() {
                         className="mt-0.5"
                       />
                       <div>
-                        <div className="font-semibold text-text-primary">Chuyên viên (STAFF)</div>
+                        <div className="font-semibold text-text-primary">Chuyên viên</div>
                         <div className="text-[11px] text-text-secondary">
                           Thực hiện nhiệm vụ được giao, nộp báo cáo kết quả, tạo việc nhóm và việc cá nhân.
                         </div>
@@ -1067,7 +1067,7 @@ export function MembersPage() {
                         className="mt-0.5"
                       />
                       <div>
-                        <div className="font-semibold text-indigo-900">Phó phòng (DEPUTY_MANAGER)</div>
+                        <div className="font-semibold text-indigo-900">Phó phòng</div>
                         <div className="text-[11px] text-text-secondary">
                           Toàn quyền điều hành chuyên môn: giao việc chính thức, phê duyệt kết quả, xem báo cáo toàn phòng. <strong>Không có quyền quản trị hệ thống</strong>.
                         </div>
@@ -1084,7 +1084,7 @@ export function MembersPage() {
                         className="mt-0.5"
                       />
                       <div>
-                        <div className="font-semibold text-emerald-900">Trưởng phòng (MANAGER)</div>
+                        <div className="font-semibold text-emerald-900">Trưởng phòng</div>
                         <div className="text-[11px] text-text-secondary">
                           Toàn quyền điều hành chuyên môn và <strong>Quản trị hệ thống</strong> (quản lý thành viên, cài đặt, nhật ký kiểm toán, sao lưu dữ liệu).
                         </div>
@@ -1324,9 +1324,9 @@ export function MembersPage() {
                     onChange={(e) => setEditRole(e.target.value as UserRole)}
                     className="w-full h-9 px-2.5 rounded-btn bg-surface border border-border text-xs focus:ring-2 focus:ring-brand-700 outline-none"
                   >
-                    <option value="STAFF">Chuyên viên (STAFF) - Thực hiện & Báo cáo</option>
-                    <option value="DEPUTY_MANAGER">Phó phòng (DEPUTY_MANAGER) - Điều hành & Phê duyệt</option>
-                    <option value="MANAGER">Trưởng phòng (MANAGER) - Toàn quyền Điều hành & Quản trị</option>
+                    <option value="STAFF">Chuyên viên - Thực hiện & báo cáo</option>
+                    <option value="DEPUTY_MANAGER">Phó phòng - Điều hành & phê duyệt</option>
+                    <option value="MANAGER">Trưởng phòng - Điều hành & quản trị</option>
                   </select>
 
                   <p className="text-[11px] text-text-muted">

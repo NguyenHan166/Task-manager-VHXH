@@ -9,6 +9,7 @@ import { App } from "./App";
 import { TasksPage } from "../features/tasks/TasksPage";
 import { TaskCreatePage } from "../features/tasks/TaskCreatePage";
 import { TaskDetailPage } from "../features/tasks/TaskDetailPage";
+import { ArchivedTasksPage } from "../features/tasks/ArchivedTasksPage";
 import { ApprovalsPage } from "../features/tasks/ApprovalsPage";
 import { PersonalTasksPage } from "../features/tasks/PersonalTasksPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
@@ -59,6 +60,14 @@ ReactDOM.createRoot(rootElement).render(
             {/* Tasks Routes */}
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/tasks/create" element={<CreateTaskRoute />} />
+            <Route
+              path="/tasks/archived"
+              element={
+                <RoleRouteGuard managerOnly featureName="Lưu trữ công việc">
+                  <ArchivedTasksPage />
+                </RoleRouteGuard>
+              }
+            />
             <Route path="/tasks/:id" element={<TaskDetailPage />} />
             <Route path="/personal-tasks" element={<PersonalTasksPage />} />
 

@@ -20,10 +20,10 @@ export function ForbiddenPage({
 
   const roleText =
     currentUser?.role === "MANAGER"
-      ? "Trưởng phòng (MANAGER - Kiêm Quản trị)"
+      ? "Trưởng phòng - Kiêm quản trị"
       : currentUser?.role === "DEPUTY_MANAGER"
-      ? "Phó phòng (DEPUTY_MANAGER - Điều hành, không quản trị)"
-      : "Chuyên viên (STAFF)";
+      ? "Phó phòng - Điều hành, không quản trị"
+      : "Chuyên viên";
 
   const roleColor =
     currentUser?.role === "MANAGER"

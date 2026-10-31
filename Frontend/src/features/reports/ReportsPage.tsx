@@ -875,13 +875,13 @@ export function ReportsPage() {
 
                 {/* KPI Cards Row */}
                 {isLoading ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                             <SkeletonCard key={i} />
                         ))}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2.5 sm:gap-3">
                         <StatCard
                             label="Tổng công việc"
                             value={stats.total}

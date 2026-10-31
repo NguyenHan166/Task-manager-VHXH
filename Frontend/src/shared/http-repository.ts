@@ -170,6 +170,7 @@ export class HttpRepository {
       dueFrom: query.dueFrom,
       dueTo: query.dueTo,
       isOverdue: query.isOverdue,
+      archived: query.archived,
       sortBy: query.sortBy,
       sortDirection: query.sortDirection,
       page: query.page ?? 1,
@@ -566,6 +567,11 @@ export class HttpRepository {
 
   async finishTask(taskId: Id, _actorId: Id): Promise<void> {
     await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/finish`, { method: "POST" });
+    this.changed(undefined);
+  }
+
+  async archiveTask(taskId: Id, _actorId: Id): Promise<void> {
+    await apiClient.request<JsonRecord>(`/tasks/${encodeURIComponent(taskId)}/archive`, { method: "POST" });
     this.changed(undefined);
   }
 

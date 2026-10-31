@@ -163,7 +163,7 @@ export function LoginPage() {
                           <div className="font-bold text-base text-text-primary flex items-center gap-2">
                             {managerUser.displayName}
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              Trưởng phòng (MANAGER)
+                              Trưởng phòng
                             </span>
                             {isLocked && (
                               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
@@ -230,7 +230,7 @@ export function LoginPage() {
                             <div className="font-bold text-base text-text-primary flex items-center gap-2">
                               {deputy.displayName}
                               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                Phó phòng (DEPUTY_MANAGER)
+                                Phó phòng
                               </span>
                               {isLocked && (
                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
@@ -306,7 +306,7 @@ export function LoginPage() {
                             <span className="font-mono text-brand-700">{staff.username}</span> • {staff.jobTitle}
                           </div>
                           <div className="text-[11px] text-blue-700 font-medium">
-                            Chuyên viên (STAFF)
+                            Chuyên viên
                           </div>
                         </div>
                       </div>
