@@ -38,6 +38,7 @@ import {
   Check,
   Repeat,
   FileText,
+  Wrench,
 } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -212,6 +213,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Tài liệu", path: "/files", icon: FileText },
     { label: "Tin nhắn", path: "/chat", icon: MessageSquare },
     { label: "Báo cáo", path: "/reports", icon: BarChart3 },
+    { label: "Tiện ích", path: "/utilities", icon: Wrench },
     { label: "Thành viên", path: "/members", icon: Users },
     { label: "Cài đặt / Nhật ký", path: "/settings", icon: Settings },
   ];
@@ -228,6 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Tài liệu", path: "/files", icon: FileText },
     { label: "Tin nhắn", path: "/chat", icon: MessageSquare },
     { label: "Báo cáo", path: "/reports", icon: BarChart3 },
+    { label: "Tiện ích", path: "/utilities", icon: Wrench },
   ];
 
   // STAFF: Tổng quan của tôi, Công việc của tôi, Việc cá nhân, Dự án, Lịch của tôi, Tài liệu, Tin nhắn, Báo cáo của tôi, Thông báo, Hồ sơ
@@ -241,6 +244,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Tài liệu", path: "/files", icon: FileText },
     { label: "Tin nhắn", path: "/chat", icon: MessageSquare },
     { label: "Báo cáo của tôi", path: "/reports", icon: BarChart3 },
+    { label: "Tiện ích", path: "/utilities", icon: Wrench },
     { label: "Thông báo", path: "/notifications", icon: Bell },
     { label: "Hồ sơ", path: "/profile", icon: UserIcon },
   ];
@@ -293,6 +297,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             const Icon = item.icon;
             const isActive =
               location.pathname === item.path ||
+              (item.path === "/utilities" && location.pathname.startsWith("/utilities/")) ||
               (item.path === "/dashboard" && location.pathname === "/");
 
             return (

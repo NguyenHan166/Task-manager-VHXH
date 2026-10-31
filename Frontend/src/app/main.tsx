@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { SessionProvider } from "../features/auth/SessionContext";
@@ -25,6 +25,16 @@ import { SettingsPage } from "../features/settings/SettingsPage";
 import { UiKitPage } from "./UiKitPage";
 import { useSession } from "../features/auth/SessionContext";
 import "../styles/tokens.css";
+
+const UtilitiesPage = lazy(() => import("../features/utilities/UtilitiesPage").then((module) => ({ default: module.UtilitiesPage })));
+const PdfMiniApp = lazy(() => import("../features/utilities/PdfMiniApp").then((module) => ({ default: module.PdfMiniApp })));
+const DataQuickToolsApp = lazy(() => import("../features/utilities/DataQuickToolsApp").then((module) => ({ default: module.DataQuickToolsApp })));
+const QrCodeApp = lazy(() => import("../features/utilities/QrCodeApp").then((module) => ({ default: module.QrCodeApp })));
+const BankQrApp = lazy(() => import("../features/utilities/BankQrApp").then((module) => ({ default: module.BankQrApp })));
+
+function UtilityLoading() {
+  return <div className="flex min-h-64 items-center justify-center text-sm text-text-secondary">Đang mở tiện ích…</div>;
+}
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -106,6 +116,13 @@ ReactDOM.createRoot(rootElement).render(
 
             {/* User Profile */}
             <Route path="/profile" element={<ProfilePage />} />
+
+            {/* Frontend utility mini apps */}
+            <Route path="/utilities" element={<Suspense fallback={<UtilityLoading />}><UtilitiesPage /></Suspense>} />
+            <Route path="/utilities/pdf" element={<Suspense fallback={<UtilityLoading />}><PdfMiniApp /></Suspense>} />
+            <Route path="/utilities/data" element={<Suspense fallback={<UtilityLoading />}><DataQuickToolsApp /></Suspense>} />
+            <Route path="/utilities/qr" element={<Suspense fallback={<UtilityLoading />}><QrCodeApp /></Suspense>} />
+            <Route path="/utilities/bank-qr" element={<Suspense fallback={<UtilityLoading />}><BankQrApp /></Suspense>} />
 
             {/* Design System UI Kit */}
             <Route path="/ui-kit" element={<UiKitPage />} />
